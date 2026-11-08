@@ -1,0 +1,90 @@
+/* Illumination Intelligence color tokens.
+   Select a brand by setting data-brand on <html>.
+   Locked Artemis banners live in ./banners/ and are copied into each app. */
+
+:root {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-sans: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --space-page: clamp(1.25rem, 4vw, 4.5rem);
+  --banner-ratio: 2.35 / 1;
+}
+
+/* Lumen — steel blue / gunmetal */
+[data-brand="lumen"] {
+  color-scheme: dark;
+  --bg: #12171c;
+  --bg-raise: #1a222b;
+  --ink: #e7eef4;
+  --ink-dim: #9aabba;
+  --line: #31404d;
+  --accent: #6f93b4;
+  --accent-strong: #8eafcc;
+  --metal: #2a343c;
+  --banner-tint: rgba(111, 147, 180, 0.16);
+  --mark: #d5e3ef;
+}
+
+/* Umbra — maroon / black */
+[data-brand="umbra"] {
+  color-scheme: dark;
+  --bg: #0c0a0b;
+  --bg-raise: #161113;
+  --ink: #f3e8ea;
+  --ink-dim: #b59aa0;
+  --line: #3a242a;
+  --accent: #7a2e3a;
+  --accent-strong: #c46b78;
+  --metal: #100c0d;
+  --banner-tint: rgba(122, 46, 58, 0.32);
+  --mark: #f0d5d9;
+}
+
+/* Prism — prismatic spectrum on a dark studio ground */
+[data-brand="prism"] {
+  color-scheme: dark;
+  --bg: #0e1016;
+  --bg-raise: #161924;
+  --ink: #f4f6fb;
+  --ink-dim: #a7adc2;
+  --line: #2c3148;
+  --accent: #7c5cff;
+  --accent-strong: #c9b8ff;
+  --prism-violet: #7c5cff;
+  --prism-cyan: #3ddcff;
+  --prism-magenta: #ff4fa3;
+  --prism-amber: #ffc14d;
+  --metal: #1a1e2e;
+  --banner-tint: rgba(124, 92, 255, 0.18);
+  --mark: #f7f4ff;
+}
+
+/* Eclipse — red / gunmetal */
+[data-brand="eclipse"] {
+  color-scheme: dark;
+  --bg: #14171b;
+  --bg-raise: #1c2127;
+  --ink: #f6f1ef;
+  --ink-dim: #b4a8a4;
+  --line: #3a3332;
+  --accent: #d2453c;
+  --accent-strong: #ee6a62;
+  --metal: #2a3036;
+  --banner-tint: rgba(210, 69, 60, 0.18);
+  --mark: #f8e4e1;
+}
+
+/* Halo — cream / gold */
+[data-brand="halo"] {
+  color-scheme: light;
+  --bg: #f6f0e4;
+  --bg-raise: #fffaf2;
+  --ink: #2a241c;
+  --ink-dim: #6f6456;
+  --line: #e0d3bc;
+  --accent: #a68445;
+  --accent-strong: #8c6b2e;
+  --metal: #efe6d4;
+  --banner-tint: rgba(166, 132, 69, 0.14);
+  --mark: #3a3124;
+}

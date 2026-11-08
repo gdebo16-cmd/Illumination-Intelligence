@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.python-version.local
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (not used by this suite; ignored so a later tool cannot pollute the tree)
+node_modules/
+dist/
+.next/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets. Never commit env files. No example file is shipped on purpose.
+.env
+.env.*
+!.env.example
+
+# Generated work and weights. Local models and image outputs stay on disk.
+outputs/
+models/
+**/*.safetensors
+**/*.gguf
+**/*.ckpt
+
+# Stray art drops at the repo root stay out. The locked Artemis set is tracked
+# under packages/design-tokens/banners/ and apps/<brand>/static/banner.png.
+/banners/
+/art/

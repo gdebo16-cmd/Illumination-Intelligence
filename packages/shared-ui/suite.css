@@ -1,0 +1,163 @@
+/* Shared shell for Illumination Intelligence stubs.
+   Brand color comes from packages/design-tokens/tokens.css. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg, #111);
+  color: var(--ink, #eee);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+body {
+  background:
+    radial-gradient(1100px 480px at 8% -10%, var(--banner-tint, transparent), transparent 60%),
+    var(--bg, #111);
+}
+
+.frame {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: var(--space-page, 1.5rem);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line, #333);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--ink-dim, #999);
+}
+
+.suite,
+.port {
+  margin: 0;
+  padding: 0;
+}
+
+.port {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+}
+
+.hero h1 {
+  margin: 0.15rem 0 1rem;
+  font-family: var(--font-serif, Georgia, serif);
+  font-weight: 500;
+  font-size: clamp(4.25rem, 12vw, 7.5rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  color: var(--mark, var(--ink, #eee));
+}
+
+.hello {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.72rem;
+  color: var(--accent-strong, var(--accent, #aaa));
+}
+
+.intent {
+  max-width: 38rem;
+  margin: 0;
+  color: var(--ink-dim, #aaa);
+  font-size: 1.05rem;
+}
+
+.banner-slot {
+  margin: 0;
+  border: 1px solid var(--line, #333);
+  background: var(--bg-raise, #1a1a1a);
+  aspect-ratio: var(--banner-ratio, 2.35 / 1);
+  display: grid;
+}
+
+.banner-inner {
+  margin: 0.75rem;
+  border: 1px dashed var(--line, #444);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.3rem;
+
+  background: var(--banner-tint, transparent);
+}
+
+.banner-label {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  color: var(--mark, var(--ink, #eee));
+}
+
+.banner-note {
+  color: var(--ink-dim, #aaa);
+  font-size: 0.92rem;
+}
+
+/* Locked Artemis banner. The artwork is a wide strip, so the frame
+   follows the image instead of the empty-slot ratio. */
+.banner-slot.has-art {
+  aspect-ratio: auto;
+  display: block;
+  border: none;
+  background: transparent;
+}
+
+.banner-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.foot {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line, #333);
+  color: var(--ink-dim, #aaa);
+  font-size: 0.9rem;
+}
+
+.foot p {
+  margin: 0.35rem 0;
+}
+
+.foot code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.84em;
+  color: var(--ink, #eee);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .top {
+    letter-spacing: 0.12em;
+  }
+
+  .banner-inner {
+    margin: 0.5rem;
+    padding: 0.85rem 0.9rem;
+  }
+}

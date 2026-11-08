@@ -1,0 +1,37 @@
+/* Umbra — maroon wash across the empty banner slot. */
+html {
+  scrollbar-width: none;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+body {
+  max-height: 100dvh;
+}
+
+main {
+  height: calc(100dvh - 42dvh);
+}
+
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100dvw;
+  display: none;
+}
+
+.suite {
+  text-align: right;
+}
+
+.banner-art {
+  border-radius: 30% 30% 30% 30% / 0% 0% 50% 50%;
+  border: 1px solid rgb(87, 53, 53);
+  box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.555);
+
+}
+
+h1 {
+  display: none;
+}
