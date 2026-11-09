@@ -19,7 +19,7 @@ export interface SuiteApp {
 export const APPS: readonly SuiteApp[] = [
   { id: 'lumen', name: 'Lumen', tagline: 'Local chat', href: '/lumen', banner: '/brand/lumen.png', color: '#7aa2ff', status: 'live' },
   { id: 'prism', name: 'Prism', tagline: 'Image studio', href: '/prism', banner: '/brand/prism.png', color: '#b07cff', status: 'live' },
-  { id: 'umbra', name: 'Umbra', tagline: 'Coming soon', href: '/umbra', banner: '/brand/umbra.png', color: '#a3394b', status: 'soon' },
+  { id: 'umbra', name: 'Umbra', tagline: 'Agent bots', href: '/umbra', banner: '/brand/umbra.png', color: '#a3394b', status: 'live' },
   { id: 'astra', name: 'Astra', tagline: 'Coming soon', href: '/astra', color: '#5ad1c4', status: 'soon' },
   { id: 'eclipse', name: 'Eclipse', tagline: 'Coming soon', href: '/eclipse', banner: '/brand/eclipse.png', color: '#e0484f', status: 'soon' },
   { id: 'halo', name: 'Halo', tagline: 'Coming soon', href: '/halo', banner: '/brand/halo.png', color: '#e3b84f', status: 'soon' },

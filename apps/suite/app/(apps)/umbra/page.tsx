@@ -1,8 +1,5 @@
-import type { Metadata } from 'next';
-import ComingSoon from '@/components/ComingSoon';
-
-export const metadata: Metadata = { title: 'Umbra' };
+import BotGallery from './_components/BotGallery';
 
 export default function UmbraPage() {
-  return <ComingSoon appId="umbra" />;
+  return <BotGallery />;
 }

@@ -1,0 +1,35 @@
+// Umbra settings: the flame avatars and the models a bot can think with.
+// Safe to import from both the browser and the server.
+
+// The eight flame spirits, cut from assets/flames.mp4 by scripts/make-flame-sprites.py.
+export const FLAMES = [
+  { id: 'violet', name: 'Violet', color: '#a77bff' },
+  { id: 'cyan', name: 'Cyan', color: '#4fe3f0' },
+  { id: 'amber', name: 'Amber', color: '#ffb547' },
+  { id: 'jade', name: 'Jade', color: '#5fe0a8' },
+  { id: 'rose', name: 'Rose', color: '#ff6fd8' },
+  { id: 'ember', name: 'Ember', color: '#ff5a5a' },
+  { id: 'azure', name: 'Azure', color: '#5b7bff' },
+  { id: 'pearl', name: 'Pearl', color: '#e8e8f0' },
+] as const;
+
+export type FlameId = (typeof FLAMES)[number]['id'];
+
+export const flameImage = (id: string, animated = true) => `/umbra/flames/${id}.${animated ? 'webp' : 'png'}`;
+export const isFlame = (id: unknown): id is FlameId => FLAMES.some((f) => f.id === id);
+export const flameColor = (id: string) => FLAMES.find((f) => f.id === id)?.color ?? '#a77bff';
+
+// Local models a bot can use. All of them can use tools (needed from Stage 2 on).
+// The first one is the default for new bots.
+export const BOT_MODELS = [
+  { id: 'qwen3:14b', name: 'Qwen 3 14B: smart all-rounder' },
+  { id: 'qwen3.5:9b', name: 'Qwen 3.5 9B: faster, can see images' },
+  { id: 'gpt-oss:20b', name: 'GPT-OSS 20B: best at multi-step tasks' },
+  { id: 'qwen3:8b', name: 'Qwen 3 8B: quick and light' },
+  { id: 'llama3.1:8b', name: 'Llama 3.1 8B: quick and light' },
+] as const;
+
+export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);
+
+// Limits for the bot form.
+export const BOT_LIMITS = { name: 40, personality: 2000, purpose: 1000 };

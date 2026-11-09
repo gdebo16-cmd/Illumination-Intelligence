@@ -2,7 +2,17 @@
 
 Gabriel DeBoer's suite of local AI apps: Lumen, Prism, Umbra, Astra, Eclipse, and Halo. They all live in one Next.js app, `apps/suite`, with one route per product. A nine-dot launcher in the top-right of every app switches between them.
 
-Lumen is the working app: local chat through Ollama. The others are "coming soon" pages until they're built.
+Working apps:
+
+- **Lumen**: local chat through Ollama.
+- **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes. ComfyUI must be running (`run_nvidia_gpu.bat`).
+- **Umbra**: agent bots. Create bots with a flame avatar, a personality, a purpose and a local model, then chat with them. (Stage 1 of 4: tools, background tasks and teams come next.)
+
+Astra, Eclipse and Halo are "coming soon" pages until they're built.
+
+Lumen, Prism and Umbra share one graphics card; `lib/queue.ts` unloads one engine's model before the other runs.
+
+To remake generated art: `node scripts/make-icons.mjs` (home-screen icons) and `scripts/make-flame-sprites.py` (Umbra's flames; run it with ComfyUI's Python, see the file).
 
 ## Run
 

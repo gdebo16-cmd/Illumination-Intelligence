@@ -67,4 +67,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_prism_user ON PrismImage (user_id, createdAt);
 `);
 
+// Umbra: the bots each profile creates, and one ongoing chat per bot.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS UmbraBot (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    flame TEXT NOT NULL,
+    personality TEXT NOT NULL DEFAULT '',
+    purpose TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_bot_user ON UmbraBot (user_id, updatedAt);
+
+  CREATE TABLE IF NOT EXISTS UmbraMessage (
+    id TEXT PRIMARY KEY,
+    bot_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bot_id) REFERENCES UmbraBot(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_message_bot ON UmbraMessage (bot_id, createdAt);
+`);
+
 export default db;
