@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import HomeIconLink from "@/components/HomeIconLink";
 import ViewportSync from "@/components/ViewportSync";
+import ThemeSync from "@/components/ThemeSync";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,9 +29,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="lumen" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
         <ViewportSync />
+        <ThemeSync />
         <HomeIconLink />
         {children}
       </body>

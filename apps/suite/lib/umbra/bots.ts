@@ -109,6 +109,8 @@ export function deleteBot(userId: string, id: string): boolean {
   if (!getBot(userId, id)) return false;
   db.prepare('DELETE FROM UmbraMessage WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraNote WHERE bot_id = ?').run(id);
+  db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
+  db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraBot WHERE id = ?').run(id);
   return true;
 }

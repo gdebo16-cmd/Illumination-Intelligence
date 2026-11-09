@@ -11,6 +11,7 @@ import type { Bot } from './types';
 export default function BotGallery() {
   const [bots, setBots] = useState<Bot[] | null>(null);
   const [error, setError] = useState('');
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     fetch('/api/umbra/bots')
@@ -19,14 +20,23 @@ export default function BotGallery() {
         setBots(await res.json());
       })
       .catch((err: Error) => setError(err.message));
+    fetch('/api/umbra/inbox?count=1')
+      .then((res) => (res.ok ? res.json() : { unread: 0 }))
+      .then((data) => setUnread(data.unread ?? 0))
+      .catch(() => {});
   }, []);
 
   return (
     <main className="umbra">
       <div className="umbra-page">
-        <div className="umbra-intro">
-          <h1>Your bots</h1>
-          <p>Each flame is a bot with its own personality and purpose. Tap one to chat.</p>
+        <div className="umbra-intro umbra-intro-row">
+          <div>
+            <h1>Your bots</h1>
+            <p>Each flame is a bot with its own personality and purpose. Tap one to chat.</p>
+          </div>
+          <Link href="/umbra/inbox" className="umbra-inbox-link">
+            Inbox{unread > 0 && <span className="umbra-badge">{unread}</span>}
+          </Link>
         </div>
 
         {error && <p className="umbra-error" role="alert">{error}</p>}

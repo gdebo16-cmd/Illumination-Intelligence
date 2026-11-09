@@ -103,6 +103,40 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_umbra_note_bot ON UmbraNote (bot_id, createdAt);
 `);
 
+// Umbra stage 3: tasks a bot runs on its own, and the reports they leave in the inbox.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS UmbraTask (
+    id TEXT PRIMARY KEY,
+    bot_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    instructions TEXT NOT NULL,
+    schedule TEXT NOT NULL,          -- JSON, see config/umbra-schedule.ts
+    enabled INTEGER NOT NULL DEFAULT 1,
+    nextRunAt TEXT,                  -- ISO time; NULL = not scheduled
+    lastRunAt TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bot_id) REFERENCES UmbraBot(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_task_due ON UmbraTask (enabled, nextRunAt);
+  CREATE INDEX IF NOT EXISTS idx_umbra_task_bot ON UmbraTask (bot_id);
+
+  CREATE TABLE IF NOT EXISTS UmbraRun (
+    id TEXT PRIMARY KEY,
+    task_id TEXT,
+    bot_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL,            -- running | done | error
+    report TEXT,
+    steps TEXT,
+    read INTEGER NOT NULL DEFAULT 0,
+    startedAt TEXT NOT NULL,
+    finishedAt TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_run_user ON UmbraRun (user_id, startedAt);
+`);
+
 // Stage 2 columns, added to databases made before tools existed:
 //   UmbraBot.tools      which tools the bot may use (a JSON list of tool ids)
 //   UmbraMessage.steps  the tool steps behind a reply (JSON), shown in the chat

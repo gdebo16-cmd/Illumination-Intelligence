@@ -12,6 +12,9 @@ import { gpuQueue } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
 import { toolsFor, type ToolContext } from './tools';
 
+/** 'high' for live chat; 'low' for background tasks, so they never make a chat wait. */
+type Priority = 'high' | 'low';
+
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const MAX_ROUNDS = 6;
 
@@ -49,7 +52,7 @@ function thinkSetting(model: string): { think?: boolean | 'low' } {
   return {};
 }
 
-async function askModel(model: string, messages: ChatMessage[], tools: unknown[]): Promise<OllamaReply> {
+async function askModel(model: string, messages: ChatMessage[], tools: unknown[], priority: Priority): Promise<OllamaReply> {
   return gpuQueue.add(async () => {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
@@ -58,7 +61,7 @@ async function askModel(model: string, messages: ChatMessage[], tools: unknown[]
     });
     if (!res.ok) throw new Error(`Ollama error ${res.status}: ${await res.text()}`);
     return (await res.json()) as OllamaReply;
-  }, 'high', 'ollama');
+  }, priority, 'ollama');
 }
 
 export async function runAgent(options: {
@@ -66,6 +69,8 @@ export async function runAgent(options: {
   toolIds: ToolId[];
   messages: ChatMessage[];
   context: ToolContext;
+  /** 'low' for background tasks. Default 'high'. */
+  priority?: Priority;
   /** Called whenever a step starts or finishes, so the chat can show it live. */
   onStep: (step: AgentStep) => void;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
@@ -77,7 +82,7 @@ export async function runAgent(options: {
   for (let round = 0; round <= MAX_ROUNDS; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
     const lastRound = round === MAX_ROUNDS;
-    const reply = await askModel(options.model, messages, lastRound ? [] : schemas);
+    const reply = await askModel(options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high');
     const calls = reply.message?.tool_calls ?? [];
 
     if (calls.length === 0 || lastRound) {
@@ -108,7 +113,7 @@ export async function runAgent(options: {
       let output: string;
       try {
         if (!def) throw new Error(`There is no tool called ${call.name}.`);
-        const result = await def.run(call.args, options.context);
+        const result = await def.run(call.args, { ...options.context, priority: options.priority ?? 'high' });
         Object.assign(step, { status: 'done', summary: result.summary, links: result.links, image: result.image });
         output = result.output;
       } catch (err) {

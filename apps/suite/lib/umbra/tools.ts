@@ -28,6 +28,8 @@ const PAGE_BYTE_LIMIT = 2_000_000;
 export interface ToolContext {
   userId: string;
   botId: string;
+  /** 'low' when a background task is running, so live chats go first. */
+  priority?: 'high' | 'low';
 }
 
 /** What a tool hands back: text for the model, plus anything the chat should show. */
@@ -285,7 +287,7 @@ const makeImage: ToolDef = {
     const style = PRISM_STYLES.some((s) => s.id === a.style) ? (a.style as string) : 'none';
     const size = SHAPES[str(a.shape)] ?? SHAPES.square;
     const result = await gpuQueue
-      .add(() => generateImage({ prompt, style, ...size }), 'high', 'comfy')
+      .add(() => generateImage({ prompt, style, ...size }), ctx.priority ?? 'high', 'comfy')
       .catch((err: Error) => {
         throw new Error(/fetch failed|ECONNREFUSED/i.test(err.message) ? 'Prism can’t paint right now: ComfyUI isn’t running.' : err.message);
       });
