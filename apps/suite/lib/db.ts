@@ -50,4 +50,21 @@ db.exec(
   fs.readFileSync(path.join(process.cwd(), 'lib', 'memory-schema.sql'), 'utf8'),
 );
 
+// Prism: one row per picture. The picture itself is saved as data/prism/images/<id>.png.
+// The prompt, style, seed and size are kept so a picture can be made again exactly.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS PrismImage (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    style TEXT NOT NULL DEFAULT 'none',
+    seed INTEGER NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    seconds REAL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_prism_user ON PrismImage (user_id, createdAt);
+`);
+
 export default db;
