@@ -141,6 +141,9 @@ const Chat = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type a prompt..."
+            aria-label="Message"
+            enterKeyHint="send"
+            autoComplete="off"
             className="input-field"
           />
           <button type="submit" disabled={loading} className="input-button send-button">

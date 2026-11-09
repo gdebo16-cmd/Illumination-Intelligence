@@ -1,16 +1,24 @@
-:root { --sidebar-w: 280px; }
+:root {
+  --sidebar-w: 280px;
+  --header-h: calc(clamp(56px, 8dvh, 88px) + env(safe-area-inset-top));
+  /* The darkest edge colour of the banners. Safari's status bar and toolbar take this colour,
+     so it must match the app's top and bottom edges. Keep in sync with themeColor in app/layout.tsx. */
+  --edge-color: #030406;
+  /* Space between the header's top/bottom and the banner image */
+  --banner-gap: 4px;
+}
 
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 html {
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
 }
 
 body {
   font-family: Arial, Helvetica, sans-serif;
-  min-height: 100dvh;
+  min-height: var(--app-height, 100dvh);
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -21,10 +29,10 @@ main {
   display: flex;
   flex-direction: column;
   flex: 1;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   width: 100dvw;
   overflow: hidden;
-  background: radial-gradient(circle at top, rgb(21, 24, 46) 0%, rgb(0, 0, 0) 100%); 
+  background: radial-gradient(circle at top, rgb(21, 24, 46) 0%, var(--edge-color) 100%);
 }
 
 header {
@@ -34,8 +42,12 @@ header {
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-  padding: 0 1rem;
-  height: 7dvh;
+  /* Safe-area padding keeps the buttons clear of the iPhone notch / status bar and rounded corners.
+     The clamp stops the header collapsing below button height on a phone turned sideways. */
+  padding: env(safe-area-inset-top) max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
+  height: var(--header-h);
+  /* Same colour as the banner's own edges, so wherever the banner doesn't reach looks continuous */
+  background-color: var(--edge-color);
   box-shadow: 0 0 20px 3px rgba(0, 0, 0, 0.911);
 }
 
@@ -48,18 +60,38 @@ header {
   pointer-events: none;
 }
 
-/* Image stays the width of the screen and counter-shifts against the push */
+/* Header banner (logo artwork) */
 .banner {
   position: absolute;
-  top: 0;
-  left: 0;
+  /* The element is exactly the banner's size, centred, so the edge fades land on the image itself */
+  left: 50%;
 
-  width: 100dvw;
-  max-width: 100dvw;
-  height: 7dvh;
+  transform: translateX(-50%);
+  /* Start below the notch/status bar, and leave a small gap top and bottom so the bright logo
+     isn't pressed against Safari's bar (Safari blurs whatever sits right under it). */
+  top: calc(env(safe-area-inset-top) + var(--banner-gap));
+  height: calc(100% - env(safe-area-inset-top) - 2 * var(--banner-gap));
+
+  /* Width follows the height, so the logo never stretches. On screens narrower than the banner,
+     cover trims the banner's empty dark sides instead of shrinking the logo. */
+  width: auto;
+  max-width: 100%;
   object-fit: cover;
-  transition: left 0.2s ease; 
-  flex: 1 1 auto;
+  /* Fade the banner's edges into the header colour. Top and bottom fade gradually over about a
+     third of the height each, so the logo's top and bottom dissolve like light instead of ending
+     at a hard line. */
+  --fade-y: linear-gradient(to bottom,
+    transparent 0%, rgb(0 0 0 / 0.15) 10%, rgb(0 0 0 / 0.55) 22%, #000 38%,
+    #000 62%, rgb(0 0 0 / 0.55) 78%, rgb(0 0 0 / 0.15) 90%, transparent 100%);
+  --fade-x: linear-gradient(to right, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  -webkit-mask-image: var(--fade-y), var(--fade-x);
+  -webkit-mask-composite: source-in;
+  mask-image: var(--fade-y), var(--fade-x);
+  mask-composite: intersect;
+  /* "screen" adds the banner's light to what's behind it: the dark background disappears and
+     only the bright logo shows, glowing over the header. */
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 /* Keep the ☰ button and the model select above the image */
@@ -71,7 +103,7 @@ header > .model-select-container {
 
 .site-container {
   display: flex;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   width: 100dvw;
   background: radial-gradient(circle at top, rgba(24, 26, 50, 0.244) 0%, rgba(0, 0, 0, 0.753) 100%); 
   color: #f3f4f6;
@@ -83,7 +115,7 @@ header > .model-select-container {
 .content-area {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   min-width: 0;
   transition: margin-left 0.2s ease;
 }
@@ -434,7 +466,7 @@ header > .model-select-container {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   width: 100dvw;
 }
 
@@ -499,7 +531,7 @@ header > .model-select-container {
     display: flex;
     flex-direction: column;
     flex: 1;
-    height: 100dvh; /* Changed from 100vh */
+    height: var(--app-height, 100dvh); /* Changed from 100vh */
     overflow: hidden;
   }
 
@@ -663,3 +695,122 @@ header > .model-select-container {
 }
 .coming-soon h1 { margin: 0; font-size: 2.5rem; letter-spacing: 0.04em; }
 .coming-soon p { margin: 0; }
+
+/* ================================================================ mobile + Safari
+   Everything phone-specific lives here, after the base styles, so it wins over them.
+   --app-height comes from components/ViewportSync.tsx (the visible height, minus the keyboard). */
+
+/* The app frame never scrolls as a page: the chat list, sidebar and panels scroll inside it.
+   This also stops a stray page scrollbar from resizing the layout. */
+html,
+body {
+  overflow: hidden;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;          /* stop Safari enlarging text when the phone turns sideways */
+}
+
+/* Safari (iOS 26+) colours its status bar and toolbar from the page background, and shows it
+   around the app while the toolbars slide in and out. Same colour as the app's edges = no seam. */
+html,
+body {
+  background-color: var(--edge-color);
+}
+
+body {
+  overscroll-behavior: none;                /* no pull-to-refresh or bounce on the app shell */
+  -webkit-tap-highlight-color: transparent; /* no grey flash on every tap */
+}
+
+/* Scrolling areas keep their momentum but don't drag the page along with them */
+.messages-container,
+.sidebar,
+.document-panel-body {
+  overscroll-behavior: contain;
+}
+
+/* Hover effects only on devices with a real mouse. On iPhone, :hover "sticks" after a tap. */
+@media (hover: none) {
+  .user-buttons:hover { background-color: #1e293b; transform: none; }
+  .sidebar button:hover,
+  .app-launcher-tile:hover { background: transparent; }
+  .app-launcher-button:hover { background: rgb(0 0 0 / 0.25); }
+}
+
+/* Pressed feedback for touch instead */
+.user-buttons:active,
+.sidebar button:active,
+.app-launcher-tile:active,
+.send-button:active { opacity: 0.75; }
+
+/* Notched phones: keep panels clear of the status bar and home indicator */
+.sidebar {
+  /* The header sits on top of the sidebar, so its content starts below the header */
+  padding-top: calc(var(--header-h) + 0.75rem);
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  padding-left: calc(0.75rem + env(safe-area-inset-left));
+}
+.document-panel-header { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
+.document-panel-body { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.input-container {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* The launcher panel never runs off the right edge of a small screen */
+.app-launcher-panel { max-width: calc(100vw - 1.5rem); }
+
+@media (max-width: 768px) {
+  /* 44px is Apple's minimum comfortable tap target */
+  .sidebar-toggle,
+  .app-launcher-button { width: 44px; height: 44px; }
+  .sidebar button { min-height: 44px; }
+
+  .app-launcher-panel { grid-template-columns: repeat(3, minmax(76px, 88px)); }
+
+  /* Chat: wider bubbles, tighter spacing, lighter text for small screens */
+  .messages-container { padding: 0.75rem; gap: 1.25rem; }
+  .message-content { max-width: 92%; padding: 0.75rem 0.25rem; font-weight: 500; }
+  .message-content.user { max-width: 85%; }
+
+  /* Code and tables scroll sideways inside their box instead of widening the page */
+  .markdown { overflow-wrap: anywhere; }
+  .markdown table { display: block; overflow-x: auto; }
+  .code-block-pre { font-size: 0.8rem; }
+
+  /* Chat input. Font stays at 16px: Safari zooms the whole page into any smaller input. */
+  .input-container { padding-top: 0.5rem; }
+  .input-form { gap: 0.5rem; }
+  .input-field { padding: 0.8rem 0.9rem; font-size: 16px; min-width: 0; }
+  .send-button { padding: 0 1.1rem; min-height: 44px; }
+  .model-select-input { font-size: 16px; }
+
+  /* Document panel takes the whole screen */
+  .document-panel { width: 100vw; border-left: none; }
+  .document-panel-header { flex-wrap: wrap; }
+
+  /* Profile picker */
+  .signin-container {
+    justify-content: center;
+    gap: 0.5rem;
+    padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem max(1.5rem, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+  .title-signin { font-size: 2rem; margin: 0; padding-bottom: 0.75rem; }
+  .sub-signin { font-size: 1rem; margin: 0.5rem 0 1rem; padding: 0; }
+  .user-container { width: 100%; max-width: 420px; height: auto; }
+  .user-buttons { min-height: 170px; }
+  .user-icon { width: 4rem; height: 4rem; }
+
+  .coming-soon h1 { font-size: 2rem; }
+}
+
+/* Phone turned sideways: short screen, so trim vertical space */
+@media (max-height: 500px) and (orientation: landscape) {
+  .messages-container { gap: 0.75rem; }
+  .input-container { padding-top: 0.25rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+  .signin-container { justify-content: flex-start; overflow-y: auto; }
+  .user-buttons { min-height: 120px; }
+}
