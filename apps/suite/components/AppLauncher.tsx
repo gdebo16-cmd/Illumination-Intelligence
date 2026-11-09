@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { APPS } from '@/config/apps';
+import HomeIconPicker from './HomeIconPicker';
 
 const NineDots = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -46,25 +47,28 @@ const AppLauncher = () => {
       </button>
 
       {open && (
-        <nav className="app-launcher-panel" aria-label="Illumination Intelligence apps">
-          {APPS.map((app) => {
-            const current = pathname === app.href || pathname.startsWith(`${app.href}/`);
-            return (
-              <Link
-                key={app.id}
-                href={app.href}
-                className="app-launcher-tile"
-                aria-current={current ? 'page' : undefined}
-                style={{ '--app-color': app.color } as React.CSSProperties}
-                onClick={() => setOpen(false)}
-              >
-                <span className="app-launcher-icon">{app.name[0]}</span>
-                <span className="app-launcher-name">{app.name}</span>
-                {app.status === 'soon' && <span className="app-launcher-badge">Soon</span>}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="app-launcher-panel">
+          <nav className="app-launcher-grid" aria-label="Illumination Intelligence apps">
+            {APPS.map((app) => {
+              const current = pathname === app.href || pathname.startsWith(`${app.href}/`);
+              return (
+                <Link
+                  key={app.id}
+                  href={app.href}
+                  className="app-launcher-tile"
+                  aria-current={current ? 'page' : undefined}
+                  style={{ '--app-color': app.color } as React.CSSProperties}
+                  onClick={() => setOpen(false)}
+                >
+                  <span className="app-launcher-icon">{app.name[0]}</span>
+                  <span className="app-launcher-name">{app.name}</span>
+                  {app.status === 'soon' && <span className="app-launcher-badge">Soon</span>}
+                </Link>
+              );
+            })}
+          </nav>
+          <HomeIconPicker />
+        </div>
       )}
     </div>
   );

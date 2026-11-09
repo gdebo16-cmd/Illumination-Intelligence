@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import HomeIconLink from "@/components/HomeIconLink";
 import ViewportSync from "@/components/ViewportSync";
 import "./globals.css";
 
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en">
       <body>
         <ViewportSync />
+        <HomeIconLink />
         {children}
       </body>
     </html>

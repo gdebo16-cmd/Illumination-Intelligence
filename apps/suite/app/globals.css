@@ -637,9 +637,6 @@ header > .model-select-container {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  display: grid;
-  grid-template-columns: repeat(3, 88px);
-  gap: 6px;
   padding: 10px;
   background: #0c1220;
   border: 1px solid rgb(255 255 255 / 0.1);
@@ -684,6 +681,34 @@ header > .model-select-container {
   color: #aab;
   background: rgb(255 255 255 / 0.08);
 }
+
+/* The app tiles inside the launcher panel */
+.app-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 88px);
+  gap: 6px;
+}
+
+/* ---------------------------------------------------------------- home-screen icon picker (bottom of the launcher) */
+.home-icon-picker {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+.home-icon-picker-title { font-size: 0.75rem; color: #aab; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.home-icon-picker-options { display: flex; justify-content: space-between; gap: 6px; }
+.home-icon-option {
+  padding: 2px;
+  background: transparent;
+  border: 2px solid transparent;
+  /* Same corner shape iPhone gives home-screen icons */
+  border-radius: 24%;
+  cursor: pointer;
+  line-height: 0;
+}
+.home-icon-option img { width: 40px; height: 40px; border-radius: 22.5%; display: block; }
+.home-icon-option[aria-checked="true"] { border-color: #e5e7f0; }
+.home-icon-picker-hint { margin: 8px 0 0; font-size: 0.7rem; color: #71717a; }
 
 /* ---------------------------------------------------------------- coming-soon pages */
 .coming-soon {
@@ -768,7 +793,7 @@ body {
   .app-launcher-button { width: 44px; height: 44px; }
   .sidebar button { min-height: 44px; }
 
-  .app-launcher-panel { grid-template-columns: repeat(3, minmax(76px, 88px)); }
+  .app-launcher-grid { grid-template-columns: repeat(3, minmax(76px, 88px)); }
 
   /* Chat: wider bubbles, tighter spacing, lighter text for small screens */
   .messages-container { padding: 0.75rem; gap: 1.25rem; }
