@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from './ChatContext';
+import { MessageContent } from './MessageContent';
+import { splitContent, DocumentCard, DocumentPanel } from './documents';
 
 const getAdaptiveLoadingText = (prompt: string): string => {
   const trimmed = prompt.trim().toLowerCase();
@@ -35,6 +37,7 @@ const Chat = () => {
   const [input, setInput] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [openDoc, setOpenDoc] = useState<{ title: string; content: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -101,13 +104,28 @@ const Chat = () => {
             <div className="loading-content">loading chat...</div>
           </div>
         )}
+
         {messages.map((msg, idx) => (
           <div key={idx} className={`message-item ${msg.role === 'user' ? 'user' : 'assistant'}`}>
             <div className={`message-content ${msg.role === 'user' ? 'user' : 'assistant'}`}>
-              {msg.content}
+              {/* This is the part that replaces {msg.content} */}
+              {msg.role === 'assistant'
+                ? splitContent(msg.content).map((seg, i) =>
+                    seg.type === 'text' ? (
+                      <MessageContent key={i} content={seg.text} />
+                    ) : (
+                      <DocumentCard
+                        key={i}
+                        title={seg.title}
+                        onOpen={() => setOpenDoc({ title: seg.title, content: seg.content })}
+                      />
+                    ),
+                  )
+                : msg.content}
             </div>
           </div>
         ))}
+
         {loading && (
           <div className="loading-container">
             <div className="loading-content">{activeQuery}...</div>
@@ -115,6 +133,7 @@ const Chat = () => {
         )}
         <div ref={messagesEndRef} />
       </div>
+
       <div className="input-container">
         <form onSubmit={handleSubmit} className="input-form">
           <input
@@ -129,6 +148,15 @@ const Chat = () => {
           </button>
         </form>
       </div>
+
+      {/* Side panel for an opened document */}
+      {openDoc && (
+        <DocumentPanel
+          title={openDoc.title}
+          content={openDoc.content}
+          onClose={() => setOpenDoc(null)}
+        />
+      )}
     </>
   );
 };

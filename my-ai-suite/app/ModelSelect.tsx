@@ -36,7 +36,7 @@ const ModelSelect = ({ pageType, onChange }: ModelSelectProps) => {
   return (
     <div className="model-select-container">
       <label htmlFor={id} className="model-select-label">
-        Active {pageType} model: 
+        Active {pageType} model 
       </label>
       <select id={id} value={activeModel} onChange={handleChange} disabled={models.length === 0} className="model-select-input input-button" >
         {models.length === 0 ? (

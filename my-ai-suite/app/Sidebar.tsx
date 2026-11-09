@@ -1,8 +1,13 @@
 'use client';
 
 import { useChat } from './ChatContext';
+import { useRouter } from 'next/navigation';
+import ModelSelect from '@/app/ModelSelect';
+  
 
 const Sidebar = () => {
+  const { setSelectedModel } = useChat();
+  const router = useRouter();
   const {
     conversations,
     conversationId,
@@ -11,6 +16,7 @@ const Sidebar = () => {
     isSidebarOpen,
     closeSidebar,
   } = useChat();
+  
 
   return (
     <div className='sidebar-container'>
@@ -20,9 +26,11 @@ const Sidebar = () => {
           <span className="sidebar-title">Chats</span>
           <button className="sidebar-close" onClick={closeSidebar} aria-label="Close chat list">✕</button>
         </div>
-        <button onClick={() => { startNewChat(); closeSidebar(); }}>New chat</button>
+        <button className='new-chat-button' onClick={() => { startNewChat(); closeSidebar(); }}>+ New chat</button>
+        <span className='sidebar-separator'>Previous Chats</span>
         {conversations.map((c) => (
           <button
+            className='chat-button'
             key={c.id}
             aria-current={c.id === conversationId}
             onClick={() => { loadConversation(c.id); closeSidebar(); }}
@@ -30,7 +38,18 @@ const Sidebar = () => {
             {c.title}
           </button>
         ))}
+        <span className='sidebar-separator'>
+          Settings
+        </span>
+        <button className='switch-profile-button' onClick={() => { fetch('/api/select-user', {method: 'DELETE',}); router.push('/select-user');}}>
+            Switch Profile
+        </button>
+        <span className='sidebar-separator'>
+          Model
+        </span>
+        <ModelSelect pageType="chat" onChange={setSelectedModel} />
       </aside>
+      
     </div>
   );
 };
