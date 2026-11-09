@@ -1,0 +1,21 @@
+# SearXNG: a private web search service for Umbra's bots.
+# It asks Google, Bing, DuckDuckGo and others for you, and answers Umbra in JSON.
+#
+# Start it (Docker Desktop must be running), from the repo root:
+#   npm run search
+#
+# It restarts by itself whenever Docker Desktop starts. Only this PC can reach it
+# (127.0.0.1), so it isn't shared on your network or through Tailscale.
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: umbra-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    environment:
+      # A random secret, kept in services/searxng/.env (not committed).
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?create services/searxng/.env with SEARXNG_SECRET=<random text>}
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro

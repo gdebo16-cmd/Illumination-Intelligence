@@ -31,5 +31,20 @@ export const BOT_MODELS = [
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);
 
+// Tools a bot can be given (Stage 2). The creator shows these as checkboxes.
+// The code behind each one lives in lib/umbra/tools.ts.
+export const BOT_TOOLS = [
+  { id: 'datetime', name: 'Date & time', description: 'Knows today’s date and time, and counts days until a date.' },
+  { id: 'calculator', name: 'Calculator', description: 'Does exact math.' },
+  { id: 'web_search', name: 'Web search', description: 'Searches the web (through SearXNG on your PC).' },
+  { id: 'read_webpage', name: 'Read web page', description: 'Opens a link and reads the page.' },
+  { id: 'make_image', name: 'Make image', description: 'Paints a picture with Prism.' },
+  { id: 'notes', name: 'Notes', description: 'Remembers things about you between chats.' },
+] as const;
+
+export type ToolId = (typeof BOT_TOOLS)[number]['id'];
+export const ALL_TOOL_IDS: ToolId[] = BOT_TOOLS.map((t) => t.id);
+export const isToolId = (id: unknown): id is ToolId => BOT_TOOLS.some((t) => t.id === id);
+
 // Limits for the bot form.
 export const BOT_LIMITS = { name: 40, personality: 2000, purpose: 1000 };

@@ -1,12 +1,16 @@
 // POST /api/umbra/bots/<id>/chat — send the bot a message: { message: string }
-// Returns the bot's reply (and saves both to its chat).
+//
+// The answer arrives as a stream, one JSON object per line, as things happen:
+//   { "type": "sent",  "message": … }   your message, saved
+//   { "type": "step",  "step": … }      a tool started or finished (may repeat)
+//   { "type": "reply", "message": … }   the bot's answer, saved, with its steps
+//   { "type": "error", "error": "…" }   something went wrong
 
 import { NextResponse } from 'next/server';
 import { getCurrentUserId, USERS } from '@/lib/user';
-import { gpuQueue } from '@/lib/queue';
-import { addMessage, getBot, listMessages, systemPrompt } from '@/lib/umbra/bots';
+import { addMessage, getBot, listMessages, listNotes, systemPrompt } from '@/lib/umbra/bots';
+import { runAgent, type ChatMessage } from '@/lib/umbra/agent';
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const MAX_MESSAGE = 4000;
 // How many earlier messages the bot "remembers" in each reply.
 const HISTORY = 40;
@@ -26,37 +30,48 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: `Keep messages under ${MAX_MESSAGE} characters.` }, { status: 400 });
   }
 
-  // 3. Build what the model reads: the bot's character sheet, recent chat, then the new message.
+  // 3. What the model reads: the bot's character sheet (with its notes), recent chat, the new message.
   const history = listMessages(bot.id, HISTORY);
-  const saved = addMessage(bot.id, 'user', message);
-  const messages = [
-    { role: 'system', content: systemPrompt(bot, USERS[userId]) },
+  const sent = addMessage(bot.id, 'user', message);
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt(bot, USERS[userId], listNotes(bot.id)) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: 'user', content: message },
   ];
 
-  // 4. Ask the bot's model, through the GPU queue (which clears Prism's model off the card first).
-  try {
-    const data = await gpuQueue.add(async () => {
-      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: bot.model, messages, stream: false }),
-      });
-      if (!res.ok) throw new Error(`Ollama error ${res.status}: ${await res.text()}`);
-      return (await res.json()) as { message?: { content?: string } };
-    }, 'high', 'ollama');
+  // 4. Run the agent loop, streaming each event to the page as it happens.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: object) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      send({ type: 'sent', message: sent });
+      try {
+        const result = await runAgent({
+          model: bot.model,
+          toolIds: bot.tools,
+          messages,
+          context: { userId, botId: bot.id },
+          onStep: (step) => send({ type: 'step', step }),
+        });
+        send({ type: 'reply', message: addMessage(bot.id, 'assistant', result.reply, result.steps) });
+      } catch (err) {
+        console.error('Umbra chat error:', err);
+        const text = (err as Error).message ?? '';
+        send({
+          type: 'error',
+          error: /fetch failed|ECONNREFUSED/i.test(text)
+            ? 'Ollama isn’t running, so the bot can’t think right now.'
+            : /not found/i.test(text)
+              ? `The model ${bot.model} isn’t installed. Pick another in the bot’s settings.`
+              : text || 'Something went wrong.',
+        });
+      } finally {
+        controller.close();
+      }
+    },
+  });
 
-    const reply = data.message?.content?.trim() || '…';
-    return NextResponse.json({ sent: saved, reply: addMessage(bot.id, 'assistant', reply) });
-  } catch (err) {
-    console.error('Umbra chat error:', err);
-    const text = (err as Error).message ?? '';
-    const friendly = /fetch failed|ECONNREFUSED/i.test(text)
-      ? 'Ollama isn’t running, so the bot can’t think right now.'
-      : /not found/i.test(text)
-        ? `The model ${bot.model} isn’t installed. Pick another in the bot’s settings.`
-        : text || 'Something went wrong.';
-    return NextResponse.json({ error: friendly, sent: saved }, { status: 502 });
-  }
+  return new Response(stream, {
+    headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache, no-transform' },
+  });
 }

@@ -5,35 +5,57 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BOT_LIMITS, BOT_MODELS, FLAMES, flameColor } from '@/config/umbra';
+import { ALL_TOOL_IDS, BOT_LIMITS, BOT_MODELS, BOT_TOOLS, FLAMES, flameColor } from '@/config/umbra';
 import Flame from './Flame';
-import type { Bot } from './types';
+import type { Bot, BotNote } from './types';
 
-const EMPTY = { name: '', flame: FLAMES[0].id as string, personality: '', purpose: '', model: BOT_MODELS[0].id as string };
+// New bots start with every tool switched on.
+const EMPTY = {
+  name: '',
+  flame: FLAMES[0].id as string,
+  personality: '',
+  purpose: '',
+  model: BOT_MODELS[0].id as string,
+  tools: [...ALL_TOOL_IDS] as string[],
+};
+type TextField = 'name' | 'flame' | 'personality' | 'purpose' | 'model';
 
 export default function BotForm({ botId }: { botId?: string }) {
   const router = useRouter();
   const editing = Boolean(botId);
   const [form, setForm] = useState(EMPTY);
+  const [notes, setNotes] = useState<BotNote[]>([]);
   const [loaded, setLoaded] = useState(!editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // When editing, fill the form with the bot's current settings.
+  // When editing, fill the form with the bot's current settings, and load what it remembers.
   useEffect(() => {
     if (!botId) return;
     fetch(`/api/umbra/bots/${botId}`)
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load this bot.');
         const bot: Bot = await res.json();
-        setForm({ name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model });
+        setForm({ name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model, tools: bot.tools });
         setLoaded(true);
       })
       .catch((err: Error) => setError(err.message));
+    fetch(`/api/umbra/bots/${botId}/notes`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setNotes)
+      .catch(() => {});
   }, [botId]);
 
-  const set = (field: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const set = (field: TextField) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const toggleTool = (id: string) =>
+    setForm((f) => ({ ...f, tools: f.tools.includes(id) ? f.tools.filter((t) => t !== id) : [...f.tools, id] }));
+
+  const forget = async (note: BotNote) => {
+    const res = await fetch(`/api/umbra/bots/${botId}/notes?note=${encodeURIComponent(note.id)}`, { method: 'DELETE' });
+    if (res.ok) setNotes((list) => list.filter((n) => n.id !== note.id));
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +149,41 @@ export default function BotForm({ botId }: { botId?: string }) {
                 ))}
               </select>
             </label>
+
+            <fieldset className="umbra-field">
+              <legend className="umbra-label">Tools it can use</legend>
+              <div className="umbra-tools">
+                {BOT_TOOLS.map((tool) => (
+                  <label key={tool.id} className="umbra-tool">
+                    <input type="checkbox" checked={form.tools.includes(tool.id)} onChange={() => toggleTool(tool.id)} />
+                    <span>
+                      <span className="umbra-tool-name">{tool.name}</span>
+                      <span className="umbra-tool-description">{tool.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            {editing && (
+              <section className="umbra-field">
+                <span className="umbra-label">What {form.name || 'it'} remembers about you</span>
+                {notes.length === 0 ? (
+                  <p className="umbra-muted umbra-notes-empty">
+                    Nothing yet. With the Notes tool on, it saves things you tell it to remember.
+                  </p>
+                ) : (
+                  <ul className="umbra-notes">
+                    {notes.map((note) => (
+                      <li key={note.id}>
+                        <span>{note.content}</span>
+                        <button type="button" onClick={() => forget(note)} aria-label={`Forget: ${note.content}`}>Forget</button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
 
             {error && <p className="umbra-error" role="alert">{error}</p>}
 

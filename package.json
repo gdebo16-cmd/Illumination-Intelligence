@@ -8,6 +8,8 @@
     "build": "npm run build --prefix apps/suite",
     "start": "npm run start --prefix apps/suite",
     "prod": "npm run build --prefix apps/suite && npm run start --prefix apps/suite",
-    "lint": "npm run lint --prefix apps/suite"
+    "lint": "npm run lint --prefix apps/suite",
+    "search": "docker compose -f services/searxng/docker-compose.yml up -d",
+    "search:stop": "docker compose -f services/searxng/docker-compose.yml down"
   }
 }

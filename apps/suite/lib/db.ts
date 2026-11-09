@@ -91,6 +91,26 @@ db.exec(`
     FOREIGN KEY (bot_id) REFERENCES UmbraBot(id) ON DELETE CASCADE
   );
   CREATE INDEX IF NOT EXISTS idx_umbra_message_bot ON UmbraMessage (bot_id, createdAt);
+
+  -- Stage 2: things a bot chose to remember with its "save note" tool.
+  CREATE TABLE IF NOT EXISTS UmbraNote (
+    id TEXT PRIMARY KEY,
+    bot_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bot_id) REFERENCES UmbraBot(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_note_bot ON UmbraNote (bot_id, createdAt);
 `);
+
+// Stage 2 columns, added to databases made before tools existed:
+//   UmbraBot.tools      which tools the bot may use (a JSON list of tool ids)
+//   UmbraMessage.steps  the tool steps behind a reply (JSON), shown in the chat
+const addColumn = (table: string, column: string, definition: string) => {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!columns.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+};
+addColumn('UmbraBot', 'tools', "TEXT NOT NULL DEFAULT '[]'");
+addColumn('UmbraMessage', 'steps', 'TEXT');
 
 export default db;
