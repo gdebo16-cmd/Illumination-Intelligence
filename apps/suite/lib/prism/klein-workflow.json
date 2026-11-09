@@ -2,7 +2,7 @@
   "1": {
     "class_type": "UNETLoader",
     "inputs": {
-      "unet_name": "flux-2-klein-base-4b-fp8.safetensors",
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
       "weight_dtype": "default"
     }
   },
@@ -63,7 +63,7 @@
   "9": {
     "class_type": "Flux2Scheduler",
     "inputs": {
-      "steps": 20,
+      "steps": 4,
       "width": 1024,
       "height": 1024
     }
@@ -83,7 +83,7 @@
         "5",
         0
       ],
-      "cfg": 5.0
+      "cfg": 1
     }
   },
   "11": {
@@ -131,7 +131,7 @@
         "12",
         0
       ],
-      "filename_prefix": "Prism-engine-test/klein_base_lake"
+      "filename_prefix": "Prism/klein"
     }
   }
 }
