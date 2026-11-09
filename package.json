@@ -7,6 +7,7 @@
     "dev": "npm run dev --prefix apps/suite",
     "build": "npm run build --prefix apps/suite",
     "start": "npm run start --prefix apps/suite",
+    "prod": "npm run build --prefix apps/suite && npm run start --prefix apps/suite",
     "lint": "npm run lint --prefix apps/suite"
   }
 }

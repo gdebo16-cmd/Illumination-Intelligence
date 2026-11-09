@@ -1,17 +1,29 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
+import { getCurrentUserId } from '@/lib/user';
 
+// Returns one chat's messages, only if it belongs to the signed-in profile.
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+    }
 
-    const msgStmt = db.prepare(
-      'SELECT role, content FROM Message WHERE conversationId = ? ORDER BY createdAt ASC'
-    );
-    const messages = msgStmt.all(id);
+    const { id } = await params;
+    const conversation = db
+      .prepare('SELECT user_id FROM Conversation WHERE id = ?')
+      .get(id) as { user_id: string | null } | undefined;
+    if (!conversation || conversation.user_id !== userId) {
+      return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
+    }
+
+    const messages = db
+      .prepare('SELECT role, content FROM Message WHERE conversationId = ? ORDER BY createdAt ASC, rowid ASC')
+      .all(id);
 
     return NextResponse.json({ messages });
   } catch (err: unknown) {

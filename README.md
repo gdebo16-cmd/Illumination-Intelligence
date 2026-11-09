@@ -8,12 +8,28 @@ Lumen is the working app: local chat through Ollama. The others are "coming soon
 
 Needs Node 22.5 or newer (the database uses the built-in `node:sqlite`). Chat needs Ollama running on this machine.
 
+First time only:
+
 ```bash
 npm run install:suite
-npm run dev
 ```
 
-Open `http://localhost:3000`. You'll pick a profile, then land on Lumen.
+There are two ways to run it, on different ports so both can run at once:
+
+| Mode | Command | Port | Use it for |
+| --- | --- | --- | --- |
+| Production | `npm run prod` | 3000 | Everyday use, on this PC and on your phone. Fast and stable. |
+| Development | `npm run dev` | 3001 | Working on the code. Changes show up instantly. |
+
+`npm run prod` builds the app, then starts it. After changing code, stop it (Ctrl+C) and run it again so the phone gets the new version. `npm run start` restarts the last build without rebuilding.
+
+Open `http://localhost:3000` (production) or `http://localhost:3001` (development). You'll pick a profile, then land on Lumen.
+
+## Phone access (Tailscale)
+
+The production app is shared privately through Tailscale at **https://illumination.shrimp-bitterling.ts.net**. Only devices signed in to the same Tailscale account can open it. Tailscale Serve forwards that address to port 3000 and stays on across restarts; the app itself has to be running (`npm run prod`).
+
+To stop sharing: `tailscale serve --https=443 off`. ComfyUI and Ollama are never shared; only the suite's pages are.
 
 ## Layout
 
