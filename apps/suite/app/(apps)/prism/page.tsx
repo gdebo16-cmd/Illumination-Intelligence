@@ -1,8 +1,16 @@
 import type { Metadata } from 'next';
-import ComingSoon from '@/components/ComingSoon';
+import AppHeader from '@/components/AppHeader';
+import Prism from './_components/Prism';
 
 export const metadata: Metadata = { title: 'Prism' };
 
 export default function PrismPage() {
-  return <ComingSoon appId="prism" />;
+  return (
+    <div className="site-container">
+      <div className="content-area">
+        <AppHeader appId="prism" />
+        <Prism />
+      </div>
+    </div>
+  );
 }

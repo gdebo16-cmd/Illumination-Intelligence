@@ -721,6 +721,198 @@ header > .model-select-container {
 .coming-soon h1 { margin: 0; font-size: 2.5rem; letter-spacing: 0.04em; }
 .coming-soon p { margin: 0; }
 
+/* ================================================================ Prism (image studio) */
+.prism {
+  --prism-accent: #b07cff;
+  color: #e5e7f0;
+  min-height: 0;
+}
+
+/* Controls on the left, the picture on the right */
+.prism-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 1.25rem;
+  padding: 1.25rem;
+}
+
+.prism-controls {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.prism-label {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #aab;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.prism-prompt,
+.prism-select {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  font: inherit;
+  font-size: 1rem;
+  color: #e5e7f0;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;
+}
+.prism-prompt { resize: vertical; min-height: 6rem; line-height: 1.45; }
+.prism-prompt:focus,
+.prism-select:focus { outline: none; border-color: var(--prism-accent); }
+.prism-select option { background: #0c1220; }
+
+.prism-shapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
+.prism-shape {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.25rem;
+  font-size: 0.75rem;
+  color: #c9cbe0;
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-shape-icon { height: 22px; max-width: 30px; border: 1.5px solid currentColor; border-radius: 3px; }
+.prism-shape[aria-checked="true"] { color: #fff; border-color: var(--prism-accent); background: rgb(176 124 255 / 0.15); }
+
+.prism-generate {
+  margin-top: 1rem;
+  min-height: 48px;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cff, #b07cff 55%, #e07cd8);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgb(124 92 255 / 0.35);
+}
+.prism-generate:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+
+.prism-error {
+  margin: 0.25rem 0 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  color: #ffd2d2;
+  background: rgb(255 80 80 / 0.12);
+  border: 1px solid rgb(255 80 80 / 0.3);
+  border-radius: 10px;
+}
+
+/* The big picture */
+.prism-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prism-result {
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.prism-result img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100% - 4.5rem);
+  min-height: 0;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.6);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.prism-result img.is-busy { opacity: 0.45; filter: blur(2px); }
+.prism-result figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.9rem;
+  max-width: 100%;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.prism-caption-text { color: #dcdcf0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.prism-caption-meta { color: #8a8ca8; }
+.prism-caption-actions { display: flex; gap: 0.5rem; }
+.prism-caption-actions button,
+.prism-caption-actions a {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #e5e7f0;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.prism-empty {
+  padding: 3rem 1.5rem;
+  color: #71717a;
+  text-align: center;
+  border: 1px dashed rgb(255 255 255 / 0.15);
+  border-radius: 14px;
+}
+
+/* Recent pictures along the bottom */
+.prism-recent {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  scrollbar-width: thin;
+}
+.prism-thumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  background: #0c1220;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prism-thumb[aria-current="true"] { border-color: var(--prism-accent); }
+
+/* Phones and narrow windows: everything stacks, and the page scrolls */
+@media (max-width: 768px) {
+  .prism { overflow-y: auto; overscroll-behavior: contain; }
+  .prism-workspace { flex: none; flex-direction: column; padding: 1rem; gap: 1rem; }
+  .prism-controls { width: 100%; overflow: visible; }
+  .prism-prompt,
+  .prism-select { font-size: 16px; }   /* keeps Safari from zooming in */
+  .prism-stage { flex: none; }
+  .prism-result img { max-height: 70vh; }
+  .prism-recent { padding-left: 1rem; padding-right: 1rem; }
+}
+
 /* ================================================================ mobile + Safari
    Everything phone-specific lives here, after the base styles, so it wins over them.
    --app-height comes from components/ViewportSync.tsx (the visible height, minus the keyboard). */
