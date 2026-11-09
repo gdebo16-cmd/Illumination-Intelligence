@@ -184,6 +184,11 @@ db.exec(`
 `);
 // A task or report that belongs to a team (its bot_id is the team's leader).
 addColumn('UmbraTask', 'team_id', 'TEXT');
+
+// Prism image editing: was the picture made from words ('create') or by editing one ('edit'),
+// and which Prism picture it was edited from (empty for an uploaded picture).
+addColumn('PrismImage', 'mode', "TEXT NOT NULL DEFAULT 'create'");
+addColumn('PrismImage', 'source_id', 'TEXT');
 addColumn('UmbraRun', 'team_id', 'TEXT');
 
 export default db;

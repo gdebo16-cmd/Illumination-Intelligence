@@ -22,6 +22,10 @@ export interface PrismImage {
   width: number;
   height: number;
   seconds: number | null;
+  /** 'create' = made from words; 'edit' = an edited picture (prompt is the instruction). */
+  mode: 'create' | 'edit';
+  /** For an edit of one of your Prism pictures: which one. */
+  sourceId: string | null;
   createdAt: string;
   /** Where the browser loads the picture from. */
   url: string;
@@ -30,8 +34,16 @@ export interface PrismImage {
 type Row = Omit<PrismImage, 'url'>;
 const withUrl = (row: Row): PrismImage => ({ ...row, url: `/api/prism/images/${row.id}` });
 
-/** Save a finished picture and its details. */
-export function saveImage(userId: string, prompt: string, style: string, result: ImageResult): PrismImage {
+/** Save a finished picture and its details. Pass `edit` when it was made by editing a picture. */
+export function saveImage(
+  userId: string,
+  prompt: string,
+  style: string,
+  result: ImageResult,
+  edit?: { sourceId: string | null },
+): PrismImage {
+  const mode = edit ? 'edit' : 'create';
+  const sourceId = edit?.sourceId ?? null;
   const id = crypto.randomUUID();
   const file = path.join(IMAGE_DIR, `${id}.png`);
   fs.writeFileSync(file, result.image);
@@ -39,23 +51,26 @@ export function saveImage(userId: string, prompt: string, style: string, result:
   const createdAt = new Date().toISOString();
   try {
     db.prepare(
-      `INSERT INTO PrismImage (id, user_id, prompt, style, seed, width, height, seconds, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, userId, prompt, style, result.seed, result.width, result.height, result.seconds, createdAt);
+      `INSERT INTO PrismImage (id, user_id, prompt, style, seed, width, height, seconds, mode, source_id, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, userId, prompt, style, result.seed, result.width, result.height, result.seconds, mode, sourceId, createdAt);
   } catch (err) {
     // Don't leave a picture file behind with no record of it.
     fs.rmSync(file, { force: true });
     throw err;
   }
 
-  return withUrl({ id, prompt, style, seed: result.seed, width: result.width, height: result.height, seconds: result.seconds, createdAt });
+  return withUrl({
+    id, prompt, style, seed: result.seed, width: result.width, height: result.height, seconds: result.seconds,
+    mode, sourceId, createdAt,
+  });
 }
 
 /** A profile's pictures, newest first. */
 export function listImages(userId: string, limit = 60): PrismImage[] {
   const rows = db
     .prepare(
-      `SELECT id, prompt, style, seed, width, height, seconds, createdAt
+      `SELECT id, prompt, style, seed, width, height, seconds, mode, source_id AS sourceId, createdAt
        FROM PrismImage WHERE user_id = ? ORDER BY createdAt DESC LIMIT ?`,
     )
     .all(userId, limit) as Row[];
