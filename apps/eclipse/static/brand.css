@@ -1,6 +1,0 @@
-/* Eclipse — red wash across the empty banner slot. */
-.banner-inner {
-  background:
-    linear-gradient(155deg, rgba(210, 69, 60, 0.38), transparent 58%),
-    var(--banner-tint);
-}

@@ -14,7 +14,7 @@ env/
 .coverage
 htmlcov/
 
-# Node (not used by this suite; ignored so a later tool cannot pollute the tree)
+# Node
 node_modules/
 dist/
 .next/
@@ -40,6 +40,15 @@ models/
 **/*.ckpt
 
 # Stray art drops at the repo root stay out. The locked Artemis set is tracked
-# under packages/design-tokens/banners/ and apps/<brand>/static/banner.png.
+# under apps/suite/public/brand/.
 /banners/
 /art/
+
+# Local databases. Each app keeps its SQLite files in its own data/ folder.
+apps/*/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3

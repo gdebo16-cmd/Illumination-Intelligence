@@ -1,15 +1,12 @@
 {
-  "dependencies": {
-    "@prisma/client": "^7.10.1",
-    "better-sqlite3": "^13.0.3",
-    "drizzle-orm": "^0.45.4"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
-    "drizzle-kit": "^0.31.11",
-    "prisma": "^8.0.0-rc.33"
-  },
+  "name": "illumination-intelligence",
+  "private": true,
+  "description": "Root scripts for the Illumination Intelligence suite. The app itself lives in apps/suite.",
   "scripts": {
-    "postinstall": "prisma skills sync || exit 0"
+    "install:suite": "npm install --prefix apps/suite",
+    "dev": "npm run dev --prefix apps/suite",
+    "build": "npm run build --prefix apps/suite",
+    "start": "npm run start --prefix apps/suite",
+    "lint": "npm run lint --prefix apps/suite"
   }
 }

@@ -1,6 +1,0 @@
-/* Halo — gold wash across the empty banner slot. */
-.banner-inner {
-  background:
-    linear-gradient(155deg, rgba(166, 132, 69, 0.32), transparent 62%),
-    var(--banner-tint);
-}

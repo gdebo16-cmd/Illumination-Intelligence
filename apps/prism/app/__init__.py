@@ -1,1 +1,0 @@
-"""Prism FastAPI stub."""

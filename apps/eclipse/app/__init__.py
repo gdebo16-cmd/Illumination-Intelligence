@@ -1,1 +1,0 @@
-"""Eclipse FastAPI stub."""
