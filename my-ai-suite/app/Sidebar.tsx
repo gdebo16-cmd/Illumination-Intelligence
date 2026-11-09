@@ -16,7 +16,11 @@ const Sidebar = () => {
     <div className='sidebar-container'>
       {isSidebarOpen && <div className="sidebar-backdrop" onClick={closeSidebar} />}
       <aside id="app-sidebar" className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
-        <button className="new-chat-button" onClick={() => { startNewChat(); closeSidebar(); }}>New chat</button>
+        <div className="sidebar-top">
+          <span className="sidebar-title">Chats</span>
+          <button className="sidebar-close" onClick={closeSidebar} aria-label="Close chat list">✕</button>
+        </div>
+        <button onClick={() => { startNewChat(); closeSidebar(); }}>New chat</button>
         {conversations.map((c) => (
           <button
             key={c.id}

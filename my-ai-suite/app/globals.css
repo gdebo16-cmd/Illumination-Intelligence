@@ -1,3 +1,9 @@
+:root { --sidebar-w: 280px; }
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html {
   height: 100dvh;
 }
@@ -16,26 +22,11 @@ main {
   flex-direction: column;
   flex: 1;
   height: 100dvh;
+  width: 100dvw;
   overflow: hidden;
   background: radial-gradient(circle at top, rgb(24, 26, 50) 0%, rgb(8, 8, 10) 100%); 
 }
 
-
-/*header {
-  height: 7dvh;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 0 1rem;
-}*/
-
-:root {
-  --header-h: 88px;      /* set this to your header's real height */
-  --sidebar-w: 280px;
-}
-
-/* Keep the header, and its ☰ button, above the sidebar */
 header {
   position: relative;
   z-index: 60;
@@ -47,12 +38,59 @@ header {
   height: 7dvh;
 }
 
-/* Sidebar: a drawer that slides in under the header */
-.sidebar {
-  position: fixed;
-  top: var(--header-h);
-  bottom: 0;
+/* Clip box: always exactly the size of the header */
+.header-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Image stays the width of the screen and counter-shifts against the push */
+.banner {
+  position: absolute;
+  top: 0;
   left: 0;
+  width: 100dvw;
+  max-width: 100dvw;
+  height: 7dvh;
+  object-fit: cover;
+  transition: left 0.2s ease; 
+  flex: 1 1 auto;
+}
+
+/* Keep the ☰ button and the model select above the image */
+header > button,
+header > .model-select-container {
+  position: relative;
+  z-index: 1;
+}
+
+.site-container {
+  display: flex;
+  height: 100dvh;
+  width: 100dvw;
+  background: radial-gradient(circle at top, rgba(24, 26, 50, 0.244) 0%, rgba(8, 8, 10, 0.517) 100%); 
+  color: #f3f4f6;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+}
+
+/* Everything except the sidebar */
+.content-area {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-width: 0;
+  transition: margin-left 0.2s ease;
+}
+
+/* Full-height sidebar on the left */
+.sidebar {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0 auto 0 0;
   width: var(--sidebar-w);
   max-width: 85vw;
   display: flex;
@@ -66,41 +104,53 @@ header {
   transition: transform 0.2s ease;
   z-index: 50;
 }
+.sidebar.open { transform: translateX(0); }
 
-.sidebar.open {
-  transform: translateX(0);
-}
+.sidebar-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
+.sidebar-title { color: #aab; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase; }
 
-.sidebar-backdrop {
-  position: fixed;
-  inset: var(--header-h) 0 0 0;
-  background: rgb(0 0 0 / 0.5);
-  z-index: 40;
-}
-
-/* Replace the default grey buttons */
 .sidebar button {
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  text-align: left;
-  color: #e5e7f0;
+  width: 100%; padding: 0.6rem 0.75rem; text-align: left;
+  color: #e5e7f0; background: transparent;
+  border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar button:hover { background: rgb(255 255 255 / 0.06); }
+.sidebar button[aria-current="true"] { background: rgb(120 120 255 / 0.15); border-color: rgb(120 120 255 / 0.35); }
+.sidebar .sidebar-close { width: auto; padding: 0.3rem 0.6rem; }
+
+/* Phones: sidebar overlays everything, backdrop closes it */
+.sidebar-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.5); z-index: 40; }
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: #fff;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid rgb(255 255 255 / 0.2);
   border-radius: 8px;
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  position: relative;
+  z-index: 60;
 }
 
-.sidebar button:hover {
-  background: rgb(255 255 255 / 0.06);
+.sidebar-content-empty {
+  text-align: center;
+  font-size: 0.75rem; 
+  color: #71717a; 
+  margin-top: 2.5rem; 
 }
 
-.sidebar button[aria-current="true"] {
-  background: rgb(120 120 255 / 0.15);
-  border-color: rgb(120 120 255 / 0.35);
+/* Tablets and up: sidebar pushes the content right instead of covering it */
+@media (min-width: 768px) {
+  .site-container.sidebar-open .content-area { margin-left: var(--sidebar-w); }
+  .sidebar-backdrop, .sidebar-close { display: none; }
 }
+
 
 .model-select-label {
   padding: 0.5rem;
@@ -119,38 +169,6 @@ header {
 .model-select-input:focus {
   outline: none;
 }
-
-
-
-
-
-.site-container {
-  display: flex;
-  height: 100dvh;
-  background: radial-gradient(circle at top, rgba(24, 26, 50, 0.244) 0%, rgba(8, 8, 10, 0.517) 100%); 
-  color: #f3f4f6;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  overflow: hidden;
-}
-
-
-.sidebar-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  color: #fff;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 0.2);
-  border-radius: 8px;
-  cursor: pointer;
-  position: relative;
-  z-index: 60;
-}
-
-
 
 .conv-item {
   width: 100%;
@@ -177,12 +195,7 @@ header {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
 }
 
-.sidebar-content-empty {
-  text-align: center;
-  font-size: 0.75rem; 
-  color: #71717a; 
-  margin-top: 2.5rem; 
-}
+
 
 .model-container {
   display: flex;
@@ -304,6 +317,7 @@ header {
 .input-container {
   padding: 1rem; 
   flex-shrink: 0;
+  max-width: 100dvw;
   background: transparent;
 }
 
@@ -386,21 +400,6 @@ header {
     opacity: 0.9;
   }
 
-
-  .banner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 0;
-    width: 100dvw;
-    height: 8dvh;
-    object-fit: cover;
-    margin: 0;
-    padding: 0;
-    pointer-events: none !important;
-  }
-
-
   .model-container {
     display: none;
   }
@@ -433,17 +432,5 @@ header {
 }
 
 @media (min-width: 769px) {
-  .banner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: -1;
-    width: 100dvw;
-    height: 7dvh;
-    object-fit: cover;
-    margin: 0;
-    padding: 0;
-    pointer-events: none !important;
-  }
 }
 

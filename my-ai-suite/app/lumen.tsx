@@ -1,18 +1,24 @@
 'use client';
 
+import { useChat } from './ChatContext';
+import Header from './Header';
 import Sidebar from './Sidebar';
 import Chat from './ChatContent';
-import Header from './Header';
 
-const Lumen = () => (
-    <div className="app-body">
-      <Header />
+const Lumen = () => {
+  const { isSidebarOpen } = useChat();
+
+  return (
+    <div className={`site-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
       <Sidebar />
-      <main>
-        <Chat />
-      </main>
+      <div className="content-area">
+        <Header />
+        <main>
+          <Chat />
+        </main>
+      </div>
     </div>
   );
-
+};
 
 export default Lumen;
