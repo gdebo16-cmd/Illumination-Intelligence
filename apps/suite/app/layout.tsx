@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import HomeIconLink from "@/components/HomeIconLink";
 import ViewportSync from "@/components/ViewportSync";
 import ThemeSync from "@/components/ThemeSync";
@@ -35,7 +36,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body>
         <ViewportSync />
-        <ThemeSync />
+        {/* Reads the address, so it waits for it without holding up the rest of the page. */}
+        <Suspense fallback={null}>
+          <ThemeSync />
+        </Suspense>
         <HomeIconLink />
         {children}
       </body>

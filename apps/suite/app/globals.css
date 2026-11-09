@@ -2136,3 +2136,134 @@ body {
     transform: rotate(360deg); 
   } }
 /* #endregion animations */
+
+/* #region Umbra teams (stage 4) */
+.umbra-teams {
+  margin-top: 2.5rem;
+}
+.umbra-teams h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.umbra-teams > .umbra-muted {
+  margin: 0 0 1rem;
+}
+/* A leader's flame with its teammates' smaller flames tucked beside it. */
+.umbra-team-flames {
+  display: inline-flex;
+  align-items: flex-end;
+}
+.umbra-team-flames .flame + .flame {
+  margin-left: -0.6rem;
+  opacity: 0.85;
+}
+.umbra-team-hello .umbra-team-flames .flame + .flame {
+  margin-left: -1.2rem;
+}
+.umbra-team-hello p {
+  max-width: 28rem;
+  text-align: center;
+}
+
+/* The team builder */
+.umbra-pick-bots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.umbra-pick-bot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 84px;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  background: rgb(255 255 255 / 0.03);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.umbra-pick-bot[aria-checked="true"] {
+  border-color: var(--bot-color);
+  background: color-mix(in srgb, var(--bot-color) 14%, transparent);
+}
+.umbra-team-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.umbra-team-member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+  background: rgb(255 255 255 / 0.03);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 12px;
+}
+.umbra-team-member.is-on {
+  border-color: color-mix(in srgb, var(--bot-color) 45%, transparent);
+  background: color-mix(in srgb, var(--bot-color) 8%, transparent);
+}
+.umbra-team-member-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1 1 160px;
+  cursor: pointer;
+}
+.umbra-form .umbra-team-member-pick input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--bot-color);
+}
+.umbra-team-member-name {
+  font-weight: 600;
+}
+.umbra-team-role {
+  flex: 1 1 180px;
+}
+
+/* A teammate's step in a team chat: its flame, its own steps indented underneath. */
+.umbra-step.is-teammate {
+  align-items: flex-start;
+}
+.umbra-step-flame {
+  flex-shrink: 0;
+  margin-top: -4px;
+}
+.umbra-step.is-teammate > .umbra-step-body > .umbra-step-label {
+  color: var(--mate-color);
+  font-weight: 600;
+}
+.umbra-step .umbra-steps {
+  margin: 0.25rem 0 0.1rem;
+  padding: 0 0 0 0.6rem;
+  border-bottom: none;
+  border-left: 2px solid color-mix(in srgb, var(--mate-color, var(--bot-color)) 35%, transparent);
+}
+.umbra-step-detail {
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
+}
+.umbra-step-detail summary {
+  color: #9a9cb8;
+  cursor: pointer;
+}
+.umbra-step-detail[open] {
+  padding: 0.5rem 0.7rem;
+  background: rgb(255 255 255 / 0.03);
+  border-radius: 10px;
+}
+/* #endregion Umbra teams */

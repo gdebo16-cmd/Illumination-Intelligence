@@ -19,6 +19,7 @@ import { saveImage } from '@/lib/prism/images';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import type { ToolId } from '@/config/umbra';
 import { calculate } from './calculator';
+import type { AgentStep } from './agent';
 
 const SEARXNG_URL = process.env.SEARXNG_URL ?? 'http://127.0.0.1:8888';
 const PAGE_TEXT_LIMIT = 6000; // characters of a web page handed to the model
@@ -30,6 +31,8 @@ export interface ToolContext {
   botId: string;
   /** 'low' when a background task is running, so live chats go first. */
   priority?: 'high' | 'low';
+  /** Show progress on this tool's step while it is still running. */
+  progress?: (update: Partial<Pick<AgentStep, 'summary' | 'children' | 'bot'>>) => void;
 }
 
 /** What a tool hands back: text for the model, plus anything the chat should show. */
@@ -42,6 +45,10 @@ export interface ToolResult {
   links?: { title: string; url: string }[];
   /** A picture the chat can show. */
   image?: { url: string; prompt: string };
+  /** Teams: who did the work, the tools they used, and their full answer. */
+  bot?: AgentStep['bot'];
+  children?: AgentStep[];
+  detail?: string;
 }
 
 interface ToolDef {

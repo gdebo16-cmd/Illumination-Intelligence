@@ -1,13 +1,13 @@
 'use client';
 
-// /umbra/<id>/tasks — jobs this bot does on its own, on a schedule.
+// /umbra/<id>/tasks and /umbra/teams/<id>/tasks — jobs a bot (or a team) does on its own, on a schedule.
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { describeSchedule, WEEKDAYS, type Schedule } from '@/config/umbra-schedule';
 import Flame from './Flame';
-import type { Bot, Task } from './types';
+import type { Bot, Task, Team } from './types';
 
 const KINDS = [
   { id: 'once', name: 'Once, right now' },
@@ -31,8 +31,17 @@ function toSchedule(f: typeof BLANK): Schedule {
   }
 }
 
-export default function BotTasks({ botId }: { botId: string }) {
-  const [bot, setBot] = useState<Bot | null>(null);
+/** Who does the tasks: a bot, or a team (shown with its leader's flame). */
+interface Owner {
+  name: string;
+  flame: string;
+  chatHref: string;
+}
+
+export default function BotTasks({ botId, teamId }: { botId?: string; teamId?: string }) {
+  const base = teamId ? `/api/umbra/teams/${teamId}` : `/api/umbra/bots/${botId}`;
+  const backHref = teamId ? `/umbra/teams/${teamId}` : `/umbra/${botId}`;
+  const [bot, setBot] = useState<Owner | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
@@ -40,14 +49,21 @@ export default function BotTasks({ botId }: { botId: string }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([fetch(`/api/umbra/bots/${botId}`), fetch(`/api/umbra/bots/${botId}/tasks`)])
-      .then(async ([botRes, taskRes]) => {
-        if (!botRes.ok) throw new Error((await botRes.json()).error ?? 'Could not load this bot.');
-        setBot(await botRes.json());
+    Promise.all([fetch(base), fetch(`${base}/tasks`)])
+      .then(async ([ownerRes, taskRes]) => {
+        if (!ownerRes.ok) throw new Error((await ownerRes.json()).error ?? 'Could not load this page.');
+        const data = await ownerRes.json();
+        if (teamId) {
+          const team = data as Team;
+          setBot({ name: team.name, flame: team.leader.flame, chatHref: `/umbra/teams/${team.id}` });
+        } else {
+          const b = data as Bot;
+          setBot({ name: b.name, flame: b.flame, chatHref: `/umbra/${b.id}` });
+        }
         if (taskRes.ok) setTasks(await taskRes.json());
       })
       .catch((err: Error) => setError(err.message));
-  }, [botId]);
+  }, [base, teamId]);
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +71,7 @@ export default function BotTasks({ botId }: { botId: string }) {
     setError('');
     setNotice('');
     try {
-      const res = await fetch(`/api/umbra/bots/${botId}/tasks`, {
+      const res = await fetch(`${base}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: form.title, instructions: form.instructions, schedule: toSchedule(form) }),
@@ -99,7 +115,7 @@ export default function BotTasks({ botId }: { botId: string }) {
     return (
       <main className="umbra">
         <div className="umbra-page">
-          <Link href={`/umbra/${botId}`} className="umbra-back">← Back</Link>
+          <Link href={backHref} className="umbra-back">← Back</Link>
           {error ? <p className="umbra-error" role="alert">{error}</p> : <p className="umbra-muted">Loading…</p>}
         </div>
       </main>
@@ -109,7 +125,7 @@ export default function BotTasks({ botId }: { botId: string }) {
   return (
     <main className="umbra">
       <div className="umbra-page umbra-tasks-page" style={{ '--bot-color': flameColor(bot.flame) } as React.CSSProperties}>
-        <Link href={`/umbra/${bot.id}`} className="umbra-back">← Chat with {bot.name}</Link>
+        <Link href={bot.chatHref} className="umbra-back">← Chat with {bot.name}</Link>
         <div className="umbra-tasks-head">
           <Flame flame={bot.flame} size={64} />
           <div>

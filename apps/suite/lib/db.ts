@@ -147,4 +147,43 @@ const addColumn = (table: string, column: string, definition: string) => {
 addColumn('UmbraBot', 'tools', "TEXT NOT NULL DEFAULT '[]'");
 addColumn('UmbraMessage', 'steps', 'TEXT');
 
+// Umbra stage 4: teams. A leader bot plus teammates (each with a role), and one team chat.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS UmbraTeam (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    purpose TEXT NOT NULL DEFAULT '',
+    leader_id TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    FOREIGN KEY (leader_id) REFERENCES UmbraBot(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_team_user ON UmbraTeam (user_id, updatedAt);
+
+  CREATE TABLE IF NOT EXISTS UmbraTeamMember (
+    team_id TEXT NOT NULL,
+    bot_id TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT '',
+    position INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (team_id, bot_id),
+    FOREIGN KEY (team_id) REFERENCES UmbraTeam(id) ON DELETE CASCADE,
+    FOREIGN KEY (bot_id) REFERENCES UmbraBot(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS UmbraTeamMessage (
+    id TEXT PRIMARY KEY,
+    team_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    steps TEXT,
+    createdAt TEXT NOT NULL,
+    FOREIGN KEY (team_id) REFERENCES UmbraTeam(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_umbra_team_message ON UmbraTeamMessage (team_id, createdAt);
+`);
+// A task or report that belongs to a team (its bot_id is the team's leader).
+addColumn('UmbraTask', 'team_id', 'TEXT');
+addColumn('UmbraRun', 'team_id', 'TEXT');
+
 export default db;

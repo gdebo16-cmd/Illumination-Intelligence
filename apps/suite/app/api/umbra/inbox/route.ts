@@ -5,6 +5,7 @@ import { connection, NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
 import { listBots } from '@/lib/umbra/bots';
 import { listRuns, unreadCount } from '@/lib/umbra/tasks';
+import { listTeams } from '@/lib/umbra/teams';
 
 export async function GET(req: Request) {
   await connection();
@@ -16,10 +17,13 @@ export async function GET(req: Request) {
 
   // Add each report's bot name and flame, so the inbox can show who wrote it.
   const bots = new Map(listBots(userId).map((b) => [b.id, b]));
+  const teams = new Map(listTeams(userId).map((t) => [t.id, t]));
   const runs = listRuns(userId).map((run) => ({
     ...run,
     botName: bots.get(run.botId)?.name ?? 'A deleted bot',
     botFlame: bots.get(run.botId)?.flame ?? 'pearl',
+    // A team's report shows the team's name (the flame is its leader's).
+    teamName: run.teamId ? (teams.get(run.teamId)?.name ?? 'A deleted team') : null,
   }));
   return NextResponse.json({ unread, runs });
 }

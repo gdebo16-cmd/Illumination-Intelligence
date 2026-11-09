@@ -10,7 +10,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { gpuQueue } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
-import { toolsFor, type ToolContext } from './tools';
+import { toolsFor, type ToolContext, type ToolDef } from './tools';
 
 /** 'high' for live chat; 'low' for background tasks, so they never make a chat wait. */
 type Priority = 'high' | 'low';
@@ -27,6 +27,12 @@ export interface AgentStep {
   summary?: string;
   links?: { title: string; url: string }[];
   image?: { url: string; prompt: string };
+  /** Teams: the teammate who did this step's work, */
+  bot?: { id: string; name: string; flame: string };
+  /** …the tools that teammate used, */
+  children?: AgentStep[];
+  /** …and the full answer it gave the leader. */
+  detail?: string;
 }
 
 interface ChatMessage {
@@ -67,6 +73,8 @@ async function askModel(model: string, messages: ChatMessage[], tools: unknown[]
 export async function runAgent(options: {
   model: string;
   toolIds: ToolId[];
+  /** Tools only this run gets, on top of the bot's own (a team leader's "ask_teammate"). */
+  extraTools?: ToolDef[];
   messages: ChatMessage[];
   context: ToolContext;
   /** 'low' for background tasks. Default 'high'. */
@@ -75,6 +83,7 @@ export async function runAgent(options: {
   onStep: (step: AgentStep) => void;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
   const tools = toolsFor(options.toolIds);
+  for (const tool of options.extraTools ?? []) tools.set(tool.schema.function.name, tool);
   const schemas = [...tools.values()].map((t) => t.schema);
   const messages = [...options.messages];
   const steps: AgentStep[] = [];
@@ -113,8 +122,24 @@ export async function runAgent(options: {
       let output: string;
       try {
         if (!def) throw new Error(`There is no tool called ${call.name}.`);
-        const result = await def.run(call.args, { ...options.context, priority: options.priority ?? 'high' });
-        Object.assign(step, { status: 'done', summary: result.summary, links: result.links, image: result.image });
+        const result = await def.run(call.args, {
+          ...options.context,
+          priority: options.priority ?? 'high',
+          // A long tool (a teammate at work) can show its progress before it finishes.
+          progress: (update) => {
+            Object.assign(step, update);
+            options.onStep({ ...step });
+          },
+        });
+        Object.assign(step, {
+          status: 'done',
+          summary: result.summary,
+          links: result.links,
+          image: result.image,
+          bot: result.bot,
+          children: result.children,
+          detail: result.detail,
+        });
         output = result.output;
       } catch (err) {
         const message = (err as Error).message || 'The tool failed.';

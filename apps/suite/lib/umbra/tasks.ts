@@ -11,12 +11,15 @@ import { USERS, type UserId } from '@/lib/users';
 import { nextRun, parseSchedule, type Schedule } from '@/config/umbra-schedule';
 import { runAgent, type AgentStep } from './agent';
 import { getBot, listNotes, systemPrompt } from './bots';
+import { getTeam, listTeamMessages, runTeam, viewTeam } from './teams';
 
 export const TASK_LIMITS = { title: 80, instructions: 2000 };
 
 export interface Task {
   id: string;
   botId: string;
+  /** Set for a team's task (then botId is the team's leader). */
+  teamId: string | null;
   title: string;
   instructions: string;
   schedule: Schedule;
@@ -30,6 +33,7 @@ export interface Run {
   id: string;
   taskId: string | null;
   botId: string;
+  teamId: string | null;
   title: string;
   status: 'running' | 'done' | 'error';
   report: string | null;
@@ -42,12 +46,13 @@ export interface Run {
 // ------------------------------------------------------------------ reading rows
 
 type TaskRow = {
-  id: string; bot_id: string; title: string; instructions: string; schedule: string;
+  id: string; bot_id: string; team_id: string | null; title: string; instructions: string; schedule: string;
   enabled: number; nextRunAt: string | null; lastRunAt: string | null; createdAt: string;
 };
 const toTask = (r: TaskRow): Task => ({
   id: r.id,
   botId: r.bot_id,
+  teamId: r.team_id ?? null,
   title: r.title,
   instructions: r.instructions,
   schedule: parseSchedule(safeJson(r.schedule)) ?? { kind: 'once' },
@@ -58,13 +63,14 @@ const toTask = (r: TaskRow): Task => ({
 });
 
 type RunRow = {
-  id: string; task_id: string | null; bot_id: string; title: string; status: Run['status'];
+  id: string; task_id: string | null; bot_id: string; team_id: string | null; title: string; status: Run['status'];
   report: string | null; steps: string | null; read: number; startedAt: string; finishedAt: string | null;
 };
 const toRun = (r: RunRow): Run => ({
   id: r.id,
   taskId: r.task_id,
   botId: r.bot_id,
+  teamId: r.team_id ?? null,
   title: r.title,
   status: r.status,
   report: r.report,
@@ -101,8 +107,15 @@ export function validateTask(input: Record<string, unknown>):
 
 export function listTasks(userId: string, botId: string): Task[] {
   const rows = db
-    .prepare('SELECT * FROM UmbraTask WHERE user_id = ? AND bot_id = ? ORDER BY createdAt ASC')
+    .prepare('SELECT * FROM UmbraTask WHERE user_id = ? AND bot_id = ? AND team_id IS NULL ORDER BY createdAt ASC')
     .all(userId, botId) as unknown as TaskRow[];
+  return rows.map(toTask);
+}
+
+export function listTeamTasks(userId: string, teamId: string): Task[] {
+  const rows = db
+    .prepare('SELECT * FROM UmbraTask WHERE user_id = ? AND team_id = ? ORDER BY createdAt ASC')
+    .all(userId, teamId) as unknown as TaskRow[];
   return rows.map(toTask);
 }
 
@@ -111,15 +124,23 @@ export function getTask(userId: string, id: string): Task | null {
   return row ? toTask(row) : null;
 }
 
-/** A new task. "Once" tasks are due right away; others at their first scheduled time. */
-export function createTask(userId: string, botId: string, input: Pick<Task, 'title' | 'instructions' | 'schedule'>): Task {
+/**
+ * A new task. "Once" tasks are due right away; others at their first scheduled time.
+ * For a team's task, botId is the team's leader.
+ */
+export function createTask(
+  userId: string,
+  botId: string,
+  input: Pick<Task, 'title' | 'instructions' | 'schedule'>,
+  teamId: string | null = null,
+): Task {
   const id = crypto.randomUUID();
   const now = new Date();
   const due = input.schedule.kind === 'once' ? now : nextRun(input.schedule, now);
   db.prepare(
-    `INSERT INTO UmbraTask (id, bot_id, user_id, title, instructions, schedule, enabled, nextRunAt, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-  ).run(id, botId, userId, input.title, input.instructions, JSON.stringify(input.schedule), due?.toISOString() ?? null, now.toISOString());
+    `INSERT INTO UmbraTask (id, bot_id, team_id, user_id, title, instructions, schedule, enabled, nextRunAt, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).run(id, botId, teamId, userId, input.title, input.instructions, JSON.stringify(input.schedule), due?.toISOString() ?? null, now.toISOString());
   return getTask(userId, id)!;
 }
 
@@ -188,16 +209,21 @@ function claim(task: Task, now: Date): boolean {
 export async function runTask(userId: string, task: Task): Promise<Run> {
   const bot = getBot(userId, task.botId);
   if (!bot) throw new Error('The bot for this task no longer exists.');
+  const teamRow = task.teamId ? getTeam(userId, task.teamId) : null;
+  const team = teamRow ? viewTeam(userId, teamRow) : null;
+  if (task.teamId && !team) throw new Error('The team for this task no longer exists.');
 
   const runId = crypto.randomUUID();
   const startedAt = new Date().toISOString();
   db.prepare(
-    `INSERT INTO UmbraRun (id, task_id, bot_id, user_id, title, status, read, startedAt) VALUES (?, ?, ?, ?, ?, 'running', 0, ?)`,
-  ).run(runId, task.id, bot.id, userId, task.title, startedAt);
+    `INSERT INTO UmbraRun (id, task_id, bot_id, team_id, user_id, title, status, read, startedAt) VALUES (?, ?, ?, ?, ?, ?, 'running', 0, ?)`,
+  ).run(runId, task.id, bot.id, task.teamId, userId, task.title, startedAt);
 
   const userName = USERS[userId as UserId] ?? 'your user';
   const job = [
-    `This is a task you're doing on your own; ${userName} isn't watching. They'll read your report later in their inbox.`,
+    team
+      ? `This is a task your team is doing on its own; ${userName} isn't watching. They'll read your report later in their inbox.`
+      : `This is a task you're doing on your own; ${userName} isn't watching. They'll read your report later in their inbox.`,
     `Task: ${task.title}`,
     `Instructions: ${task.instructions}`,
     'Do the task now, using your tools where they help. Your final message IS the report: a short, clear write-up ' +
@@ -207,17 +233,28 @@ export async function runTask(userId: string, task: Task): Promise<Run> {
   ].join('\n\n');
 
   try {
-    const result = await runAgent({
-      model: bot.model,
-      toolIds: bot.tools,
-      messages: [
-        { role: 'system', content: systemPrompt(bot, userName, listNotes(bot.id)) },
-        { role: 'user', content: job },
-      ],
-      context: { userId, botId: bot.id },
-      priority: 'low',
-      onStep: () => {},
-    });
+    const result = team
+      ? await runTeam({
+          userId,
+          userName,
+          team,
+          // The leader gets the recent team chat for context, like in a live chat.
+          history: listTeamMessages(team.id, 10).map((m) => ({ role: m.role, content: m.content })),
+          message: job,
+          priority: 'low',
+          onStep: () => {},
+        })
+      : await runAgent({
+          model: bot.model,
+          toolIds: bot.tools,
+          messages: [
+            { role: 'system', content: systemPrompt(bot, userName, listNotes(bot.id)) },
+            { role: 'user', content: job },
+          ],
+          context: { userId, botId: bot.id },
+          priority: 'low',
+          onStep: () => {},
+        });
     db.prepare("UPDATE UmbraRun SET status = 'done', report = ?, steps = ?, finishedAt = ? WHERE id = ?").run(
       result.reply, JSON.stringify(result.steps), new Date().toISOString(), runId,
     );

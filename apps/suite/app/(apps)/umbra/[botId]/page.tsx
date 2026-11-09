@@ -1,9 +1,7 @@
-'use client';
-
-import { useParams } from 'next/navigation';
 import BotChat from '../_components/BotChat';
 
-export default function BotChatPage() {
-  const { botId } = useParams<{ botId: string }>();
+// The id comes from the address. Reading it here (on the server) means the first HTML already has it.
+export default async function BotChatPage({ params }: { params: Promise<{ botId: string }> }) {
+  const { botId } = await params;
   return <BotChat key={botId} botId={botId} />;
 }

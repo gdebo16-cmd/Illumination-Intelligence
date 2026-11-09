@@ -73,7 +73,7 @@ export default function Inbox() {
                 <span className="umbra-report-who">
                   <span className="umbra-report-title">{run.title}</span>
                   <span className="umbra-report-meta">
-                    {run.botName} · {when(run.startedAt)}
+                    {run.teamName ? `${run.teamName} (team)` : run.botName} · {when(run.startedAt)}
                     {run.status === 'running' && ' · working…'}
                     {run.status === 'error' && ' · didn’t finish'}
                   </span>
@@ -89,7 +89,11 @@ export default function Inbox() {
                     <MessageContent content={run.report ?? ''} />
                   )}
                   <div className="umbra-report-actions">
-                    <Link href={`/umbra/${run.botId}`}>Chat with {run.botName}</Link>
+                    {run.teamId && run.teamName !== 'A deleted team' ? (
+                      <Link href={`/umbra/teams/${run.teamId}`}>Chat with {run.teamName}</Link>
+                    ) : (
+                      <Link href={`/umbra/${run.botId}`}>Chat with {run.botName}</Link>
+                    )}
                     <button type="button" onClick={() => remove(run)}>Delete report</button>
                   </div>
                 </div>

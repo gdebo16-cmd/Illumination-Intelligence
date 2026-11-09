@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import Flame from './Flame';
-import type { Bot } from './types';
+import type { Bot, Team } from './types';
 
 export default function BotGallery() {
   const [bots, setBots] = useState<Bot[] | null>(null);
   const [error, setError] = useState('');
   const [unread, setUnread] = useState(0);
+  const [teams, setTeams] = useState<Team[]>([]);
 
   useEffect(() => {
     fetch('/api/umbra/bots')
@@ -20,6 +21,10 @@ export default function BotGallery() {
         setBots(await res.json());
       })
       .catch((err: Error) => setError(err.message));
+    fetch('/api/umbra/teams')
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setTeams)
+      .catch(() => {});
     fetch('/api/umbra/inbox?count=1')
       .then((res) => (res.ok ? res.json() : { unread: 0 }))
       .then((data) => setUnread(data.unread ?? 0))
@@ -63,6 +68,38 @@ export default function BotGallery() {
         </div>
 
         {bots === null && !error && <p className="umbra-muted">Gathering your flames…</p>}
+
+        {/* Teams: bots working together under a leader. */}
+        {bots && bots.length >= 2 && (
+          <section className="umbra-teams">
+            <h2>Teams</h2>
+            <p className="umbra-muted">Bots working together: a leader hands parts of a job to its teammates.</p>
+            <div className="umbra-grid">
+              {teams.map((team) => (
+                <Link
+                  key={team.id}
+                  href={`/umbra/teams/${team.id}`}
+                  className="umbra-card umbra-team-card"
+                  style={{ '--bot-color': flameColor(team.leader.flame) } as React.CSSProperties}
+                >
+                  <span className="umbra-team-flames">
+                    <Flame flame={team.leader.flame} size={84} />
+                    {team.crew.slice(0, 3).map((c) => <Flame key={c.bot.id} flame={c.bot.flame} size={52} still />)}
+                  </span>
+                  <span className="umbra-card-name">{team.name}</span>
+                  <span className="umbra-card-purpose">
+                    {team.leader.name} + {team.crew.map((c) => c.bot.name).join(', ')}
+                  </span>
+                </Link>
+              ))}
+              <Link href="/umbra/teams/new" className="umbra-card umbra-card-new">
+                <span className="umbra-card-plus" aria-hidden>+</span>
+                <span className="umbra-card-name">Build a team</span>
+                <span className="umbra-card-purpose">Put a few bots on one job</span>
+              </Link>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );

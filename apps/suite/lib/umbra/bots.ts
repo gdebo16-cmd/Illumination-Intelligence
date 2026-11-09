@@ -111,6 +111,14 @@ export function deleteBot(userId: string, id: string): boolean {
   db.prepare('DELETE FROM UmbraNote WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
+  // Teams: drop it from teams it's on; teams it leads go too (a team can't work without its leader).
+  db.prepare('DELETE FROM UmbraTeamMember WHERE bot_id = ?').run(id);
+  for (const { id: teamId } of db.prepare('SELECT id FROM UmbraTeam WHERE leader_id = ?').all(id) as { id: string }[]) {
+    db.prepare('DELETE FROM UmbraTeamMessage WHERE team_id = ?').run(teamId);
+    db.prepare('DELETE FROM UmbraTeamMember WHERE team_id = ?').run(teamId);
+    db.prepare('DELETE FROM UmbraTask WHERE team_id = ?').run(teamId);
+    db.prepare('DELETE FROM UmbraTeam WHERE id = ?').run(teamId);
+  }
   db.prepare('DELETE FROM UmbraBot WHERE id = ?').run(id);
   return true;
 }

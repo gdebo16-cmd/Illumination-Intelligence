@@ -1,9 +1,7 @@
-'use client';
-
-import { useParams } from 'next/navigation';
 import BotForm from '../../_components/BotForm';
 
-export default function EditBotPage() {
-  const { botId } = useParams<{ botId: string }>();
+// The id comes from the address. Reading it here (on the server) means the first HTML already has it.
+export default async function EditBotPage({ params }: { params: Promise<{ botId: string }> }) {
+  const { botId } = await params;
   return <BotForm key={botId} botId={botId} />;
 }
