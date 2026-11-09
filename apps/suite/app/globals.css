@@ -925,7 +925,7 @@ header > .model-select-container {
 }
 
 /* Bot creator */
-.umbra-form { max-width: 640px; display: flex; flex-direction: column; gap: 1rem; }
+.umbra-form { max-width: 640px; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;}
 .umbra-field { display: flex; flex-direction: column; gap: 0.4rem; margin: 0; padding: 0; border: none; min-width: 0; }
 .umbra-label { font-size: 0.75rem; color: #aab; text-transform: uppercase; letter-spacing: 0.05em; padding: 0; }
 .umbra-form input,
