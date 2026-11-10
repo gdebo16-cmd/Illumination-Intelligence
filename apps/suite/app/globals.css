@@ -2327,6 +2327,37 @@ body {
     transform: rotate(360deg); 
   } }
 /* #endregion animations */
+/* #region chat bar floats over the messages (phones) */
+/* The message list runs to the bottom of the screen, behind the message bar. --bar-h is the bar's
+   height (set by hooks/use-bar-height.ts), so the newest message still stops just above the bar. */
+@media (max-width: 768px) {
+  main:has(> .input-container),
+  .umbra-chat { position: relative; }
+  .input-container,
+  .umbra-chat .umbra-input {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    isolation: isolate;}
+  /* Soft blur behind the bar that fades out upward, so messages slide under it gently */
+  .input-container::before,
+  .umbra-chat .umbra-input::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
+    mask-image: linear-gradient(to top, #000 55%, transparent);}
+  .messages-container,
+  .umbra-chat .umbra-messages {
+    padding-bottom: calc(var(--bar-h, 5rem) + 0.75rem);
+    scroll-padding-bottom: calc(var(--bar-h, 5rem) + 0.75rem);}}
+/* #endregion chat bar */
 
 /* #region Umbra teams (stage 4) */
 .umbra-teams {

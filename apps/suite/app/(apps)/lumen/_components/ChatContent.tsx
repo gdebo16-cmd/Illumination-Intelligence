@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from './ChatContext';
 import { MessageContent } from '@/components/MessageContent';
+import { useBarHeight } from '@/hooks/use-bar-height';
 import { splitContent, DocumentCard, DocumentPanel } from './documents';
 
 const getAdaptiveLoadingText = (prompt: string): string => {
@@ -42,6 +43,9 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  useBarHeight(barRef, listRef);
 
   // The box grows with what you type (up to about six lines), then scrolls.
   useEffect(() => {
@@ -111,7 +115,7 @@ const Chat = () => {
 
   return (
     <>
-      <div className="messages-container">
+      <div ref={listRef} className="messages-container">
         {messages.length === 0 && !loadingConversation && (
           <div className="messages-empty">
             <p className="messages-empty-subtitle">Select your model above and write a prompt to begin.</p>
@@ -152,7 +156,7 @@ const Chat = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="input-container">
+      <div ref={barRef} className="input-container">
         <form ref={formRef} onSubmit={handleSubmit} className="input-form">
           <textarea
             ref={inputRef}

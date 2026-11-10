@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
+import { useBarHeight } from '@/hooks/use-bar-height';
 import Flame from './Flame';
 import { Steps } from './Steps';
 import type { AgentStep, BotMessage, Team } from './types';
@@ -19,6 +20,9 @@ export default function TeamChat({ teamId }: { teamId: string }) {
   const [liveSteps, setLiveSteps] = useState<AgentStep[]>([]);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLFormElement>(null);
+  useBarHeight(barRef, listRef, Boolean(team));
 
   useEffect(() => {
     Promise.all([fetch(`/api/umbra/teams/${teamId}`), fetch(`/api/umbra/teams/${teamId}/messages`)])
@@ -132,7 +136,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
         <button type="button" className="umbra-chat-action" onClick={clearChat} disabled={messages.length === 0}>Clear</button>
       </div>
 
-      <div className="umbra-messages">
+      <div ref={listRef} className="umbra-messages">
         {messages.length === 0 && !thinking && (
           <div className="umbra-hello umbra-team-hello">
             <div className="umbra-team-flames">
@@ -170,7 +174,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
         <div ref={endRef} />
       </div>
 
-      <form className="umbra-input" onSubmit={send}>
+      <form ref={barRef} className="umbra-input" onSubmit={send}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
+import { useBarHeight } from '@/hooks/use-bar-height';
 import Flame from './Flame';
 import { Steps } from './Steps';
 import type { AgentStep, Bot, BotMessage } from './types';
@@ -18,6 +19,9 @@ export default function BotChat({ botId }: { botId: string }) {
   const [liveSteps, setLiveSteps] = useState<AgentStep[]>([]);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLFormElement>(null);
+  useBarHeight(barRef, listRef, Boolean(bot));
 
   // Load the bot and its chat.
   useEffect(() => {
@@ -122,7 +126,7 @@ export default function BotChat({ botId }: { botId: string }) {
       </div>
 
       {/* The conversation */}
-      <div className="umbra-messages">
+      <div ref={listRef} className="umbra-messages">
         {messages.length === 0 && !thinking && (
           <div className="umbra-hello">
             <Flame flame={bot.flame} size={120} />
@@ -160,7 +164,7 @@ export default function BotChat({ botId }: { botId: string }) {
       </div>
 
       {/* Your message */}
-      <form className="umbra-input" onSubmit={send}>
+      <form ref={barRef} className="umbra-input" onSubmit={send}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
