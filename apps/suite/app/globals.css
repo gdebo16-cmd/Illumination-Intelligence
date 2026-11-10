@@ -2,8 +2,16 @@
 
 :root {
   --sidebar-w: 280px;
-  --header-h: calc(clamp(56px, 8dvh, 88px) + env(safe-area-inset-top));
+  /* Room for the phone's status bar (clock, battery). --status-gap adds a little more below it,
+     because when the app is saved to the iPhone home screen, iOS blurs a strip just under the
+     status bar too, and the logo should sit clear of that blur. */
+  --status-gap: 0px;
+  --safe-top: calc(env(safe-area-inset-top) + var(--status-gap));
+  --header-h: calc(clamp(56px, 8dvh, 88px) + var(--safe-top));
   --banner-gap: 4px;}
+/* Home-screen app on a phone with a status bar (the min() is 0 on screens without one) */
+@media (display-mode: standalone) {
+  :root { --status-gap: min(env(safe-area-inset-top), 14px); }}
 
 /* #region Global CSS Styles */
 *, *::before, *::after {
@@ -35,7 +43,7 @@ header {
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-  padding: env(safe-area-inset-top) max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
+  padding: var(--safe-top) max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
   height: var(--header-h);
   background-color: var(--edge-color);
   box-shadow: var(--box-shadow);}
@@ -69,8 +77,8 @@ body {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  top: calc(env(safe-area-inset-top) + var(--banner-gap));
-  height: calc(100% - env(safe-area-inset-top) - 2 * var(--banner-gap));
+  top: calc(var(--safe-top) + var(--banner-gap));
+  height: calc(100% - var(--safe-top) - 2 * var(--banner-gap));
   width: auto;
   max-width: 100%;
   object-fit: cover;
