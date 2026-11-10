@@ -191,4 +191,27 @@ addColumn('PrismImage', 'mode', "TEXT NOT NULL DEFAULT 'create'");
 addColumn('PrismImage', 'source_id', 'TEXT');
 addColumn('UmbraRun', 'team_id', 'TEXT');
 
+// Prism videos: one row per video made from a picture. The files are data/prism/videos/<id>.mp4
+// and <id>.png (the starting picture, shown before the video plays).
+// status: 'working' while it's being made, then 'done' or 'failed' (with the reason in error).
+// seconds is how long the GPU took, which is what the length picker's time estimates average.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS PrismVideo (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    image_id TEXT,
+    prompt TEXT NOT NULL,
+    length TEXT NOT NULL,
+    frames INTEGER NOT NULL,
+    seed INTEGER NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'working',
+    error TEXT,
+    seconds REAL,
+    createdAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_prism_video_user ON PrismVideo (user_id, createdAt);
+`);
+
 export default db;

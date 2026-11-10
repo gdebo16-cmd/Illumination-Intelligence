@@ -63,7 +63,7 @@ export interface ImageResult {
 }
 
 // Shape of one box in the recipe file.
-type Workflow = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
+export type Workflow = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
 // The model needs sizes in steps of 16 pixels, between 256 and 2048.
 const fitSize = (n: number) => Math.min(2048, Math.max(256, Math.round(n / 16) * 16));
@@ -106,7 +106,7 @@ export function buildWorkflow(
  * Step 0, UPLOAD (editing only): put the picture in ComfyUI's input folder, like the
  * "choose file to upload" button on a Load Image box. Returns the name to put in the recipe.
  */
-async function upload(png: Buffer): Promise<string> {
+export async function upload(png: Buffer): Promise<string> {
   const form = new FormData();
   const name = `edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
   form.append('image', new Blob([new Uint8Array(png)], { type: 'image/png' }), name);
@@ -119,7 +119,7 @@ async function upload(png: Buffer): Promise<string> {
 }
 
 /** Step 1, ORDER: hand the recipe to ComfyUI. Returns the ticket number. */
-async function order(workflow: Workflow): Promise<string> {
+export async function order(workflow: Workflow): Promise<string> {
   const res = await fetch(`${COMFY_URL}/prompt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -134,14 +134,17 @@ async function order(workflow: Workflow): Promise<string> {
 }
 
 // What ComfyUI says about a finished picture: its file name and folder.
-interface ImageInfo {
+export interface ImageInfo {
   filename: string;
   subfolder: string;
   type: string;
 }
 
-/** Step 2, WAIT: ask about the ticket every half second until it's done. */
-async function waitFor(ticket: string, timeoutSeconds = 300): Promise<ImageInfo> {
+/**
+ * Step 2, WAIT: ask about the ticket every half second until it's done.
+ * `saveBox` is the box whose result we want (videos come out of a different box than pictures).
+ */
+export async function waitFor(ticket: string, saveBox = BOX.save, timeoutSeconds = 300): Promise<ImageInfo> {
   const giveUpAt = Date.now() + timeoutSeconds * 1000;
 
   while (Date.now() < giveUpAt) {
@@ -158,7 +161,7 @@ async function waitFor(ticket: string, timeoutSeconds = 300): Promise<ImageInfo>
         const problem = job.status.messages?.find(([kind]) => kind === 'execution_error')?.[1];
         throw new Error(`ComfyUI failed in ${problem?.node_type ?? 'a step'}: ${problem?.exception_message ?? 'unknown error'}`);
       }
-      const picture = job.outputs?.[BOX.save]?.images?.[0];
+      const picture = job.outputs?.[saveBox]?.images?.[0];
       if (picture) return picture;
     }
 
@@ -168,11 +171,23 @@ async function waitFor(ticket: string, timeoutSeconds = 300): Promise<ImageInfo>
 }
 
 /** Step 3, PICK UP: download the finished picture. */
-async function pickUp(info: ImageInfo): Promise<Buffer> {
+export async function pickUp(info: ImageInfo): Promise<Buffer> {
   const query = new URLSearchParams({ filename: info.filename, subfolder: info.subfolder, type: info.type });
   const res = await fetch(`${COMFY_URL}/view?${query}`);
-  if (!res.ok) throw new Error(`Couldn't download the picture from ComfyUI (${res.status}).`);
+  if (!res.ok) throw new Error(`Couldn't download the result from ComfyUI (${res.status}).`);
   return Buffer.from(await res.arrayBuffer());
+}
+
+/**
+ * Ask ComfyUI to unload its models and give the memory back. The video model is big (10 GB)
+ * and didn't fit next to the picture models, so videos clear the way first and tidy up after.
+ */
+export async function freeMemory(): Promise<void> {
+  await fetch(`${COMFY_URL}/free`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ unload_models: true, free_memory: true }),
+  });
 }
 
 /** All the steps together: describe (or hand over) a picture, get the PNG back. */

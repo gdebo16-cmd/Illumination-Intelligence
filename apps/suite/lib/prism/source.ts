@@ -6,6 +6,7 @@
 //   1. turn it upright (phones store "rotate me" as a note instead of rotating the pixels),
 //   2. put any see-through parts on solid black (ComfyUI can't handle transparency),
 //   3. resize it smoothly to about 1 megapixel, in steps of 16 pixels (what the model needs).
+// Videos use the same steps with a smaller size (see lib/prism/video.ts).
 
 import 'server-only';
 import sharp, { type Metadata } from 'sharp';
@@ -21,7 +22,14 @@ export interface PreparedSource {
   height: number;
 }
 
-export async function prepareSource(input: Buffer): Promise<PreparedSource> {
+/**
+ * Options: `pixels` is the target size (default about 1 megapixel) and `step` the multiple the
+ * sides are rounded to (16 for FLUX pictures; the Wan video model needs 32).
+ */
+export async function prepareSource(
+  input: Buffer,
+  { pixels = TARGET_PIXELS, step = 16 }: { pixels?: number; step?: number } = {},
+): Promise<PreparedSource> {
   let meta: Metadata;
   try {
     meta = await sharp(input).metadata();
@@ -35,11 +43,11 @@ export async function prepareSource(input: Buffer): Promise<PreparedSource> {
   const w = sideways ? meta.height : meta.width;
   const h = sideways ? meta.width : meta.height;
 
-  // Scale to about 1 megapixel, keeping the shape, rounded to multiples of 16.
-  const scale = Math.sqrt(TARGET_PIXELS / (w * h));
-  const fit16 = (n: number) => Math.min(2048, Math.max(256, Math.round((n * scale) / 16) * 16));
-  const width = fit16(w);
-  const height = fit16(h);
+  // Scale to the target size, keeping the shape, rounded to multiples of `step`.
+  const scale = Math.sqrt(pixels / (w * h));
+  const fit = (n: number) => Math.min(2048, Math.max(256, Math.round((n * scale) / step) * step));
+  const width = fit(w);
+  const height = fit(h);
 
   const png = await sharp(input)
     .rotate() // upright, using the phone's note
