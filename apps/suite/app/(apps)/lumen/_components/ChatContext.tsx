@@ -35,6 +35,7 @@ interface ChatContextValue {
   conversations: ConversationItem[];
   refreshConversations: () => Promise<void>;
   loadConversation: (id: string) => Promise<void>;
+  deleteConversation: (id: string) => Promise<void>;
   startNewChat: () => void;
   loadingConversation: boolean;
   isSidebarOpen: boolean;
@@ -98,6 +99,19 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setMessages([]);
   }, []);
 
+  const deleteConversation = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/lumen/conversations/${id}`, { method: 'DELETE' });
+      // 404 means it is already gone, so drop it from the list either way.
+      if (!res.ok && res.status !== 404) return;
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      // Deleting the chat that is open leaves an empty, new chat.
+      if (id === conversationId) startNewChat();
+    } catch (err) {
+      console.error('Failed to delete conversation', err);
+    }
+  }, [conversationId, startNewChat]);
+
   const value = useMemo(
     () => ({
       selectedModel,
@@ -109,13 +123,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       conversations,
       refreshConversations,
       loadConversation,
+      deleteConversation,
       startNewChat,
       loadingConversation,
       isSidebarOpen,
       toggleSidebar,
       closeSidebar,
     }),
-    [selectedModel, messages, conversationId, conversations, refreshConversations, loadConversation, startNewChat, loadingConversation, isSidebarOpen, toggleSidebar, closeSidebar],
+    [selectedModel, messages, conversationId, conversations, refreshConversations, loadConversation, deleteConversation, startNewChat, loadingConversation, isSidebarOpen, toggleSidebar, closeSidebar],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -12,6 +12,7 @@ const Sidebar = () => {
     conversations,
     conversationId,
     loadConversation,
+    deleteConversation,
     startNewChat,
     isSidebarOpen,
     closeSidebar,
@@ -28,16 +29,29 @@ const Sidebar = () => {
         </div>
         <button className='new-chat-button' onClick={() => { startNewChat(); closeSidebar(); }}>+ New chat</button>
         <span className='sidebar-separator'>Previous Chats</span>
-        {conversations.map((c) => (
-          <button
-            className='chat-button'
-            key={c.id}
-            aria-current={c.id === conversationId}
-            onClick={() => { loadConversation(c.id); closeSidebar(); }}
-          >
-            {c.title}
-          </button>
-        ))}
+        <div className='chat-list'>
+          {conversations.map((c) => (
+            <div className={`chat-row ${c.id === conversationId ? 'is-current' : ''}`} key={c.id}>
+              <button
+                className='chat-button'
+                aria-current={c.id === conversationId}
+                onClick={() => { loadConversation(c.id); closeSidebar(); }}
+              >
+                {c.title}
+              </button>
+              <button
+                className='chat-delete'
+                aria-label={`Delete chat: ${c.title}`}
+                title='Delete chat'
+                onClick={() => {
+                  if (window.confirm(`Delete "${c.title}"? This can't be undone.`)) deleteConversation(c.id);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
         <span className='sidebar-separator'>
           Settings
         </span>

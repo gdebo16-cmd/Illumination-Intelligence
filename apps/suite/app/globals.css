@@ -103,6 +103,7 @@ header > .model-select-container {
   gap: 0.5rem;
   padding: 0.75rem;
   overflow-y: auto;
+  scrollbar-width: none;
   background: var(--accent-color);
   border-right: 1px solid var(--border-color);
   transform: translateX(-100%);
@@ -129,7 +130,8 @@ header > .model-select-container {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .sidebar button:hover { 
   background: rgb(255 255 255 / 0.06); }
-.sidebar button[aria-current="true"] { 
+.sidebar button[aria-current="true"],
+.chat-row.is-current { 
   background: rgb(120 120 255 / 0.15); 
   border-color: rgb(120 120 255 / 0.35); }
 .sidebar .sidebar-close { 
@@ -162,12 +164,58 @@ header > .model-select-container {
   text-align: left;
   color: #e5e7f0;
   background: transparent;}
-.chat-button {
-  width: 100%;
+.sidebar::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar {
+  display: none;}
+/* Everything in the sidebar keeps its size except the chat list, which scrolls inside
+   its own box. That keeps New chat, Previous Chats, Settings and Model on screen together. */
+.sidebar > * {
+  flex-shrink: 0;}
+.sidebar > .chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 0 1 auto;
+  height: 40dvh;
+  min-height: 3rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;}
+.chat-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;}
+.chat-row:hover {
+  background: rgb(255 255 255 / 0.06);}
+.sidebar .chat-button {
+  flex: 1;
+  min-width: 0;
+  width: auto;
   padding: 0.6rem 0.75rem;
   text-align: left;
   color: #e5e7f0;
+  border: none;
   background: transparent;}
+/* The row carries the hover and current-chat highlight, not the button inside it */
+.sidebar .chat-button:hover,
+.sidebar .chat-button[aria-current="true"] {
+  background: transparent;}
+.sidebar .chat-delete {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  color: #aab;
+  border: none;
+  background: transparent;}
+.sidebar .chat-delete:hover {
+  color: #ffb4b4;
+  background: rgb(255 80 80 / 0.15);}
 .switch-profile-button {
   width: 100%;
   padding: 0.6rem 0.75rem;
@@ -906,6 +954,14 @@ textarea.input-field {
 .prism-thumb.is-failed .prism-thumb-badge { background: rgb(200 60 60 / 0.85); }
 /* #endregion prism */
 /* #region umbra */
+.umbra {
+  --bot-color: #a77bff;
+  color: #e5e7f0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
 .umbra::-webkit-scrollbar { 
   display: none; 
 }
@@ -1161,6 +1217,7 @@ textarea.input-field {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -1610,6 +1667,12 @@ textarea.input-field {
   .sidebar-toggle,
   .app-launcher-button { width: 44px; height: 44px; }
   .sidebar button { min-height: 44px; }
+  /* On phones the header covers the top of the screen, including the sidebar, so the
+     sidebar's content starts below it. */
+  .sidebar {
+    padding-top: calc(var(--header-h) + 0.75rem);
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    padding-left: calc(0.75rem + env(safe-area-inset-left));}
   .app-launcher-grid { grid-template-columns: repeat(3, minmax(76px, 88px)); }
   .messages-container { padding: 0.75rem; gap: 1.25rem; }
   .message-content { max-width: 92%; padding: 0.75rem 0.25rem; font-weight: 500; }
