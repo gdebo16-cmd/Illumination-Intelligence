@@ -312,6 +312,14 @@ header > .model-select-container {
     background: radial-gradient(circle at top center, var(--load) 0%, var(--primary-color) 100%); }
 .input-field::placeholder {
   color: var(--placeholder); }
+/* Lumen's message box is a textarea so Enter can add a new line. */
+textarea.input-field {
+  display: block;
+  resize: none;
+  font-family: inherit;
+  line-height: normal;
+  overflow-y: auto;
+  scrollbar-width: none;}
 .send-button {
   background: radial-gradient(circle at center, var(--load) 0%, var(--primary-color) 100%); 
   color: var(--text-color); 

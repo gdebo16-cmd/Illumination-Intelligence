@@ -40,6 +40,24 @@ const Chat = () => {
   const [openDoc, setOpenDoc] = useState<{ title: string; content: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // The box grows with what you type (up to about six lines), then scrolls.
+  useEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
+  }, [input]);
+
+  // Enter adds a new line. Ctrl+Enter (Cmd+Enter on a Mac) sends, like the send button.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      formRef.current?.requestSubmit();
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -135,14 +153,16 @@ const Chat = () => {
       </div>
 
       <div className="input-container">
-        <form onSubmit={handleSubmit} className="input-form">
-          <input
-            type="text"
+        <form ref={formRef} onSubmit={handleSubmit} className="input-form">
+          <textarea
+            ref={inputRef}
+            rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Type a prompt..."
             aria-label="Message"
-            enterKeyHint="send"
+            enterKeyHint="enter"
             autoComplete="off"
             className="input-field"
           />
