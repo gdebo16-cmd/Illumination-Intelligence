@@ -23,7 +23,7 @@ export default function BotChat({ botId }: { botId: string }) {
   useEffect(() => {
     Promise.all([fetch(`/api/umbra/bots/${botId}`), fetch(`/api/umbra/bots/${botId}/messages`)])
       .then(async ([botRes, msgRes]) => {
-        if (!botRes.ok) throw new Error((await botRes.json()).error ?? 'Could not load this bot.');
+        if (!botRes.ok) throw new Error((await botRes.json()).error ?? 'Could not load this Flicker.');
         setBot(await botRes.json());
         if (msgRes.ok) setMessages(await msgRes.json());
       })
@@ -57,7 +57,7 @@ export default function BotChat({ botId }: { botId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
       });
-      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error ?? 'The bot could not reply.');
+      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error ?? 'The Flicker could not reply.');
 
       // Read the stream line by line: each line is one event.
       const reader = res.body.getReader();
@@ -80,7 +80,7 @@ export default function BotChat({ botId }: { botId: string }) {
         }
       }
     } catch (err) {
-      setError((err as Error).message || 'The bot could not reply.');
+      setError((err as Error).message || 'The Flicker could not reply.');
     } finally {
       setThinking(false);
       setLiveSteps([]);
@@ -88,7 +88,7 @@ export default function BotChat({ botId }: { botId: string }) {
   };
 
   const clearChat = async () => {
-    if (!bot || !window.confirm(`Clear your whole chat with ${bot.name}? The bot itself stays.`)) return;
+    if (!bot || !window.confirm(`Clear your whole chat with ${bot.name}? The Flicker itself stays.`)) return;
     const res = await fetch(`/api/umbra/bots/${botId}/messages`, { method: 'DELETE' });
     if (res.ok) setMessages([]);
   };
@@ -97,8 +97,8 @@ export default function BotChat({ botId }: { botId: string }) {
     return (
       <main className="umbra">
         <div className="umbra-page">
-          <Link href="/umbra" className="umbra-back">← Your bots</Link>
-          {error ? <p className="umbra-error" role="alert">{error}</p> : <p className="umbra-muted">Waking your bot…</p>}
+          <Link href="/umbra" className="umbra-back">← Your Flickers</Link>
+          {error ? <p className="umbra-error" role="alert">{error}</p> : <p className="umbra-muted">Waking your Flicker…</p>}
         </div>
       </main>
     );
@@ -110,7 +110,7 @@ export default function BotChat({ botId }: { botId: string }) {
     <main className="umbra umbra-chat" style={{ '--bot-color': flameColor(bot.flame) } as React.CSSProperties}>
       {/* Who you're talking to */}
       <div className="umbra-chat-bar">
-        <Link href="/umbra" className="umbra-back" aria-label="Your bots">←</Link>
+        <Link href="/umbra" className="umbra-back" aria-label="Your Flickers">←</Link>
         <Flame flame={bot.flame} size={40} />
         <div className="umbra-chat-who">
           <span className="umbra-chat-name">{bot.name}</span>

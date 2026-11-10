@@ -99,7 +99,7 @@ export function validateTask(input: Record<string, unknown>):
   const schedule = parseSchedule(input.schedule);
   if (!title) return { error: 'Give the task a short title.' };
   if (title.length > TASK_LIMITS.title) return { error: `Keep the title under ${TASK_LIMITS.title} characters.` };
-  if (!instructions) return { error: 'Describe what the bot should do.' };
+  if (!instructions) return { error: 'Describe what the Flicker should do.' };
   if (instructions.length > TASK_LIMITS.instructions) return { error: 'The instructions are too long.' };
   if (!schedule) return { error: 'Pick when the task should run.' };
   return { task: { title, instructions, schedule } };
@@ -208,7 +208,7 @@ function claim(task: Task, now: Date): boolean {
 /** Run a task now: the bot works on it with its tools, and the report lands in the inbox. */
 export async function runTask(userId: string, task: Task): Promise<Run> {
   const bot = getBot(userId, task.botId);
-  if (!bot) throw new Error('The bot for this task no longer exists.');
+  if (!bot) throw new Error('The Flicker for this task no longer exists.');
   const teamRow = task.teamId ? getTeam(userId, task.teamId) : null;
   const team = teamRow ? viewTeam(userId, teamRow) : null;
   if (task.teamId && !team) throw new Error('The team for this task no longer exists.');
@@ -261,7 +261,7 @@ export async function runTask(userId: string, task: Task): Promise<Run> {
   } catch (err) {
     const message = (err as Error).message || 'The task failed.';
     db.prepare("UPDATE UmbraRun SET status = 'error', report = ?, finishedAt = ? WHERE id = ?").run(
-      /fetch failed|ECONNREFUSED/i.test(message) ? 'Ollama wasn’t running, so the bot couldn’t work on this.' : message,
+      /fetch failed|ECONNREFUSED/i.test(message) ? 'Ollama wasn’t running, so the Flicker couldn’t work on this.' : message,
       new Date().toISOString(),
       runId,
     );

@@ -34,7 +34,7 @@ export default function BotForm({ botId }: { botId?: string }) {
     if (!botId) return;
     fetch(`/api/umbra/bots/${botId}`)
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load this bot.');
+        if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load this Flicker.');
         const bot: Bot = await res.json();
         setForm({ name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model, tools: bot.tools });
         setLoaded(true);
@@ -68,7 +68,7 @@ export default function BotForm({ botId }: { botId?: string }) {
         body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Could not save the bot.');
+      if (!res.ok) throw new Error(data.error ?? 'Could not save the Flicker.');
       router.push(`/umbra/${data.id}`);
     } catch (err) {
       setError((err as Error).message);
@@ -77,17 +77,17 @@ export default function BotForm({ botId }: { botId?: string }) {
   };
 
   const remove = async () => {
-    if (!window.confirm(`Delete ${form.name || 'this bot'} and its whole chat? This can't be undone.`)) return;
+    if (!window.confirm(`Delete ${form.name || 'this Flicker'} and its whole chat? This can't be undone.`)) return;
     const res = await fetch(`/api/umbra/bots/${botId}`, { method: 'DELETE' });
     if (res.ok) router.push('/umbra');
-    else setError('Could not delete the bot.');
+    else setError('Could not delete the Flicker.');
   };
 
   return (
     <main className="umbra">
       <form className="umbra-page umbra-form" onSubmit={save} style={{ '--bot-color': flameColor(form.flame) } as React.CSSProperties}>
-        <Link href={editing ? `/umbra/${botId}` : '/umbra'} className="umbra-back">← {editing ? 'Back to chat' : 'Your bots'}</Link>
-        <h1>{editing ? `Edit ${form.name || 'bot'}` : 'Create a bot'}</h1>
+        <Link href={editing ? `/umbra/${botId}` : '/umbra'} className="umbra-back">← {editing ? 'Back to chat' : 'Your Flickers'}</Link>
+        <h1>{editing ? `Edit ${form.name || 'Flicker'}` : 'Create a Flicker'}</h1>
 
         {!loaded && !error && <p className="umbra-muted">Loading…</p>}
 
@@ -192,7 +192,7 @@ export default function BotForm({ botId }: { botId?: string }) {
                 {saving ? 'Saving…' : editing ? 'Save changes' : 'Bring it to life'}
               </button>
               {editing && (
-                <button type="button" className="umbra-danger" onClick={remove}>Delete bot</button>
+                <button type="button" className="umbra-danger" onClick={remove}>Delete Flicker</button>
               )}
             </div>
           </>

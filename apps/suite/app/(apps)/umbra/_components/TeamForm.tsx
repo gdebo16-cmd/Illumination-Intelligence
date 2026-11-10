@@ -29,7 +29,7 @@ export default function TeamForm({ teamId }: { teamId?: string }) {
   useEffect(() => {
     fetch('/api/umbra/bots')
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load your bots.');
+        if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load your Flickers.');
         const list: Bot[] = await res.json();
         setBots(list);
         if (!teamId) setLeaderId((id) => id || list[0]?.id || '');
@@ -83,7 +83,7 @@ export default function TeamForm({ teamId }: { teamId?: string }) {
   };
 
   const remove = async () => {
-    if (!window.confirm(`Delete the team ${name || ''} and its chat? The bots themselves stay.`)) return;
+    if (!window.confirm(`Delete the team ${name || ''} and its chat? The Flickers themselves stay.`)) return;
     const res = await fetch(`/api/umbra/teams/${teamId}`, { method: 'DELETE' });
     if (res.ok) router.push('/umbra');
     else setError('Could not delete the team.');
@@ -99,7 +99,7 @@ export default function TeamForm({ teamId }: { teamId?: string }) {
         onSubmit={save}
         style={{ '--bot-color': flameColor(leader?.flame ?? '') } as React.CSSProperties}
       >
-        <Link href={editing ? `/umbra/teams/${teamId}` : '/umbra'} className="umbra-back">← {editing ? 'Back to the team' : 'Your bots'}</Link>
+        <Link href={editing ? `/umbra/teams/${teamId}` : '/umbra'} className="umbra-back">← {editing ? 'Back to the team' : 'Your Flickers'}</Link>
         <h1>{editing ? `Edit ${name || 'team'}` : 'Build a team'}</h1>
         <p className="umbra-muted">
           The leader reads your message and hands parts of the job to teammates. Each teammate works with its own tools,
@@ -110,7 +110,7 @@ export default function TeamForm({ teamId }: { teamId?: string }) {
 
         {bots !== null && bots.length < 2 && (
           <p className="umbra-notice">
-            A team needs at least two bots. <Link href="/umbra/new">Create another bot</Link> first.
+            A team needs at least two Flickers. <Link href="/umbra/new">Create another Flicker</Link> first.
           </p>
         )}
 
@@ -151,7 +151,7 @@ export default function TeamForm({ teamId }: { teamId?: string }) {
                   </button>
                 ))}
               </div>
-              <span className="umbra-muted umbra-hint">Pick a bot with a capable model; it does the planning. GPT-OSS works best.</span>
+              <span className="umbra-muted umbra-hint">Pick a Flicker with a capable model; it does the planning. GPT-OSS works best.</span>
             </fieldset>
 
             <fieldset className="umbra-field">

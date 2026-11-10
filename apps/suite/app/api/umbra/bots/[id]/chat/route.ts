@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const userId = await getCurrentUserId();
   if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
   const bot = getBot(userId, (await params).id);
-  if (!bot) return NextResponse.json({ error: 'Bot not found.' }, { status: 404 });
+  if (!bot) return NextResponse.json({ error: 'Flicker not found.' }, { status: 404 });
 
   // 2. What did they say?
   const body = (await req.json().catch(() => ({}))) as { message?: unknown };

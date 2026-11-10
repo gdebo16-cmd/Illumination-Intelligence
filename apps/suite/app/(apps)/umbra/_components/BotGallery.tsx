@@ -17,7 +17,7 @@ export default function BotGallery() {
   useEffect(() => {
     fetch('/api/umbra/bots')
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load your bots.');
+        if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load your Flickers.');
         setBots(await res.json());
       })
       .catch((err: Error) => setError(err.message));
@@ -36,8 +36,8 @@ export default function BotGallery() {
       <div className="umbra-page">
         <div className="umbra-intro umbra-intro-row">
           <div>
-            <h1>Your bots</h1>
-            <p>Each flame is a bot with its own personality and purpose. Tap one to chat.</p>
+            <h1>Your Flickers</h1>
+            <p>Each flame is a Flicker with its own personality and purpose. Tap one to chat.</p>
           </div>
           <Link href="/umbra/inbox" className="umbra-inbox-link">
             Inbox{unread > 0 && <span className="umbra-badge">{unread}</span>}
@@ -62,7 +62,7 @@ export default function BotGallery() {
 
           <Link href="/umbra/new" className="umbra-card umbra-card-new">
             <span className="umbra-card-plus" aria-hidden>+</span>
-            <span className="umbra-card-name">Create a bot</span>
+            <span className="umbra-card-name">Create a Flicker</span>
             <span className="umbra-card-purpose">Pick a flame and bring it to life</span>
           </Link>
         </div>
@@ -73,7 +73,7 @@ export default function BotGallery() {
         {bots && bots.length >= 2 && (
           <section className="umbra-teams">
             <h2>Teams</h2>
-            <p className="umbra-muted">Bots working together: a leader hands parts of a job to its teammates.</p>
+            <p className="umbra-muted">Flickers working together: a leader hands parts of a job to its teammates.</p>
             <div className="umbra-grid">
               {teams.map((team) => (
                 <Link
@@ -95,7 +95,7 @@ export default function BotGallery() {
               <Link href="/umbra/teams/new" className="umbra-card umbra-card-new">
                 <span className="umbra-card-plus" aria-hidden>+</span>
                 <span className="umbra-card-name">Build a team</span>
-                <span className="umbra-card-purpose">Put a few bots on one job</span>
+                <span className="umbra-card-purpose">Put a few Flickers on one job</span>
               </Link>
             </div>
           </section>

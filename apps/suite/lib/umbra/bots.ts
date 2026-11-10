@@ -62,9 +62,9 @@ export function validateBot(input: Record<string, unknown>): { error: string } |
     // Leaving tools out (older forms) gives the bot every tool.
     tools: Array.isArray(input.tools) ? [...new Set(input.tools.filter(isToolId))] : [...ALL_TOOL_IDS],
   };
-  if (!bot.name) return { error: 'Give your bot a name.' };
+  if (!bot.name) return { error: 'Give your Flicker a name.' };
   if (bot.name.length > BOT_LIMITS.name) return { error: `Keep the name under ${BOT_LIMITS.name} characters.` };
-  if (!isFlame(bot.flame)) return { error: 'Pick a flame for your bot.' };
+  if (!isFlame(bot.flame)) return { error: 'Pick a flame for your Flicker.' };
   if (bot.personality.length > BOT_LIMITS.personality) return { error: 'The personality is too long.' };
   if (bot.purpose.length > BOT_LIMITS.purpose) return { error: 'The purpose is too long.' };
   if (!isBotModel(bot.model)) return { error: 'Pick one of the listed models.' };
@@ -178,7 +178,7 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
   const usesWeb = bot.tools.includes('web_search') || bot.tools.includes('read_webpage');
 
   return [
-    `You are ${bot.name}, a bot created by ${userName} in Umbra, part of the Illumination Intelligence suite.`,
+    `You are ${bot.name}, a Flicker (an AI helper) created by ${userName} in Umbra, part of the Illumination Intelligence suite.`,
     `You appear as a small ${bot.flame} flame spirit.`,
     bot.purpose && `What you're for: ${bot.purpose}`,
     bot.personality && `Your personality and how you talk: ${bot.personality}`,

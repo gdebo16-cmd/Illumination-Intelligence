@@ -1,6 +1,6 @@
 'use client';
 
-// /umbra/inbox — reports from tasks your bots did on their own.
+// /umbra/inbox — reports from tasks your Flickers did on their own.
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -51,10 +51,10 @@ export default function Inbox() {
   return (
     <main className="umbra">
       <div className="umbra-page">
-        <Link href="/umbra" className="umbra-back">← Your bots</Link>
+        <Link href="/umbra" className="umbra-back">← Your Flickers</Link>
         <div className="umbra-intro">
           <h1>Inbox</h1>
-          <p>Reports from tasks your bots did on their own. Give a bot tasks from its chat (the Tasks button).</p>
+          <p>Reports from tasks your Flickers did on their own. Give a Flicker tasks from its chat (the Tasks button).</p>
         </div>
 
         {error && <p className="umbra-error" role="alert">{error}</p>}

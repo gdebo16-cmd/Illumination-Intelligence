@@ -11,7 +11,7 @@ async function ownedBot(params: Params['params']) {
   const userId = await getCurrentUserId();
   if (!userId) return { error: NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 }) };
   const bot = getBot(userId, (await params).id);
-  if (!bot) return { error: NextResponse.json({ error: 'Bot not found.' }, { status: 404 }) };
+  if (!bot) return { error: NextResponse.json({ error: 'Flicker not found.' }, { status: 404 }) };
   return { bot };
 }
 

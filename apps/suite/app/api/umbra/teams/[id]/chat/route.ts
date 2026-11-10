@@ -53,7 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           error: /fetch failed|ECONNREFUSED/i.test(text)
             ? 'Ollama isn’t running, so the team can’t think right now.'
             : /not found/i.test(text)
-              ? 'One of the team’s models isn’t installed. Check each bot’s settings.'
+              ? 'One of the team’s models isn’t installed. Check each Flicker’s settings.'
               : text || 'Something went wrong.',
         });
       } finally {

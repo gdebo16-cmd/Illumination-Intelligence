@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   const teams = new Map(listTeams(userId).map((t) => [t.id, t]));
   const runs = listRuns(userId).map((run) => ({
     ...run,
-    botName: bots.get(run.botId)?.name ?? 'A deleted bot',
+    botName: bots.get(run.botId)?.name ?? 'A deleted Flicker',
     botFlame: bots.get(run.botId)?.flame ?? 'pearl',
     // A team's report shows the team's name (the flame is its leader's).
     teamName: run.teamId ? (teams.get(run.teamId)?.name ?? 'A deleted team') : null,

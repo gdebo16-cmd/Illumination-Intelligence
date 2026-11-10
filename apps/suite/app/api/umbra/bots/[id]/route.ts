@@ -8,7 +8,7 @@ import { deleteBot, getBot, updateBot, validateBot } from '@/lib/umbra/bots';
 
 type Params = { params: Promise<{ id: string }> };
 const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
-const notFound = () => NextResponse.json({ error: 'Bot not found.' }, { status: 404 });
+const notFound = () => NextResponse.json({ error: 'Flicker not found.' }, { status: 404 });
 
 export async function GET(_req: Request, { params }: Params) {
   const userId = await getCurrentUserId();

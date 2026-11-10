@@ -94,7 +94,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
     return (
       <main className="umbra">
         <div className="umbra-page">
-          <Link href="/umbra" className="umbra-back">← Your bots</Link>
+          <Link href="/umbra" className="umbra-back">← Your Flickers</Link>
           {error ? <p className="umbra-error" role="alert">{error}</p> : <p className="umbra-muted">Gathering the team…</p>}
         </div>
       </main>
@@ -116,7 +116,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
   return (
     <main className="umbra umbra-chat" style={{ '--bot-color': flameColor(leader.flame) } as React.CSSProperties}>
       <div className="umbra-chat-bar">
-        <Link href="/umbra" className="umbra-back" aria-label="Your bots">←</Link>
+        <Link href="/umbra" className="umbra-back" aria-label="Your Flickers">←</Link>
         <div className="umbra-team-flames" aria-hidden>
           <Flame flame={leader.flame} size={40} />
           {team.crew.slice(0, 3).map((c) => <Flame key={c.bot.id} flame={c.bot.flame} size={26} still />)}
