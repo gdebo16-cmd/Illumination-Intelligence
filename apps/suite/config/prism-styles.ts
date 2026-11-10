@@ -23,7 +23,10 @@ export const PRISM_STYLES: readonly PrismStyle[] = [
   { id: 'pixel', name: 'Pixel art', words: 'pixel art, 16-bit retro game style, limited color palette, crisp pixels' },
   { id: '3d', name: '3D render', words: '3D render, soft studio lighting, smooth materials, octane render style' },
   { id: 'comic', name: 'Comic book', words: 'comic book art, bold ink outlines, halftone shading, dynamic composition' },
-  { id: 'fantasy', name: 'Fantasy RPG', words: 'fantasy RPG concept art, painterly, epic lighting, detailed environment' },
+  { id: 'fantasy', name: 'Fantasy RPG', words: 'epic fantasy RPG scene, painterly digital painting, dramatic lighting, rich detailed environment, clean full-frame image filling the whole canvas, edge to edge' },
+  { id: 'mono-sketch', name: 'Mono sketch', words: 'graphite pencil sketch, monochrome, loose expressive strokes, cross-hatching, visible construction lines, sketchbook paper, no color' },
+  { id: 'color-sketch', name: 'Colored sketch', words: 'colored pencil sketch, loose pencil linework with light color washes, hand-drawn, visible strokes and hatching, sketchbook paper texture' },
+  { id: 'linework', name: 'Linework', words: 'clean ink line art, black lines on white background, precise even line weight, no shading, no color, no fill, coloring book style' },
 ];
 
 /** Your prompt plus the chosen style's words. Unknown style ids are treated as "None". */
