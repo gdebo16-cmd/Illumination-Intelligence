@@ -2,7 +2,7 @@
 //
 // Each picture is two things:
 //   - the PNG file, in data/prism/images/<id>.png
-//   - a row in the PrismImage table: who made it, and the prompt/style/seed/size used
+//   - a row in the PrismImage table: who made it, and the prompt/style/seed/size/model used
 
 import 'server-only';
 import crypto from 'node:crypto';
@@ -22,6 +22,10 @@ export interface PrismImage {
   width: number;
   height: number;
   seconds: number | null;
+  /** The model that painted it: an id from config/prism-models.ts. */
+  model: string;
+  /** What the prompt expander turned your prompt into. null when it wasn't used. */
+  expandedPrompt: string | null;
   /** 'create' = made from words; 'edit' = an edited picture (prompt is the instruction). */
   mode: 'create' | 'edit';
   /** For an edit of one of your Prism pictures: which one. */
@@ -51,9 +55,12 @@ export function saveImage(
   const createdAt = new Date().toISOString();
   try {
     db.prepare(
-      `INSERT INTO PrismImage (id, user_id, prompt, style, seed, width, height, seconds, mode, source_id, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, userId, prompt, style, result.seed, result.width, result.height, result.seconds, mode, sourceId, createdAt);
+      `INSERT INTO PrismImage (id, user_id, prompt, style, seed, width, height, seconds, model, expanded_prompt, mode, source_id, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id, userId, prompt, style, result.seed, result.width, result.height, result.seconds, result.model, result.expandedPrompt,
+      mode, sourceId, createdAt,
+    );
   } catch (err) {
     // Don't leave a picture file behind with no record of it.
     fs.rmSync(file, { force: true });
@@ -62,7 +69,7 @@ export function saveImage(
 
   return withUrl({
     id, prompt, style, seed: result.seed, width: result.width, height: result.height, seconds: result.seconds,
-    mode, sourceId, createdAt,
+    model: result.model, expandedPrompt: result.expandedPrompt, mode, sourceId, createdAt,
   });
 }
 
@@ -70,7 +77,8 @@ export function saveImage(
 export function listImages(userId: string, limit = 60): PrismImage[] {
   const rows = db
     .prepare(
-      `SELECT id, prompt, style, seed, width, height, seconds, mode, source_id AS sourceId, createdAt
+      `SELECT id, prompt, style, seed, width, height, seconds, model, expanded_prompt AS expandedPrompt, mode,
+              source_id AS sourceId, createdAt
        FROM PrismImage WHERE user_id = ? ORDER BY createdAt DESC LIMIT ?`,
     )
     .all(userId, limit) as Row[];

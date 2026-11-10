@@ -8,7 +8,7 @@
 
 import 'server-only';
 import crypto from 'node:crypto';
-import { gpuQueue } from '@/lib/queue';
+import { gpuQueue, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
 import { toolsFor, type ToolContext, type ToolDef } from './tools';
 import type { CodeEditView } from './code';
@@ -63,16 +63,23 @@ function thinkSetting(model: string): { think?: boolean | 'low' } {
   return {};
 }
 
-async function askModel(model: string, messages: ChatMessage[], tools: unknown[], priority: Priority): Promise<OllamaReply> {
+async function askModel(model: string, messages: ChatMessage[], tools: unknown[], priority: Priority, userId: string): Promise<OllamaReply> {
   return gpuQueue.add(async () => {
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: false, ...thinkSetting(model), ...(tools.length ? { tools } : {}) }),
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: { num_ctx: OLLAMA_NUM_CTX },
+        ...thinkSetting(model),
+        ...(tools.length ? { tools } : {}),
+      }),
     });
     if (!res.ok) throw new Error(`Ollama error ${res.status}: ${await res.text()}`);
     return (await res.json()) as OllamaReply;
-  }, priority, 'ollama');
+  }, priority, 'ollama', { userId, model });
 }
 
 export async function runAgent(options: {
@@ -97,7 +104,7 @@ export async function runAgent(options: {
   for (let round = 0; round <= maxRounds; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
     const lastRound = round === maxRounds;
-    const reply = await askModel(options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high');
+    const reply = await askModel(options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high', options.context.userId);
     const calls = reply.message?.tool_calls ?? [];
 
     if (calls.length === 0 || lastRound) {

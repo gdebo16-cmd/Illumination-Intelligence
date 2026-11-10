@@ -1,16 +1,18 @@
 'use client';
 
-// Prism's page: describe a picture, pick a style and shape, press Generate.
+// Prism's page: describe a picture, pick a model, style and shape, press Generate.
 // Or start from a picture (upload one, or "Edit this" on one of yours) and either say what to
 // change, or bring it to life as a short video ("Make video").
 // It talks to these API routes:
 //   POST /api/prism/generate   make a picture, or edit one
 //   GET  /api/prism/images     your recent pictures
+//   GET  /api/prism/models     the picture models, and whether each one is downloaded yet
 //   POST /api/prism/videos     start a video (it's made in the background)
 //   GET  /api/prism/videos     your videos, and the length choices with their usual wait
 
 import { useEffect, useRef, useState } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
+import { DEFAULT_PRISM_MODEL, PRISM_MODELS, findPrismModel } from '@/config/prism-models';
 import QueueNotice from '@/components/QueueNotice';
 
 // The shapes you can pick. Sizes are in steps of 16 pixels, as the model needs.
@@ -30,10 +32,22 @@ interface PrismImage {
   width: number;
   height: number;
   seconds: number | null;
+  model?: string;
+  expandedPrompt?: string | null;
   mode?: 'create' | 'edit';
   sourceId?: string | null;
   createdAt: string;
   url: string;
+}
+
+// A picture model in the dropdown. `ready` is false until its files are in ComfyUI;
+// `expands` is true when it has a prompt expander (the "Expand my prompt" switch).
+interface ModelChoice {
+  id: string;
+  name: string;
+  note: string;
+  expands: boolean;
+  ready: boolean;
 }
 
 // ...and for each video.
@@ -97,6 +111,12 @@ const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.fl
 const Prism = () => {
   // The form
   const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState<string>(DEFAULT_PRISM_MODEL);
+  // Until the server says which models are downloaded, list them all as ready.
+  const [models, setModels] = useState<ModelChoice[]>(() => PRISM_MODELS.map((m) => ({ ...m, ready: true })));
+  const pickedModel = models.find((m) => m.id === model);
+  // The prompt expander's switch. It only does something for a model that has one (FLUX.3).
+  const [expand, setExpand] = useState(true);
   const [style, setStyle] = useState<string>(PRISM_STYLES[0].id);
   const [shape, setShape] = useState<(typeof SHAPES)[number]['id']>('square');
   const [source, setSource] = useState<Source | null>(null);
@@ -131,6 +151,13 @@ const Prism = () => {
         if (cancelled) return;
         setImages(list);
         setShown((current) => current ?? (list[0] ? { kind: 'image', id: list[0].id } : null));
+      })
+      .catch(() => {});
+    // Which picture models are downloaded? (The ones that aren't get greyed out.)
+    fetch('/api/prism/models')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((list: ModelChoice[] | null) => {
+        if (!cancelled && list?.length) setModels(list);
       })
       .catch(() => {});
     loadVideos();
@@ -237,10 +264,10 @@ const Prism = () => {
       const res = await send(
         '/api/prism/generate',
         source?.kind === 'image'
-          ? { prompt, style, sourceId: source.image.id }
+          ? { prompt, model, expand: String(expand), style, sourceId: source.image.id }
           : source
-            ? { prompt, style }
-            : { prompt, style, width: size.width, height: size.height },
+            ? { prompt, model, expand: String(expand), style }
+            : { prompt, model, expand: String(expand), style, width: size.width, height: size.height },
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
@@ -253,9 +280,16 @@ const Prism = () => {
     }
   };
 
-  // Put a past picture's prompt, style and shape back into the form.
+  // Put a past picture's prompt, model, style and shape back into the form.
   const reuse = (image: PrismImage) => {
     setPrompt(image.prompt);
+    // Its model too, as long as that model is still downloaded.
+    const itsModel = models.find((m) => m.id === image.model && m.ready);
+    if (itsModel) {
+      setModel(itsModel.id);
+      // ...and whether the prompt expander was on (a picture has expanded text only if it was).
+      if (itsModel.expands) setExpand(Boolean(image.expandedPrompt));
+    }
     setStyle(image.style);
     setMake('edit');
     // For an edit, bring back the picture it started from too (if it's still in your list).
@@ -414,6 +448,31 @@ const Prism = () => {
             </>
           ) : (
             <>
+              <label className="prism-label" htmlFor="prism-model">Model</label>
+              <select id="prism-model" className="prism-select" value={model} onChange={(e) => setModel(e.target.value)}>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id} disabled={!m.ready}>
+                    {m.ready ? m.name : `${m.name} (not downloaded yet)`}
+                  </option>
+                ))}
+              </select>
+              <p className="prism-note">{pickedModel?.note}</p>
+
+              {/* Only for a model with a prompt expander (FLUX.3) */}
+              {pickedModel?.expands && (
+                <label className="prism-check">
+                  <input type="checkbox" checked={expand} onChange={(e) => setExpand(e.target.checked)} />
+                  <span>
+                    Expand my prompt
+                    <span>
+                      {editing
+                        ? 'A helper looks at your picture and writes out the change in detail. This model works best that way.'
+                        : 'A helper rewrites your prompt into a long, detailed one. This model paints best from those.'}
+                    </span>
+                  </span>
+                </label>
+              )}
+
               <label className="prism-label" htmlFor="prism-style">Art style</label>
               <select id="prism-style" className="prism-select" value={style} onChange={(e) => setStyle(e.target.value)}>
                 {PRISM_STYLES.map((s) => (
@@ -502,9 +561,16 @@ const Prism = () => {
               <figcaption>
                 <span className="prism-caption-text">{shownImage.prompt}</span>
                 <span className="prism-caption-meta">
-                  {shownImage.mode === 'edit' ? 'Edit · ' : ''}{styleName(shownImage.style)} · {shownImage.width}×{shownImage.height}
+                  {shownImage.mode === 'edit' ? 'Edit · ' : ''}{findPrismModel(shownImage.model).name} · {styleName(shownImage.style)} · {shownImage.width}×{shownImage.height}
                   {shownImage.seconds ? ` · ${shownImage.seconds.toFixed(1)}s` : ''}
                 </span>
+                {/* With the prompt expander on: what it wrote, and so what the model really painted from */}
+                {shownImage.expandedPrompt && (
+                  <details className="prism-expanded" key={shownImage.id}>
+                    <summary>See the expanded prompt</summary>
+                    <p>{shownImage.expandedPrompt}</p>
+                  </details>
+                )}
                 <span className="prism-caption-actions">
                   <button type="button" onClick={() => startFrom(shownImage, 'edit')}>Edit this</button>
                   <button type="button" onClick={() => startFrom(shownImage, 'video')}>Make video</button>

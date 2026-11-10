@@ -40,19 +40,19 @@
 [data-theme="prism"] {
     --background-color: #000000;
     --text-color: #ffffff;
-    --primary-color: rgba(36, 24, 50, 0.685);
-    --secondary-color: rgba(45, 73, 59, 0.753);
-    --grad-color-1: #2c4a66;
-    --grad-color-2: #240d2e;
-    --accent-color: #e4dab9;
-    --border-color: #5a4b39;
+    --primary-color: rgba(151, 89, 221, 0.685);
+    --secondary-color: rgba(10, 54, 32, 0.753);
+    --grad-color-1: #162736;
+    --grad-color-2: #176864;
+    --accent-color: #1a3a35;
+    --border-color: #8f7336;
     --edge-color: #030406;
     --chat-user: #d7e6c0;
     --chat-assistant: #d1abfc;
     --load: #6f3c7e;
     --placeholder: #3f414567;
     --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+    --box-shadow: 0 0 30px 2px rgb(0, 0, 0);
 }
 
 [data-theme="halo"] {

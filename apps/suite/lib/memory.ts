@@ -3,7 +3,7 @@
 import 'server-only';
 
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
-const EXTRACT_MODEL = process.env.MEMORY_EXTRACT_MODEL ?? 'qwen3:8b'; // ideally the model already loaded
+export const EXTRACT_MODEL = process.env.MEMORY_EXTRACT_MODEL ?? 'qwen3:8b'; // ideally the model already loaded
 const EMBED_MODEL = process.env.MEMORY_EMBED_MODEL ?? 'nomic-embed-text';
 
 // Minimal shape of node:sqlite's DatabaseSync, so this file needs no extra types.
@@ -246,4 +246,4 @@ export async function buildMemoryBlock(
   ).run(...usedIds);
 
   return `Things you know about the user (use only when relevant; don't mention that you have notes):\n${lines.join('\n')}`;
-}
+}

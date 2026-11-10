@@ -1,33 +1,38 @@
 {
-  "name": "illumination-suite",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev -p 3001",
-    "build": "next build",
-    "start": "next start -p 3000",
-    "prod": "next build && next start -p 3000",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "dotenv": "^18.0.9",
-    "highlight.js": "^11.12.0",
-    "next": "16.4.5",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "react-markdown": "^10.1.0",
-    "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1",
-    "server-only": "^0.0.1",
-    "sharp": "^0.35.5"
-  },
-  "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.5",
-    "typescript": "^5"
-  }
+    "name":  "illumination-suite",
+    "version":  "0.1.0",
+    "private":  true,
+    "scripts":  {
+                    "dev":  "next dev -p 3001",
+                    "build":  "next build",
+                    "start":  "next start -p 3000",
+                    "prod":  "next build \u0026\u0026 next start -p 3000",
+                    "lint":  "eslint"
+                },
+    "dependencies":  {
+                         "dotenv":  "^18.0.9",
+                         "highlight.js":  "^11.12.0",
+                         "next":  "16.4.5",
+                         "react":  "19.3.0",
+                         "react-dom":  "19.3.0",
+                         "react-markdown":  "^10.1.0",
+                         "rehype-highlight":  "^7.0.2",
+                         "remark-gfm":  "^4.0.1",
+                         "server-only":  "^0.0.1",
+                         "sharp":  "^0.35.5"
+                     },
+    "devDependencies":  {
+                            "@tailwindcss/turbopack":  "^4",
+                            "@types/node":  "^20",
+                            "@types/react":  "^19",
+                            "@types/react-dom":  "^19",
+                            "eslint":  "^9",
+                            "eslint-config-next":  "16.4.5",
+                            "typescript":  "^5"
+                        },
+    "overrides":  {
+                      "@typescript-eslint/typescript-estree":  {
+                                                                   "minimatch":  "^11.0.6"
+                                                               }
+                  }
 }

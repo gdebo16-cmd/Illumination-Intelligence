@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from './ChatContext';
 import { MessageContent } from '@/components/MessageContent';
+import QueueNotice from '@/components/QueueNotice';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import { splitContent, DocumentCard, DocumentPanel } from './documents';
 
@@ -115,6 +116,7 @@ const Chat = () => {
 
   return (
     <>
+      <QueueNotice active={loading} />
       <div ref={listRef} className="messages-container">
         {messages.length === 0 && !loadingConversation && (
           <div className="messages-empty">
@@ -188,4 +190,4 @@ const Chat = () => {
   );
 };
 
-export default Chat;
+export default Chat;

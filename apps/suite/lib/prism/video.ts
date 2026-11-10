@@ -8,9 +8,19 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { freeMemory, order, pickUp, upload, waitFor, type Workflow } from './comfy.ts';
+import { freeMemory, modelFiles, order, pickUp, upload, waitFor, type Workflow } from './comfy.ts';
+import { LOCAL_WORKER, type GpuWorker } from '../../config/gpu-workers.ts';
+import type { GpuNeeds } from '../gpu/router.ts';
 
 const RECIPE = path.join(process.cwd(), 'lib', 'prism', 'wan-video-workflow.json');
+const readRecipe = () => JSON.parse(fs.readFileSync(RECIPE, 'utf8')) as Workflow;
+
+/**
+ * What a video job needs from a machine, for the GPU queue's router. The Wan model and its text
+ * encoder together want about 14 GB, so videos prefer the Raider's 16 GB card. They can only go
+ * to the Alienware once its ComfyUI has the Wan files too.
+ */
+export const videoNeeds = (): GpuNeeds => ({ label: 'Wan 2.2 video', vramGB: 14, files: modelFiles(readRecipe()) });
 
 // Which numbered box in the recipe holds each setting we change.
 const BOX = {
@@ -59,10 +69,12 @@ export interface VideoResult {
   seed: number;
   /** How long it took, in seconds (including loading the model). */
   seconds: number;
+  /** The machine that made it, e.g. "Raider". */
+  machine: string;
 }
 
 export function buildVideoWorkflow(request: VideoRequest, uploadedName: string): { workflow: Workflow; seed: number } {
-  const workflow = JSON.parse(fs.readFileSync(RECIPE, 'utf8')) as Workflow;
+  const workflow = readRecipe();
   const seed = request.seed ?? Math.floor(Math.random() * 2 ** 32);
   workflow[BOX.prompt].inputs.text = request.prompt;
   workflow[BOX.picture].inputs.image = uploadedName;
@@ -73,20 +85,24 @@ export function buildVideoWorkflow(request: VideoRequest, uploadedName: string):
   return { workflow, seed };
 }
 
-/** Make the video: clear ComfyUI's memory, run the recipe, download the MP4, clear up again. */
-export async function generateVideo(request: VideoRequest): Promise<VideoResult> {
+/**
+ * Make the video: clear ComfyUI's memory, run the recipe, download the MP4, clear up again.
+ * `worker` is the machine the GPU queue picked (this one when left out).
+ */
+export async function generateVideo(request: VideoRequest, worker: GpuWorker = LOCAL_WORKER): Promise<VideoResult> {
+  const { url } = worker;
   const started = Date.now();
-  await freeMemory();
+  await freeMemory(url);
   try {
-    const uploadedName = await upload(request.picture.png);
+    const uploadedName = await upload(url, request.picture.png);
     const { workflow, seed } = buildVideoWorkflow(request, uploadedName);
-    const ticket = await order(workflow);
+    const ticket = await order(url, workflow);
     // A long clip can take several minutes; allow up to 20.
-    const info = await waitFor(ticket, BOX.save, 20 * 60);
-    const video = await pickUp(info);
-    return { video, seed, seconds: (Date.now() - started) / 1000 };
+    const info = await waitFor(url, ticket, BOX.save, 20 * 60);
+    const video = await pickUp(url, info);
+    return { video, seed, seconds: (Date.now() - started) / 1000, machine: worker.name };
   } finally {
     // Give the memory back for pictures and chat, even if something went wrong.
-    await freeMemory().catch(() => undefined);
+    await freeMemory(url).catch(() => undefined);
   }
 }

@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import db from '@/lib/db';
 import { gpuQueue } from '@/lib/queue';
-import { VIDEO_LENGTHS, generateVideo, type VideoLengthId } from './video';
+import { VIDEO_LENGTHS, generateVideo, videoNeeds, type VideoLengthId } from './video';
 import type { PreparedSource } from './source';
 
 const VIDEO_DIR = path.join(process.cwd(), 'data', 'prism', 'videos');
@@ -71,8 +71,12 @@ export function startVideo(
   ).run(id, userId, options.imageId, options.prompt, length.id, length.frames, picture.width, picture.height, createdAt);
 
   // Not awaited on purpose: this keeps going after the page gets its answer.
+  // The GPU queue picks a machine that has the video model (see lib/gpu/router.ts).
   void gpuQueue
-    .add(() => generateVideo({ prompt: options.prompt, picture, frames: length.frames }), 'high', 'comfy', { userId })
+    .add((worker) => generateVideo({ prompt: options.prompt, picture, frames: length.frames }, worker), 'high', 'comfy', {
+      userId,
+      needs: videoNeeds(),
+    })
     .then((result) => {
       fs.writeFileSync(path.join(VIDEO_DIR, `${id}.mp4`), result.video);
       db.prepare(`UPDATE PrismVideo SET status = 'done', seed = ?, seconds = ? WHERE id = ?`).run(result.seed, result.seconds, id);

@@ -677,6 +677,58 @@ textarea.input-field {
   font-size: 0.85rem;
   opacity: 0.7;
 }
+/* Model switcher: the "Expand my prompt" tick box, for a model with a prompt expander */
+.prism-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.9rem;
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0.1rem 0 0;
+  flex-shrink: 0;
+  accent-color: var(--prism-accent);
+}
+.prism-check > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.prism-check > span > span {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+/* ...and what the expander wrote, tucked under the picture until you open it */
+.prism-expanded {
+  flex-basis: 100%;
+}
+.prism-expanded summary {
+  font-size: 0.8rem;
+  color: #8a8ca8;
+  cursor: pointer;
+}
+.prism-expanded p {
+  max-width: 62ch;
+  max-height: 7.5rem;
+  margin: 0.4rem auto 0;
+  padding: 0.6rem 0.75rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: left;
+  color: #dcdcf0;
+  background: rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;
+}
 .prism-shapes { 
   display: grid; 
   grid-template-columns: repeat(4, 1fr); 
@@ -1952,3 +2004,39 @@ textarea.input-field {
   border-radius: 10px;
 }
 /* #endregion Umbra teams */
+
+/* #region Queue notice (components/QueueNotice.tsx) */
+.queue-notice {
+  position: fixed;
+  top: calc(var(--header-h) + 0.75rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  font-size: 0.95rem;
+  color: #e8eaf6;
+  background: rgb(20 24 44 / 0.92);
+  border: 1px solid rgb(140 150 255 / 0.35);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.queue-notice-close {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.queue-notice-close:hover { background: rgb(255 255 255 / 0.1); }
+/* #endregion */

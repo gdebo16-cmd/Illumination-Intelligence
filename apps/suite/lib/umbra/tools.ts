@@ -15,7 +15,7 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import db from '@/lib/db';
 import { gpuQueue } from '@/lib/queue';
-import { generateImage } from '@/lib/prism/comfy';
+import { generateImage, imageNeeds } from '@/lib/prism/comfy';
 import { saveImage } from '@/lib/prism/images';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import type { ToolId } from '@/config/umbra';
@@ -297,8 +297,13 @@ const makeImage: ToolDef = {
     if (!prompt) throw new Error('No picture description given.');
     const style = PRISM_STYLES.some((s) => s.id === a.style) ? (a.style as string) : 'none';
     const size = SHAPES[str(a.shape)] ?? SHAPES.square;
+    const request = { prompt, style, ...size };
+    // The GPU queue picks the machine (see lib/gpu/router.ts) and passes it in as `worker`.
     const result = await gpuQueue
-      .add(() => generateImage({ prompt, style, ...size }), ctx.priority ?? 'high', 'comfy')
+      .add((worker) => generateImage(request, worker), ctx.priority ?? 'high', 'comfy', {
+        userId: ctx.userId,
+        needs: imageNeeds(request),
+      })
       .catch((err: Error) => {
         throw new Error(/fetch failed|ECONNREFUSED/i.test(err.message) ? 'Prism can’t paint right now: ComfyUI isn’t running.' : err.message);
       });

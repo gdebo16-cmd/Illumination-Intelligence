@@ -189,6 +189,11 @@ addColumn('UmbraTask', 'team_id', 'TEXT');
 // and which Prism picture it was edited from (empty for an uploaded picture).
 addColumn('PrismImage', 'mode', "TEXT NOT NULL DEFAULT 'create'");
 addColumn('PrismImage', 'source_id', 'TEXT');
+// Prism model switcher: which model painted the picture (an id from config/prism-models.ts).
+// Every picture from before the switcher was made with FLUX.2 Klein.
+addColumn('PrismImage', 'model', "TEXT NOT NULL DEFAULT 'flux2-klein'");
+// What the model's prompt expander turned the prompt into (empty when it wasn't used).
+addColumn('PrismImage', 'expanded_prompt', 'TEXT');
 addColumn('UmbraRun', 'team_id', 'TEXT');
 
 // Code helper: the one project folder a bot may look at, and whether it may change files without asking.

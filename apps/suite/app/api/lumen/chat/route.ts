@@ -1,12 +1,28 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '@/lib/db';
-import { buildMemoryBlock, extractMemories } from '@/lib/memory';
+import { buildMemoryBlock, extractMemories, EXTRACT_MODEL } from '@/lib/memory';
 import { getCurrentUserId } from '@/lib/user';
-import { gpuQueue } from '@/lib/queue';
+import { gpuQueue, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
+const DEFAULT_MODEL = 'qwen3-coder:30b';
+
+// Roughly how much past chat fits in the context window next to the system prompt and the reply.
+// (About 3 characters per token, keeping a quarter of the window free for the answer.)
+const HISTORY_CHAR_BUDGET = Math.floor(OLLAMA_NUM_CTX * 3 * 0.75);
+
+/** Keep the newest messages that fit in the budget, so Ollama never has to cut off the start. */
+function recentHistory<T extends { content: string }>(history: T[], budget: number): T[] {
+  let used = 0;
+  let start = history.length;
+  while (start > 0 && used + history[start - 1].content.length <= budget) {
+    used += history[start - 1].content.length;
+    start--;
+  }
+  return history.slice(start);
+}
 
 export async function POST(req: Request) {
   try {
@@ -75,9 +91,10 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join('\n\n');
 
+    const budget = Math.max(2000, HISTORY_CHAR_BUDGET - systemPrompt.length - prompt.length);
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...history.map((m) => ({
+      ...recentHistory(history, budget).map((m) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content,
       })),
@@ -85,21 +102,31 @@ export async function POST(req: Request) {
     ];
 
     // 8. Send to Ollama through the queue (live chat has priority over background jobs)
-    const ollamaData = await gpuQueue.add(async () => {
-      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: model || 'qwen3-coder:30b',
-          messages,
-          stream: false,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(`Ollama error: ${res.status} ${res.statusText}`);
-      }
-      return (await res.json()) as { message?: { content?: string } };
-    }, 'high');
+    //    The queue unloads any other model first and retries once if Ollama crashes.
+    const chatModel: string = model || DEFAULT_MODEL;
+    const ollamaData = await gpuQueue.add(
+      async () => {
+        const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: chatModel,
+            messages,
+            stream: false,
+            options: { num_ctx: OLLAMA_NUM_CTX },
+          }),
+        });
+        if (!res.ok) {
+          // Ollama puts the real reason in the body; keep it for the server log.
+          const detail = (await res.text().catch(() => '')).slice(0, 300);
+          throw new Error(`Ollama error: ${res.status} ${res.statusText}${detail ? ` - ${detail}` : ''}`);
+        }
+        return (await res.json()) as { message?: { content?: string } };
+      },
+      'high',
+      'ollama',
+      { userId, model: chatModel },
+    );
 
     const reply = ollamaData.message?.content || 'No response generated.';
 
@@ -114,7 +141,7 @@ export async function POST(req: Request) {
 
     // 10. Extract new memories in the background: do not await, so the reply returns immediately
     gpuQueue
-      .add(() => extractMemories(db, userId, activeConversationId), 'low')
+      .add(() => extractMemories(db, userId, activeConversationId), 'low', 'ollama', { userId, model: EXTRACT_MODEL })
       .catch((memoryError) => console.error('Memory extraction error:', memoryError));
 
     // 11. Return the response to the frontend

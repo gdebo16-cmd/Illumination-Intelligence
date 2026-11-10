@@ -49,8 +49,8 @@ export function checkCodeFolder(folder: string): string | null {
   if (!path.isAbsolute(folder)) return 'Give the full folder path, starting with the drive (like C:\\…).';
   let real: string;
   try {
-    real = fs.realpathSync(folder);
-    if (!fs.statSync(real).isDirectory()) return 'That path is a file, not a folder.';
+    real = fs.realpathSync(/* turbopackIgnore: true */ folder);
+    if (!fs.statSync(/* turbopackIgnore: true */ real).isDirectory()) return 'That path is a file, not a folder.';
   } catch {
     return 'That folder doesn’t exist on this PC.';
   }
@@ -73,7 +73,7 @@ function botSettings(botId: string): CodeBot {
     | undefined;
   if (!row?.code_folder) throw new Error('No project folder is set for the Code helper. Add one in this Flicker’s settings.');
   if (checkCodeFolder(row.code_folder)) throw new Error('The project folder in this Flicker’s settings can’t be used anymore. Check it in the settings.');
-  return { codeFolder: fs.realpathSync(row.code_folder), codeAutoWrite: row.code_auto === 1 };
+  return { codeFolder: fs.realpathSync(/* turbopackIgnore: true */ row.code_folder), codeAutoWrite: row.code_auto === 1 };
 }
 
 /** Turn a path the model gave into a real path inside the project folder, or refuse. */
@@ -83,8 +83,8 @@ function resolveInside(root: string, given: unknown): string {
   if (!isInside(root, target)) throw new Error('That path is outside the project folder.');
   // Follow shortcuts (symlinks): the deepest part that exists must still be inside.
   let probe = target;
-  while (!fs.existsSync(probe)) probe = path.dirname(probe);
-  if (!isInside(root, fs.realpathSync(probe))) throw new Error('That path leads outside the project folder.');
+  while (!fs.existsSync(/* turbopackIgnore: true */ probe)) probe = path.dirname(probe);
+  if (!isInside(root, fs.realpathSync(/* turbopackIgnore: true */ probe))) throw new Error('That path leads outside the project folder.');
   const parts = path.relative(root, target).split(path.sep);
   if (parts.includes('.git')) throw new Error('The .git folder is off limits.');
   if (SECRET_FILE.test(path.basename(target))) throw new Error('That file may hold passwords or keys, so it’s off limits.');
@@ -94,10 +94,10 @@ function resolveInside(root: string, given: unknown): string {
 const shown = (root: string, full: string) => path.relative(root, full).split(path.sep).join('/') || '.';
 
 function readText(file: string): string {
-  const stat = fs.statSync(file);
+  const stat = fs.statSync(/* turbopackIgnore: true */ file);
   if (!stat.isFile()) throw new Error('That is a folder, not a file.');
   if (stat.size > FILE_BYTE_LIMIT) throw new Error('That file is too big to read.');
-  const buffer = fs.readFileSync(file);
+  const buffer = fs.readFileSync(/* turbopackIgnore: true */ file);
   if (buffer.subarray(0, 8000).includes(0)) throw new Error('That isn’t a text file.');
   return buffer.toString('utf8');
 }
@@ -120,8 +120,8 @@ const listFolder: ToolDef = {
   run: async (a, ctx) => {
     const { codeFolder: root } = botSettings(ctx.botId);
     const dir = resolveInside(root, a.path);
-    if (!fs.statSync(dir).isDirectory()) throw new Error('That is a file, not a folder.');
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    if (!fs.statSync(/* turbopackIgnore: true */ dir).isDirectory()) throw new Error('That is a file, not a folder.');
+    const entries = fs.readdirSync(/* turbopackIgnore: true */ dir, { withFileTypes: true })
       .filter((e) => !(e.isDirectory() && SKIP_DIRS.has(e.name)) && !SECRET_FILE.test(e.name))
       .sort((x, y) => Number(y.isDirectory()) - Number(x.isDirectory()) || x.name.localeCompare(y.name));
     const lines = entries.slice(0, LIST_LIMIT).map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
@@ -196,7 +196,7 @@ const searchCode: ToolDef = {
     const hits: string[] = [];
     let files = 0;
     const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      for (const entry of fs.readdirSync(/* turbopackIgnore: true */ dir, { withFileTypes: true })) {
         if (hits.length >= SEARCH_RESULT_LIMIT || files >= SEARCH_FILE_LIMIT) return;
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
@@ -218,7 +218,7 @@ const searchCode: ToolDef = {
         }
       }
     };
-    if (fs.statSync(start).isDirectory()) walk(start);
+    if (fs.statSync(/* turbopackIgnore: true */ start).isDirectory()) walk(start);
     else throw new Error('Give a folder to search in, not a file.');
     if (hits.length === 0) return { output: 'No matches.', summary: 'No matches' };
     const capped = hits.length >= SEARCH_RESULT_LIMIT ? '\n…(more matches; search for something more specific)' : '';
@@ -277,9 +277,9 @@ function makeDiff(file: string, before: string, find: string, replace: string): 
 function writeEdit(edit: Pick<EditRow, 'root' | 'path' | 'find' | 'replace'>): void {
   const file = resolveInside(edit.root, edit.path);
   if (!edit.find) {
-    if (fs.existsSync(file)) throw new Error('That file exists now, so it wasn’t created.');
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, edit.replace, 'utf8');
+    if (fs.existsSync(/* turbopackIgnore: true */ file)) throw new Error('That file exists now, so it wasn’t created.');
+    fs.mkdirSync(/* turbopackIgnore: true */ path.dirname(file), { recursive: true });
+    fs.writeFileSync(/* turbopackIgnore: true */ file, edit.replace, 'utf8');
     return;
   }
   const before = readText(file);
@@ -289,7 +289,7 @@ function writeEdit(edit: Pick<EditRow, 'root' | 'path' | 'find' | 'replace'>): v
   const replace = crlf ? edit.replace.replace(/\n/g, '\r\n') : edit.replace;
   const count = before.split(find).length - 1;
   if (count !== 1) throw new Error('The file changed since this was suggested, so it wasn’t applied.');
-  fs.writeFileSync(file, before.replace(find, () => replace), 'utf8');
+  fs.writeFileSync(/* turbopackIgnore: true */ file, before.replace(find, () => replace), 'utf8');
 }
 
 const proposeEdit: ToolDef = {
@@ -322,7 +322,7 @@ const proposeEdit: ToolDef = {
 
     let diff: string;
     if (!find) {
-      if (fs.existsSync(file)) throw new Error('That file already exists. To change it, give the text to replace in find.');
+      if (fs.existsSync(/* turbopackIgnore: true */ file)) throw new Error('That file already exists. To change it, give the text to replace in find.');
       diff = makeDiff(rel, '', '', replace);
     } else {
       const before = readText(file).replace(/\r\n/g, '\n');

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
+import QueueNotice from '@/components/QueueNotice';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import Flame from './Flame';
 import { Steps } from './Steps';
@@ -119,6 +120,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
 
   return (
     <main className="umbra umbra-chat" style={{ '--bot-color': flameColor(leader.flame) } as React.CSSProperties}>
+      <QueueNotice active={thinking} />
       <div className="umbra-chat-bar">
         <Link href="/umbra" className="umbra-back" aria-label="Your Flickers">←</Link>
         <div className="umbra-team-flames" aria-hidden>
