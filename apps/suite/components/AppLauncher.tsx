@@ -57,10 +57,10 @@ const AppLauncher = () => {
                   href={app.href}
                   className="app-launcher-tile"
                   aria-current={current ? 'page' : undefined}
-                  style={{ '--app-color': app.color } as React.CSSProperties}
                   onClick={() => setOpen(false)}
                 >
-                  <span className="app-launcher-icon">{app.name[0]}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- small static icon, no optimisation needed */}
+                  <img className="app-launcher-icon" src={app.icon} alt="" width={44} height={44} />
                   <span className="app-launcher-name">{app.name}</span>
                   {app.status === 'soon' && <span className="app-launcher-badge">Soon</span>}
                 </Link>

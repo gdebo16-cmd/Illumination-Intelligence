@@ -482,15 +482,10 @@ textarea.input-field {
   background: var(--secondary-color); 
   border-color: var(--border-color); }
 .app-launcher-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--text-color);
-  background: var(--app-color);}
+  display: block;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;}
 .app-launcher-name { 
   font-size: 0.8rem; }
 .app-launcher-badge {
@@ -504,8 +499,21 @@ textarea.input-field {
   background: var(--secondary-color);}
 .app-launcher-grid {
   display: grid;
-  grid-template-columns: repeat(3, 88px);
+  grid-template-columns: repeat(4, 84px);
   gap: 6px;}
+/* The clickable middle of the header banner (symbol + name). Opens that app's first page. */
+.banner-link {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: var(--safe-top);
+  height: calc(100% - var(--safe-top));
+  aspect-ratio: 3 / 1;
+  max-width: 60%;
+  border-radius: 8px;}
+.banner-link:focus-visible {
+  outline: 2px solid var(--text-color);
+  outline-offset: -4px;}
 /* #endregion app launcher */
 /* #region home icon picker */
 .home-icon-option img { 
@@ -525,9 +533,14 @@ textarea.input-field {
   gap: 0.5rem;
   color: var(--text-color);
   text-align: center;}
-.coming-soon h1 { 
-  margin: 0; 
-  font-size: 2.5rem; 
+.coming-soon-icon {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;}
+.coming-soon h1 {
+  margin: 0;
+  font-size: 2.5rem;
   letter-spacing: 0.04em; }
 .coming-soon p { 
   margin: 0; }
