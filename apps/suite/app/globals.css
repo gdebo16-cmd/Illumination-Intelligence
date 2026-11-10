@@ -1614,6 +1614,12 @@ header > .model-select-container {
   .sidebar-toggle,
   .app-launcher-button { width: 44px; height: 44px; }
   .sidebar button { min-height: 44px; }
+  /* On phones the header covers the top of the screen, including the sidebar, so the
+     sidebar's content starts below it. */
+  .sidebar {
+    padding-top: calc(var(--header-h) + 0.75rem);
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    padding-left: calc(0.75rem + env(safe-area-inset-left));}
   .app-launcher-grid { grid-template-columns: repeat(3, minmax(76px, 88px)); }
   .messages-container { padding: 0.75rem; gap: 1.25rem; }
   .message-content { max-width: 92%; padding: 0.75rem 0.25rem; font-weight: 500; }
