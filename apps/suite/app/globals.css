@@ -101,6 +101,7 @@ header > .model-select-container {
   gap: 0.5rem;
   padding: 0.75rem;
   overflow-y: auto;
+  scrollbar-width: none;
   background: var(--accent-color);
   border-right: 1px solid var(--border-color);
   transform: translateX(-100%);
@@ -127,7 +128,8 @@ header > .model-select-container {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .sidebar button:hover { 
   background: rgb(255 255 255 / 0.06); }
-.sidebar button[aria-current="true"] { 
+.sidebar button[aria-current="true"],
+.chat-row.is-current { 
   background: rgb(120 120 255 / 0.15); 
   border-color: rgb(120 120 255 / 0.35); }
 .sidebar .sidebar-close { 
@@ -165,12 +167,58 @@ header > .model-select-container {
   text-align: left;
   color: #e5e7f0;
   background: transparent;}
-.chat-button {
-  width: 100%;
+.sidebar::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar {
+  display: none;}
+/* Everything in the sidebar keeps its size except the chat list, which scrolls inside
+   its own box. That keeps New chat, Previous Chats, Settings and Model on screen together. */
+.sidebar > * {
+  flex-shrink: 0;}
+.sidebar > .chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 0 1 auto;
+  height: 40dvh;
+  min-height: 3rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;}
+.chat-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;}
+.chat-row:hover {
+  background: rgb(255 255 255 / 0.06);}
+.sidebar .chat-button {
+  flex: 1;
+  min-width: 0;
+  width: auto;
   padding: 0.6rem 0.75rem;
   text-align: left;
   color: #e5e7f0;
+  border: none;
   background: transparent;}
+/* The row carries the hover and current-chat highlight, not the button inside it */
+.sidebar .chat-button:hover,
+.sidebar .chat-button[aria-current="true"] {
+  background: transparent;}
+.sidebar .chat-delete {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  color: #aab;
+  border: none;
+  background: transparent;}
+.sidebar .chat-delete:hover {
+  color: #ffb4b4;
+  background: rgb(255 80 80 / 0.15);}
 .switch-profile-button {
   width: 100%;
   padding: 0.6rem 0.75rem;
@@ -841,575 +889,7 @@ header > .model-select-container {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  :root {
-  --sidebar-w: 280px;
-  --header-h: calc(clamp(56px, 8dvh, 88px) + env(safe-area-inset-top));
-  --edge-color: #030406;
-  --banner-gap: 4px;
-}
-
-
-
-
-
-/* Phones and narrow windows: everything stacks, and the page scrolls */
-@media (max-width: 768px) {
-  .prism { overflow-y: auto; overscroll-behavior: contain; }
-  .prism-workspace { flex: none; flex-direction: column; padding: 1rem; gap: 1rem; }
-  .prism-controls { width: 100%; overflow: visible; }
-  .prism-prompt,
-  .prism-select { font-size: 16px; }   /* keeps Safari from zooming in */
-  .prism-stage { flex: none; }
-  .prism-result img { max-height: 70vh; }
-  .prism-recent { padding-left: 1rem; padding-right: 1rem; }
-}
-
-/* ================================================================ Umbra (agent bots) */
-.umbra {
-  --bot-color: #a77bff;
-  color: #e5e7f0;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  
-}
-.umbra::-webkit-scrollbar { display: none; }
-.flame { display: block; user-select: none; -webkit-user-drag: none; }
-
-.umbra-page { width: 100%; max-width: 960px; margin: 0 auto; padding: 1.5rem 1.25rem 2.5rem; }
-.umbra-intro h1, .umbra-form h1 { margin: 0.25rem 0 0.35rem; font-size: 1.6rem; font-weight: 600; }
-.umbra-intro p { margin: 0 0 1.5rem; color: #9a9cb8; }
-.umbra-muted { color: #8a8ca8; }
-.umbra-back { display: inline-block; margin-bottom: 0.5rem; color: #aab; text-decoration: none; font-size: 0.9rem; }
-.umbra-error {
-  margin: 0.75rem 0;
-  padding: 0.6rem 0.8rem;
-  font-size: 0.9rem;
-  color: #ffd2d2;
-  background: rgb(255 80 80 / 0.12);
-  border: 1px solid rgb(255 80 80 / 0.3);
-  border-radius: 10px;
-}
-
-/* Gallery of bots */
-.umbra-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
-.umbra-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 1.25rem 0.9rem 1.1rem;
-  min-height: 220px;
-  color: inherit;
-  text-align: center;
-  text-decoration: none;
-  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--bot-color) 18%, transparent), transparent 65%), rgb(255 255 255 / 0.03);
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 16px;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-.umbra-card:hover { border-color: color-mix(in srgb, var(--bot-color) 55%, transparent); }
-.umbra-card:active { transform: scale(0.98); }
-.umbra-card-name { margin-top: 0.4rem; font-weight: 600; font-size: 1.05rem; }
-.umbra-card-purpose { font-size: 0.8rem; color: #9a9cb8; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.umbra-card-new { justify-content: center; background: transparent; border-style: dashed; border-color: rgb(255 255 255 / 0.18); }
-.umbra-card-plus {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  font-size: 2rem;
-  color: #c9cbe0;
-  border: 1px dashed rgb(255 255 255 / 0.25);
-  border-radius: 50%;
-}
-
-/* Bot creator */
-.umbra-form { max-width: 640px; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;}
-.umbra-field { display: flex; flex-direction: column; gap: 0.4rem; margin: 0; padding: 0; border: none; min-width: 0; }
-.umbra-label { font-size: 0.75rem; color: #aab; text-transform: uppercase; letter-spacing: 0.05em; padding: 0; }
-.umbra-form input,
-.umbra-form textarea,
-.umbra-form select {
-  width: 100%;
-  padding: 0.75rem 0.85rem;
-  font: inherit;
-  font-size: 1rem;
-  color: #e5e7f0;
-  background: rgb(255 255 255 / 0.05);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 10px;
-}
-.umbra-form textarea { resize: vertical; line-height: 1.45; }
-.umbra-form input:focus,
-.umbra-form textarea:focus,
-.umbra-form select:focus { outline: none; border-color: var(--bot-color); }
-.umbra-form select option { background: #0c1220; }
-
-.umbra-flames { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.4rem; }
-.umbra-flame-option {
-  display: grid;
-  place-items: center;
-  padding: 0.5rem 0;
-  background: rgb(255 255 255 / 0.03);
-  border: 2px solid transparent;
-  border-radius: 14px;
-  cursor: pointer;
-}
-.umbra-flame-option[aria-checked="true"] {
-  border-color: var(--bot-color);
-  background: color-mix(in srgb, var(--bot-color) 14%, transparent);
-}
-
-.umbra-form-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
-.umbra-primary {
-  min-height: 48px;
-  padding: 0 1.5rem;
-  font: inherit;
-  font-weight: 600;
-  color: #0b0b14;
-  background: var(--bot-color);
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--bot-color) 40%, transparent);
-  
-}
-.umbra-primary:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
-.umbra-danger {
-  min-height: 48px;
-  padding: 0 1.25rem;
-  font: inherit;
-  color: #ffb4b4;
-  background: transparent;
-  border: 1px solid rgb(255 120 120 / 0.35);
-  border-radius: 12px;
-  cursor: pointer;
-}
-
-/* Chat with a bot */
-.umbra-chat { overflow: hidden; display: flex; flex-direction: column; }
-.umbra-chat-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem max(1rem, env(safe-area-inset-left));
-  border-bottom: 1px solid rgb(255 255 255 / 0.08);
-  background: color-mix(in srgb, var(--bot-color) 6%, transparent);
-  
-}
-.umbra-chat-bar .umbra-back { margin: 0; padding: 0.3rem 0.5rem; font-size: 1.1rem; }
-.umbra-chat-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.umbra-chat-name { font-weight: 600; }
-.umbra-chat-purpose { font-size: 0.8rem; color: #9a9cb8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.umbra-chat-action {
-  padding: 0.35rem 0.75rem;
-  font: inherit;
-  font-size: 0.85rem;
-  color: #d5d7ea;
-  text-decoration: none;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 0.18);
-  border-radius: 8px;
-  cursor: pointer;
-  
-}
-.umbra-chat-action:disabled { opacity: 0.4; cursor: default; }
-
-.umbra-messages {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 1.25rem 1rem;
   scrollbar-width: none;
-}
-.umbra-hello { margin: auto; display: flex; flex-direction: column; align-items: center; color: #9a9cb8;  }
-.umbra-message { display: flex; align-items: flex-end; gap: 0.5rem; }
-.umbra-message.user { justify-content: flex-end; }
-.umbra-message-flame { flex-shrink: 0; }
-.umbra-bubble {
-  max-width: min(80%, 640px);
-  padding: 0.7rem 0.95rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  border-radius: 16px;
-}
-.umbra-message.assistant .umbra-bubble {
-  white-space: normal;
-  background: color-mix(in srgb, var(--bot-color) 12%, rgb(255 255 255 / 0.03));
-  border: 1px solid color-mix(in srgb, var(--bot-color) 28%, transparent);
-  border-bottom-left-radius: 4px;
-}
-.umbra-message.user .umbra-bubble { background: rgb(255 255 255 / 0.08); border-bottom-right-radius: 4px; }
-.umbra-thinking { color: #b8bad0; font-style: italic; animation: pulse 1.6s ease-in-out infinite; }
-
-.umbra-input {
-  flex-shrink: 0;
-  display: flex;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 0.6rem max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-}
-.umbra-input input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.85rem 1rem;
-  font: inherit;
-  font-size: 16px;
-  color: #e5e7f0;
-  background: rgb(255 255 255 / 0.06);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 14px;
-}
-.umbra-input input:focus { outline: none; border-color: var(--bot-color); }
-.umbra-input button {
-  min-height: 44px;
-  padding: 0 1.2rem;
-  font: inherit;
-  font-weight: 600;
-  color: #0b0b14;
-  background: var(--bot-color);
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-}
-.umbra-input button:disabled { opacity: 0.45; cursor: default; }
-
-@media (max-width: 768px) {
-  .umbra-page { padding: 1rem 1rem 2rem; }
-  .umbra-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-  .umbra-card { min-height: 190px; padding: 1rem 0.6rem; }
-  .umbra-flames { grid-template-columns: repeat(4, 1fr); }
-  .umbra-bubble { max-width: 85%; }
-  .umbra-chat-purpose { display: none; }
-}
-
-/* Umbra stage 2: tool choices in the creator */
-.umbra-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
-.umbra-tool {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 0.65rem 0.75rem;
-  background: rgb(255 255 255 / 0.03);
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 12px;
-  cursor: pointer;
-}
-.umbra-tool:has(input:checked) { border-color: color-mix(in srgb, var(--bot-color) 55%, transparent); background: color-mix(in srgb, var(--bot-color) 8%, transparent); }
-.umbra-form .umbra-tool input { width: 18px; height: 18px; margin: 0.1rem 0 0; padding: 0; flex-shrink: 0; accent-color: var(--bot-color); }
-.umbra-tool > span { display: flex; flex-direction: column; gap: 0.15rem; }
-.umbra-tool-name { font-weight: 600; font-size: 0.9rem; }
-.umbra-tool-description { font-size: 0.8rem; color: #9a9cb8; }
-
-/* What a bot remembers (edit page) */
-.umbra-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.umbra-notes li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.75rem;
-  background: rgb(255 255 255 / 0.04);
-  border: 1px solid rgb(255 255 255 / 0.08);
-  border-radius: 10px;
-}
-.umbra-notes li span { flex: 1; font-size: 0.9rem; }
-.umbra-notes button { padding: 0.25rem 0.6rem; font: inherit; font-size: 0.8rem; color: #ffb4b4; background: transparent; border: 1px solid rgb(255 120 120 / 0.3); border-radius: 8px; cursor: pointer; }
-.umbra-notes-empty { margin: 0; font-size: 0.85rem; }
-
-/* Tool steps inside a bot's reply */
-.umbra-steps {
-  list-style: none;
-  margin: 0 0 0.6rem;
-  padding: 0 0 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--bot-color) 20%, transparent);
-}
-.umbra-step { display: flex; gap: 0.5rem; font-size: 0.85rem; }
-.umbra-step-mark {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #0b0b14;
-  background: var(--bot-color);
-  border-radius: 50%;
-}
-.umbra-step.is-running .umbra-step-mark {
-  background: transparent;
-  border: 2px solid color-mix(in srgb, var(--bot-color) 30%, transparent);
-  border-top-color: var(--bot-color);
-  animation: umbra-spin 0.8s linear infinite;
-}
-.umbra-step.is-error .umbra-step-mark { background: #ff7a7a; }
-@keyframes umbra-spin { to { transform: rotate(360deg); } }
-.umbra-step-body { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
-.umbra-step-label { color: #d5d7ea; }
-.umbra-step-summary { color: #9a9cb8; font-size: 0.8rem; overflow-wrap: anywhere; }
-.umbra-step.is-error .umbra-step-summary { color: #ffb4b4; }
-.umbra-step-links { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.umbra-step-links a {
-  max-width: 220px;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.75rem;
-  color: #d5d7ea;
-  text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: rgb(255 255 255 / 0.06);
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 999px;
-}
-.umbra-step-image img { display: block; max-width: min(100%, 360px); max-height: 360px; margin-top: 0.3rem; border-radius: 10px; }
-
-
-
-/* Umbra stage 3: inbox link on the bots page */
-.umbra-intro-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.umbra-inbox-link {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.35rem;
-  padding: 0.55rem 1rem;
-  color: #e5e7f0;
-  text-decoration: none;
-  background: rgb(255 255 255 / 0.05);
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 12px;
-}
-.umbra-badge {
-  min-width: 1.3rem;
-  padding: 0.05rem 0.4rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-align: center;
-  color: #0b0b14;
-  background: #ff8a5c;
-  border-radius: 999px;
-}
-
-/* A bot's tasks page */
-.umbra-tasks-page { max-width: 760px; }
-.umbra-tasks-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
-.umbra-tasks-head h1 { margin: 0 0 0.2rem; font-size: 1.5rem; }
-.umbra-tasks-head p { margin: 0; }
-.umbra-tasks-head a { color: var(--bot-color); }
-.umbra-task-list { list-style: none; margin: 0 0 1.5rem; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
-.umbra-task {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 0.9rem 1rem;
-  background: color-mix(in srgb, var(--bot-color) 6%, rgb(255 255 255 / 0.02));
-  border: 1px solid color-mix(in srgb, var(--bot-color) 22%, transparent);
-  border-radius: 14px;
-}
-.umbra-task.is-paused { opacity: 0.6; }
-.umbra-task-main { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
-.umbra-task-title { font-weight: 600; }
-.umbra-task-when { font-size: 0.8rem; color: var(--bot-color); }
-.umbra-task-instructions { font-size: 0.85rem; color: #9a9cb8; }
-.umbra-task-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; flex-shrink: 0; }
-.umbra-task-actions button,
-.umbra-report-actions button,
-.umbra-report-actions a {
-  padding: 0.35rem 0.7rem;
-  font: inherit;
-  font-size: 0.8rem;
-  color: #e5e7f0;
-  text-decoration: none;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 0.18);
-  border-radius: 8px;
-  cursor: pointer;
-}
-.umbra-task-actions .is-danger { color: #ffb4b4; border-color: rgb(255 120 120 / 0.3); }
-.umbra-notice {
-  margin: 0 0 1rem;
-  padding: 0.6rem 0.8rem;
-  font-size: 0.9rem;
-  color: #d8f5e6;
-  background: rgb(80 220 150 / 0.1);
-  border: 1px solid rgb(80 220 150 / 0.28);
-  border-radius: 10px;
-}
-.umbra-task-form { max-width: none; padding: 1.1rem; background: rgb(255 255 255 / 0.025); border: 1px solid rgb(255 255 255 / 0.08); border-radius: 16px;  }
-.umbra-task-form h2 { margin: 0; font-size: 1.1rem; }
-.umbra-schedule { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.umbra-schedule select,
-.umbra-schedule input { width: auto; flex: 1 1 140px; }
-.umbra-hint { font-size: 0.8rem; }
-
-/* Inbox */
-.umbra-inbox { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
-.umbra-report { background: rgb(255 255 255 / 0.03); border: 1px solid rgb(255 255 255 / 0.08); border-radius: 14px; overflow: hidden; }
-.umbra-report.is-unread { border-color: color-mix(in srgb, var(--bot-color) 45%, transparent); }
-.umbra-report-head {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  scrollbar-width: none;
-}
-.umbra-report-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
-.umbra-report-title { font-weight: 600; }
-.umbra-report.is-unread .umbra-report-title { color: #fff; }
-.umbra-report-meta { font-size: 0.8rem; color: #9a9cb8; }
-.umbra-report.is-error .umbra-report-meta { color: #ffb4b4; }
-.umbra-unread-dot { width: 10px; height: 10px; flex-shrink: 0; background: var(--bot-color); border-radius: 50%; box-shadow: 0 0 10px var(--bot-color); }
-.umbra-report-body { padding: 0 1rem 1rem 3.75rem; line-height: 1.55; }
-.umbra-report-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-
-@media (max-width: 768px) {
-  .umbra-task { flex-direction: column; }
-  .umbra-task-actions { justify-content: flex-start; }
-  .umbra-report-body { padding-left: 1rem; }
-  .umbra-chat-bar { gap: 0.4rem; }
-  .umbra-chat-action { padding: 0.35rem 0.55rem; }
-}
-
-/* ================================================================ mobile + Safari
-   Everything phone-specific lives here, after the base styles, so it wins over them.
-   --app-height comes from components/ViewportSync.tsx (the visible height, minus the keyboard). */
-
-/* The app frame never scrolls as a page: the chat list, sidebar and panels scroll inside it.
-   This also stops a stray page scrollbar from resizing the layout. */
-html,
-body {
-  overflow: hidden;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;          /* stop Safari enlarging text when the phone turns sideways */
-}
-
-/* Safari (iOS 26+) colours its status bar and toolbar from the page background, and shows it
-   around the app while the toolbars slide in and out. Same colour as the app's edges = no seam. */
-html,
-body {
-  background-color: var(--edge-color);
-}
-
-body {
-  overscroll-behavior: none;                /* no pull-to-refresh or bounce on the app shell */
-  -webkit-tap-highlight-color: transparent; /* no grey flash on every tap */
-}
-
-/* Scrolling areas keep their momentum but don't drag the page along with them */
-.messages-container,
-.sidebar,
-.document-panel-body {
-  overscroll-behavior: contain;
-}
-
-/* Hover effects only on devices with a real mouse. On iPhone, :hover "sticks" after a tap. */
-@media (hover: none) {
-  .user-buttons:hover { background-color: #1e293b; transform: none; }
-  .sidebar button:hover,
-  .app-launcher-tile:hover { background: transparent; }
-  .app-launcher-button:hover { background: rgb(0 0 0 / 0.25); }
-}
-
-/* Pressed feedback for touch instead */
-.user-buttons:active,
-.sidebar button:active,
-.app-launcher-tile:active,
-.send-button:active { opacity: 0.75; }
-
-/* Notched phones: keep panels clear of the status bar and home indicator */
-.sidebar {
-  /* The header sits on top of the sidebar, so its content starts below the header */
-  padding-top: calc(var(--header-h) + 0.75rem);
-  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
-  padding-left: calc(0.75rem + env(safe-area-inset-left));
-}
-.document-panel-header { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
-.document-panel-body { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
-.input-container {
-  padding-left: max(1rem, env(safe-area-inset-left));
-  padding-right: max(1rem, env(safe-area-inset-right));
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
-}
-
-/* The launcher panel never runs off the right edge of a small screen */
-.app-launcher-panel { max-width: calc(100vw - 1.5rem); }
-
-@media (max-width: 768px) {
-  /* 44px is Apple's minimum comfortable tap target */
-  .sidebar-toggle,
-  .app-launcher-button { width: 44px; height: 44px; }
-  .sidebar button { min-height: 44px; }
-
-  .app-launcher-grid { grid-template-columns: repeat(3, minmax(76px, 88px)); }
-
-  /* Chat: wider bubbles, tighter spacing, lighter text for small screens */
-  .messages-container { padding: 0.75rem; gap: 1.25rem; }
-  .message-content { max-width: 92%; padding: 0.75rem 0.25rem; font-weight: 500; }
-  .message-content.user { max-width: 85%; }
-
-  /* Code and tables scroll sideways inside their box instead of widening the page */
-  .markdown { overflow-wrap: anywhere; }
-  .markdown table { display: block; overflow-x: auto; }
-  .code-block-pre { font-size: 0.8rem; }
-
-  /* Chat input. Font stays at 16px: Safari zooms the whole page into any smaller input. */
-  .input-container { padding-top: 0.5rem; }
-  .input-form { gap: 0.5rem; }
-  .input-field { padding: 0.8rem 0.9rem; font-size: 16px; min-width: 0; }
-  .send-button { padding: 0 1.1rem; min-height: 44px; }
-  .model-select-input { font-size: 16px; }
-
-  /* Document panel takes the whole screen */
-  .document-panel { width: 100vw; border-left: none; }
-  .document-panel-header { flex-wrap: wrap; }
-
-  /* Profile picker */
-  .signin-container {
-    justify-content: center;
-    gap: 0.5rem;
-    padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem max(1.5rem, env(safe-area-inset-bottom));
-    text-align: center;
-  }
-  .title-signin { font-size: 2rem; margin: 0; padding-bottom: 0.75rem; }
-  .sub-signin { font-size: 1rem; margin: 0.5rem 0 1rem; padding: 0; }
-  .user-container { width: 100%; max-width: 420px; height: auto; }
-  .user-buttons { min-height: 170px; }
-  .user-icon { width: 4rem; height: 4rem; }
-
-  .coming-soon h1 { font-size: 2rem; }
-}
-
-/* Phone turned sideways: short screen, so trim vertical space */
-
-  
 }
 .umbra::-webkit-scrollbar { 
   display: none; 
@@ -1514,6 +994,9 @@ body {
   display: flex; 
   flex-direction: column; 
   gap: 1rem; 
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
 .umbra-field { 
   display: flex; 
@@ -1663,6 +1146,7 @@ body {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
   display: flex;
   flex-direction: column;
   gap: 1rem;

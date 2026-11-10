@@ -32,3 +32,35 @@ export async function GET(
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
+
+// Deletes one chat and its messages, only if it belongs to the signed-in profile.
+// Memories learned from the chat are kept: they belong to the profile, not the chat.
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const conversation = db
+      .prepare('SELECT user_id FROM Conversation WHERE id = ?')
+      .get(id) as { user_id: string | null } | undefined;
+    if (!conversation || conversation.user_id !== userId) {
+      return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
+    }
+
+    db.prepare('DELETE FROM Message WHERE conversationId = ?').run(id);
+    db.prepare('DELETE FROM memory_extractions WHERE conversation_id = ?').run(id);
+    db.prepare('DELETE FROM Conversation WHERE id = ?').run(id);
+
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Delete Conversation Error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
