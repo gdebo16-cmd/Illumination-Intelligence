@@ -18,7 +18,12 @@ export interface WorkerState {
 }
 
 // The boxes that load a model file, and the setting in each that names the file.
-export const LOADERS: Record<string, string> = { UNETLoader: 'unet_name', CLIPLoader: 'clip_name', VAELoader: 'vae_name' };
+export const LOADERS: Record<string, string> = {
+  UNETLoader: 'unet_name',
+  CLIPLoader: 'clip_name',
+  VAELoader: 'vae_name',
+  UpscaleModelLoader: 'model_name', // Prism's Upscale button
+};
 
 const ONLINE_FOR_MS = 3_000; // re-check a machine that answered after this long
 const OFFLINE_FOR_MS = 15_000; // and one that didn't after this long

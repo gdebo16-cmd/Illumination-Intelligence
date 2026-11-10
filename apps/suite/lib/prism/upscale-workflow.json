@@ -1,0 +1,60 @@
+{
+  "1": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": {
+      "model_name": "RealESRGAN_x4plus.safetensors"
+    },
+    "_meta": {
+      "title": "Load the upscale model (it always makes a picture 4 times bigger)"
+    }
+  },
+  "2": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": [
+        "1",
+        0
+      ],
+      "image": [
+        "14",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Make it 4 times bigger"
+    }
+  },
+  "3": {
+    "class_type": "ImageScaleBy",
+    "inputs": {
+      "image": [
+        "2",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "scale_by": 0.5
+    },
+    "_meta": {
+      "title": "Shrink to the size asked for (0.5 = twice the original)"
+    }
+  },
+  "13": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "3",
+        0
+      ],
+      "filename_prefix": "Prism/prism-upscale"
+    }
+  },
+  "14": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    },
+    "_meta": {
+      "title": "Load Image (your picture)"
+    }
+  }
+}

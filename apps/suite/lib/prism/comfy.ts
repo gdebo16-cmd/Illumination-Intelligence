@@ -315,10 +315,10 @@ export async function waitFor(url: string, ticket: string, saveBox = BOX.save, t
 }
 
 /** Step 3, PICK UP: download the finished picture (over the network, from whichever machine made it). */
-export async function pickUp(url: string, info: ImageInfo): Promise<Buffer> {
+export async function pickUp(url: string, info: ImageInfo, timeoutMs = 15_000): Promise<Buffer> {
   const query = new URLSearchParams({ filename: info.filename, subfolder: info.subfolder, type: info.type });
   // The picture is already made, so a slow download is simply asked for again.
-  return askSafely(`${url}/view?${query}`, 15_000, 'downloading the result', async (res) => {
+  return askSafely(`${url}/view?${query}`, timeoutMs, 'downloading the result', async (res) => {
     if (!res.ok) throw new Error(`it answered ${res.status}`);
     return Buffer.from(await res.arrayBuffer());
   });
@@ -374,6 +374,39 @@ export async function generateImage(request: ImageRequest, worker: GpuWorker = L
     painted = await paint();
   }
   return { ...painted, seed, width, height, seconds: (Date.now() - started) / 1000, model, machine: worker.name };
+}
+
+// ---------------------------------------------------------------- upscaling
+// Making a finished picture bigger and sharper. This isn't FLUX: it's a small "upscale model"
+// (Real-ESRGAN) that enlarges the picture you give it without repainting it. The recipe is
+// upscale-workflow.json: load picture → 4 times bigger → shrink to the size asked for → save.
+
+const UPSCALE_RECIPE = 'upscale-workflow.json';
+const UPSCALE_BOX = { shrink: '3' }; // ImageScaleBy: the model's 4× result, scaled to what you asked for
+/** How much bigger a picture can be made. The model always makes 4×; 2× is that, halved. */
+export const UPSCALE_FACTORS = [2, 4] as const;
+/** Pictures with a side longer than this aren't upscaled further (the result would be enormous). */
+export const UPSCALE_MAX_SIDE = 2048;
+
+/** What an upscale needs from a machine: the upscale model's file, and very little graphics memory. */
+export function upscaleNeeds(): GpuNeeds {
+  return { label: 'Upscale', vramGB: 4, files: modelFiles(readRecipe(UPSCALE_RECIPE)) };
+}
+
+/** Make a picture `factor` times bigger (2 or 4). Returns the new PNG and how long it took. */
+export async function upscaleImage(
+  png: Buffer,
+  factor: number,
+  worker: GpuWorker = LOCAL_WORKER,
+): Promise<{ image: Buffer; seconds: number; machine: string }> {
+  const { url } = worker;
+  const started = Date.now();
+  const workflow = readRecipe(UPSCALE_RECIPE);
+  workflow[BOX.picture].inputs.image = await upload(url, png);
+  workflow[UPSCALE_BOX.shrink].inputs.scale_by = factor / 4;
+  const ticket = await order(url, workflow);
+  const image = await pickUp(url, await waitFor(url, ticket), 60_000); // big pictures take longer to download
+  return { image, seconds: (Date.now() - started) / 1000, machine: worker.name };
 }
 
 /** The text a "Preview as Text" box showed for a finished ticket (null if it showed none). */

@@ -26,9 +26,12 @@ export interface PrismImage {
   model: string;
   /** What the prompt expander turned your prompt into. null when it wasn't used. */
   expandedPrompt: string | null;
-  /** 'create' = made from words; 'edit' = an edited picture (prompt is the instruction). */
-  mode: 'create' | 'edit';
-  /** For an edit of one of your Prism pictures: which one. */
+  /**
+   * 'create' = made from words; 'edit' = an edited picture (prompt is the instruction);
+   * 'upscale' = a bigger copy of another picture (it keeps that picture's prompt and settings).
+   */
+  mode: 'create' | 'edit' | 'upscale';
+  /** For an edit or an upscale of one of your Prism pictures: which one. */
   sourceId: string | null;
   createdAt: string;
   /** Where the browser loads the picture from. */
@@ -38,16 +41,19 @@ export interface PrismImage {
 type Row = Omit<PrismImage, 'url'>;
 const withUrl = (row: Row): PrismImage => ({ ...row, url: `/api/prism/images/${row.id}` });
 
-/** Save a finished picture and its details. Pass `edit` when it was made by editing a picture. */
+/**
+ * Save a finished picture and its details. Pass `from` when it was made from another picture:
+ * by editing it (the usual case) or, with mode 'upscale', by making it bigger.
+ */
 export function saveImage(
   userId: string,
   prompt: string,
   style: string,
-  result: ImageResult,
-  edit?: { sourceId: string | null },
+  result: Omit<ImageResult, 'machine'>,
+  from?: { sourceId: string | null; mode?: 'edit' | 'upscale' },
 ): PrismImage {
-  const mode = edit ? 'edit' : 'create';
-  const sourceId = edit?.sourceId ?? null;
+  const mode = from ? (from.mode ?? 'edit') : 'create';
+  const sourceId = from?.sourceId ?? null;
   const id = crypto.randomUUID();
   const file = path.join(IMAGE_DIR, `${id}.png`);
   fs.writeFileSync(file, result.image);
@@ -83,6 +89,18 @@ export function listImages(userId: string, limit = 60): PrismImage[] {
     )
     .all(userId, limit) as Row[];
   return rows.map(withUrl);
+}
+
+/** One picture's details, only if it belongs to this profile. */
+export function getImage(userId: string, id: string): PrismImage | null {
+  const row = db
+    .prepare(
+      `SELECT id, prompt, style, seed, width, height, seconds, model, expanded_prompt AS expandedPrompt, mode,
+              source_id AS sourceId, createdAt
+       FROM PrismImage WHERE id = ? AND user_id = ?`,
+    )
+    .get(id, userId) as Row | undefined;
+  return row ? withUrl(row) : null;
 }
 
 /** The PNG file for one picture, only if it belongs to this profile. */

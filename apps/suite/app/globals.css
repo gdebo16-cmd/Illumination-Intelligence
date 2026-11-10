@@ -839,9 +839,15 @@ textarea.input-field {
 .prism-caption-meta { 
   color: #8a8ca8; 
 }
-.prism-caption-actions { 
-  display: flex; 
-  gap: 0.5rem; 
+.prism-caption-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.prism-caption-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .prism-caption-actions button,
 .prism-caption-actions a {

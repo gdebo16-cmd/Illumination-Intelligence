@@ -23,6 +23,10 @@ const SHAPES = [
   { id: 'phone', name: 'Phone', width: 768, height: 1344 },
 ] as const;
 
+// A picture with a side longer than this has no Upscale button (the same limit as
+// UPSCALE_MAX_SIDE in lib/prism/comfy.ts, which the server enforces).
+const MAX_UPSCALE_SIDE = 2048;
+
 // What the API sends back for each picture.
 interface PrismImage {
   id: string;
@@ -34,7 +38,7 @@ interface PrismImage {
   seconds: number | null;
   model?: string;
   expandedPrompt?: string | null;
-  mode?: 'create' | 'edit';
+  mode?: 'create' | 'edit' | 'upscale';
   sourceId?: string | null;
   createdAt: string;
   url: string;
@@ -129,6 +133,7 @@ const Prism = () => {
 
   // What's happening
   const [busy, setBusy] = useState(false);
+  const [upscaling, setUpscaling] = useState(false); // busy because of the Upscale button
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
@@ -280,6 +285,31 @@ const Prism = () => {
     }
   };
 
+  // "Upscale" on the big picture: make a copy twice as big and sharper. The original is kept.
+  const upscale = async (image: PrismImage) => {
+    if (busy) return;
+    setBusy(true);
+    setUpscaling(true);
+    setElapsed(0);
+    setError('');
+    try {
+      const res = await fetch('/api/prism/upscale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: image.id, factor: 2 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
+      setImages((list) => [data, ...list]);
+      setShown({ kind: 'image', id: data.id });
+    } catch (err) {
+      setError((err as Error).message || 'Something went wrong.');
+    } finally {
+      setBusy(false);
+      setUpscaling(false);
+    }
+  };
+
   // Put a past picture's prompt, model, style and shape back into the form.
   const reuse = (image: PrismImage) => {
     setPrompt(image.prompt);
@@ -318,7 +348,9 @@ const Prism = () => {
     ...videos.map((video) => ({ kind: 'video' as const, id: video.id, at: video.createdAt, video })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
-  const buttonText = busy
+  const buttonText = upscaling
+    ? `Upscaling… ${elapsed.toFixed(1)}s`
+    : busy
     ? animating
       ? 'Starting…'
       : `${editing ? 'Editing' : 'Painting'}… ${elapsed.toFixed(1)}s`
@@ -561,7 +593,7 @@ const Prism = () => {
               <figcaption>
                 <span className="prism-caption-text">{shownImage.prompt}</span>
                 <span className="prism-caption-meta">
-                  {shownImage.mode === 'edit' ? 'Edit · ' : ''}{findPrismModel(shownImage.model).name} · {styleName(shownImage.style)} · {shownImage.width}×{shownImage.height}
+                  {shownImage.mode === 'edit' ? 'Edit · ' : shownImage.mode === 'upscale' ? 'Upscaled · ' : ''}{findPrismModel(shownImage.model).name} · {styleName(shownImage.style)} · {shownImage.width}×{shownImage.height}
                   {shownImage.seconds ? ` · ${shownImage.seconds.toFixed(1)}s` : ''}
                 </span>
                 {/* With the prompt expander on: what it wrote, and so what the model really painted from */}
@@ -574,6 +606,12 @@ const Prism = () => {
                 <span className="prism-caption-actions">
                   <button type="button" onClick={() => startFrom(shownImage, 'edit')}>Edit this</button>
                   <button type="button" onClick={() => startFrom(shownImage, 'video')}>Make video</button>
+                  {/* Not offered for a picture that's already as big as Prism makes them */}
+                  {Math.max(shownImage.width, shownImage.height) <= MAX_UPSCALE_SIDE && (
+                    <button type="button" onClick={() => void upscale(shownImage)} disabled={busy}>
+                      {upscaling ? 'Upscaling…' : 'Upscale 2×'}
+                    </button>
+                  )}
                   <button type="button" onClick={() => reuse(shownImage)}>Reuse settings</button>
                   <a href={shownImage.url} download={`prism-${shownImage.id.slice(0, 8)}.png`}>Download</a>
                 </span>
