@@ -27,6 +27,7 @@ export const BOT_MODELS = [
   { id: 'gpt-oss:20b', name: 'GPT-OSS 20B: best at multi-step tasks' },
   { id: 'qwen3:8b', name: 'Qwen 3 8B: quick and light' },
   { id: 'llama3.1:8b', name: 'Llama 3.1 8B: quick and light' },
+  { id: 'qwen3-coder:30b', name: 'Qwen 3 Coder 30B: best for code (slower)' },
 ] as const;
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);
@@ -40,11 +41,14 @@ export const BOT_TOOLS = [
   { id: 'read_webpage', name: 'Read web page', description: 'Opens a link and reads the page.' },
   { id: 'make_image', name: 'Make image', description: 'Paints a picture with Prism.' },
   { id: 'notes', name: 'Notes', description: 'Remembers things about you between chats.' },
+  { id: 'code', name: 'Code helper', description: 'Reads and searches one project folder, and suggests changes for you to approve.' },
 ] as const;
 
 export type ToolId = (typeof BOT_TOOLS)[number]['id'];
 export const ALL_TOOL_IDS: ToolId[] = BOT_TOOLS.map((t) => t.id);
 export const isToolId = (id: unknown): id is ToolId => BOT_TOOLS.some((t) => t.id === id);
+// New Flickers start with these. The Code helper stays off until you pick a folder for it.
+export const DEFAULT_TOOL_IDS: ToolId[] = ALL_TOOL_IDS.filter((id) => id !== 'code');
 
 // Limits for the bot form.
 export const BOT_LIMITS = { name: 40, personality: 2000, purpose: 1000 };

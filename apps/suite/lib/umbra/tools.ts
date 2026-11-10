@@ -5,8 +5,9 @@
 //     and decides when to use a tool. This is the "function calling" format Ollama understands.
 //   - the code that actually runs when the model asks for it.
 //
-// Safety: bots get exactly these tools and nothing else. No access to files, programs or
-// settings on the PC, and "read web page" refuses addresses inside your own network.
+// Safety: bots get exactly these tools and nothing else. No access to programs or settings on
+// the PC, "read web page" refuses addresses inside your own network, and the Code helper
+// (lib/umbra/code.ts) only sees the one project folder chosen in the bot's settings.
 
 import 'server-only';
 import crypto from 'node:crypto';
@@ -19,6 +20,7 @@ import { saveImage } from '@/lib/prism/images';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import type { ToolId } from '@/config/umbra';
 import { calculate } from './calculator';
+import { CODE_TOOLS, type CodeEditView } from './code';
 import type { AgentStep } from './agent';
 
 const SEARXNG_URL = process.env.SEARXNG_URL ?? 'http://127.0.0.1:8888';
@@ -45,6 +47,8 @@ export interface ToolResult {
   links?: { title: string; url: string }[];
   /** A picture the chat can show. */
   image?: { url: string; prompt: string };
+  /** A file change the Code helper suggested, with Apply / Don't apply buttons in the chat. */
+  edit?: CodeEditView;
   /** Teams: who did the work, the tools they used, and their full answer. */
   bot?: AgentStep['bot'];
   children?: AgentStep[];
@@ -338,6 +342,7 @@ const TOOLS_BY_ID: Record<ToolId, ToolDef[]> = {
   read_webpage: [readWebpage],
   make_image: [makeImage],
   notes: [saveNote],
+  code: CODE_TOOLS,
 };
 
 /** The tools a bot with these settings may use, keyed by the function name the model calls. */

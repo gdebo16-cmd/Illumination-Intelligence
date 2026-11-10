@@ -8,8 +8,19 @@ export interface Bot {
   purpose: string;
   model: string;
   tools: string[];
+  codeFolder: string;
+  codeAutoWrite: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A file change the Code helper suggested. (Mirrors lib/umbra/code.ts.) */
+export interface CodeEdit {
+  id: string;
+  path: string;
+  diff: string;
+  status: 'pending' | 'applied' | 'rejected' | 'failed';
+  note?: string;
 }
 
 /** One tool use, as shown in the chat. */
@@ -21,6 +32,7 @@ export interface AgentStep {
   summary?: string;
   links?: { title: string; url: string }[];
   image?: { url: string; prompt: string };
+  edit?: CodeEdit;
   /** Teams: the teammate who did this step's work, the tools it used, and its full answer. */
   bot?: { id: string; name: string; flame: string };
   children?: AgentStep[];

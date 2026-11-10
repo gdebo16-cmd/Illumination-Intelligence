@@ -6,7 +6,8 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
-import { ALL_TOOL_IDS, BOT_LIMITS, BOT_MODELS, BOT_TOOLS, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
+import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
+import { checkCodeFolder, editStatuses } from './code';
 import type { AgentStep } from './agent';
 
 export interface Bot {
@@ -17,6 +18,10 @@ export interface Bot {
   purpose: string;
   model: string;
   tools: ToolId[];
+  /** Code helper: the one project folder it may look at ('' when not set)… */
+  codeFolder: string;
+  /** …and whether it may change files there without asking first. */
+  codeAutoWrite: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,18 +41,19 @@ export interface BotNote {
   createdAt: string;
 }
 
-export type BotInput = Pick<Bot, 'name' | 'flame' | 'personality' | 'purpose' | 'model' | 'tools'>;
+export type BotInput = Pick<Bot, 'name' | 'flame' | 'personality' | 'purpose' | 'model' | 'tools' | 'codeFolder' | 'codeAutoWrite'>;
 
-const BOT_COLUMNS = 'id, name, flame, personality, purpose, model, tools, createdAt, updatedAt';
+const BOT_COLUMNS =
+  'id, name, flame, personality, purpose, model, tools, code_folder AS codeFolder, code_auto AS codeAutoWrite, createdAt, updatedAt';
 
 // The database keeps the tool list as JSON text; turn it back into a list (dropping unknown ids).
-type BotRow = Omit<Bot, 'tools'> & { tools: string };
+type BotRow = Omit<Bot, 'tools' | 'codeAutoWrite'> & { tools: string; codeAutoWrite: number };
 const fromRow = (row: BotRow): Bot => {
   let tools: unknown = [];
   try {
     tools = JSON.parse(row.tools);
   } catch {}
-  return { ...row, tools: Array.isArray(tools) ? tools.filter(isToolId) : [] };
+  return { ...row, tools: Array.isArray(tools) ? tools.filter(isToolId) : [], codeAutoWrite: row.codeAutoWrite === 1 };
 };
 
 /** Check and tidy what the form sent. Returns an error message, or the cleaned-up bot. */
@@ -59,8 +65,10 @@ export function validateBot(input: Record<string, unknown>): { error: string } |
     personality: text(input.personality),
     purpose: text(input.purpose),
     model: text(input.model) || BOT_MODELS[0].id,
-    // Leaving tools out (older forms) gives the bot every tool.
-    tools: Array.isArray(input.tools) ? [...new Set(input.tools.filter(isToolId))] : [...ALL_TOOL_IDS],
+    // Leaving tools out (older forms) gives the bot the usual tools.
+    tools: Array.isArray(input.tools) ? [...new Set(input.tools.filter(isToolId))] : [...DEFAULT_TOOL_IDS],
+    codeFolder: text(input.codeFolder),
+    codeAutoWrite: input.codeAutoWrite === true,
   };
   if (!bot.name) return { error: 'Give your Flicker a name.' };
   if (bot.name.length > BOT_LIMITS.name) return { error: `Keep the name under ${BOT_LIMITS.name} characters.` };
@@ -68,6 +76,10 @@ export function validateBot(input: Record<string, unknown>): { error: string } |
   if (bot.personality.length > BOT_LIMITS.personality) return { error: 'The personality is too long.' };
   if (bot.purpose.length > BOT_LIMITS.purpose) return { error: 'The purpose is too long.' };
   if (!isBotModel(bot.model)) return { error: 'Pick one of the listed models.' };
+  if (bot.tools.includes('code')) {
+    const problem = checkCodeFolder(bot.codeFolder);
+    if (problem) return { error: problem };
+  }
   return { bot };
 }
 
@@ -90,9 +102,12 @@ export function createBot(userId: string, input: BotInput): Bot {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO UmbraBot (id, user_id, name, flame, personality, purpose, model, tools, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, userId, input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools), now, now);
+    `INSERT INTO UmbraBot (id, user_id, name, flame, personality, purpose, model, tools, code_folder, code_auto, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id, userId, input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools),
+    input.codeFolder, input.codeAutoWrite ? 1 : 0, now, now,
+  );
   return { id, ...input, createdAt: now, updatedAt: now };
 }
 
@@ -100,8 +115,12 @@ export function updateBot(userId: string, id: string, input: BotInput): Bot | nu
   if (!getBot(userId, id)) return null;
   const now = new Date().toISOString();
   db.prepare(
-    `UPDATE UmbraBot SET name = ?, flame = ?, personality = ?, purpose = ?, model = ?, tools = ?, updatedAt = ? WHERE id = ?`,
-  ).run(input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools), now, id);
+    `UPDATE UmbraBot SET name = ?, flame = ?, personality = ?, purpose = ?, model = ?, tools = ?, code_folder = ?, code_auto = ?,
+     updatedAt = ? WHERE id = ?`,
+  ).run(
+    input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools),
+    input.codeFolder, input.codeAutoWrite ? 1 : 0, now, id,
+  );
   return getBot(userId, id);
 }
 
@@ -111,6 +130,7 @@ export function deleteBot(userId: string, id: string): boolean {
   db.prepare('DELETE FROM UmbraNote WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
+  db.prepare('DELETE FROM UmbraCodeEdit WHERE bot_id = ?').run(id);
   // Teams: drop it from teams it's on; teams it leads go too (a team can't work without its leader).
   db.prepare('DELETE FROM UmbraTeamMember WHERE bot_id = ?').run(id);
   for (const { id: teamId } of db.prepare('SELECT id FROM UmbraTeam WHERE leader_id = ?').all(id) as { id: string }[]) {
@@ -135,13 +155,18 @@ export function listMessages(botId: string, limit = 200): BotMessage[] {
        WHERE bot_id = ? ORDER BY createdAt DESC, rowid DESC LIMIT ?`,
     )
     .all(botId, limit) as unknown as MessageRow[];
-  return rows.reverse().map(({ steps, ...m }) => {
+  const messages = rows.reverse().map(({ steps, ...m }): BotMessage => {
     let parsed: AgentStep[] | undefined;
     try {
       parsed = steps ? JSON.parse(steps) : undefined;
     } catch {}
     return parsed?.length ? { ...m, steps: parsed } : m;
   });
+  // Code helper: show whether each suggested change was applied since (the saved steps say "pending").
+  const editSteps = messages.flatMap((m) => m.steps ?? []).filter((s) => s.edit);
+  const current = editStatuses(editSteps.map((s) => s.edit!.id));
+  for (const step of editSteps) Object.assign(step.edit!, current.get(step.edit!.id));
+  return messages;
 }
 
 export function addMessage(botId: string, role: BotMessage['role'], content: string, steps?: AgentStep[]): BotMessage {
@@ -193,6 +218,13 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
     bot.tools.includes('calculator') &&
       'Never do arithmetic in your head: use the calculate tool for any math, and days_until for counting days.',
     usesWeb && 'When your answer uses information from the web, mention where it came from, with links.',
+    bot.tools.includes('code') &&
+      `You can work with the code in ${userName}'s project folder (${bot.codeFolder}). Look around with list_folder, ` +
+        'search_code and read_file before answering questions about it; never guess what a file says. ' +
+        'To change a file, call propose_edit with text copied exactly from read_file. ' +
+        (bot.codeAutoWrite
+          ? 'Your changes are written straight away, so be careful and make one small change at a time.'
+          : `${userName} sees each change and applies it with a button, so tell them what each change does and why.`),
     bot.tools.includes('notes') &&
       `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note.`,
     notes.length > 0 &&

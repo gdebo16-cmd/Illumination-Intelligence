@@ -191,6 +191,26 @@ addColumn('PrismImage', 'mode', "TEXT NOT NULL DEFAULT 'create'");
 addColumn('PrismImage', 'source_id', 'TEXT');
 addColumn('UmbraRun', 'team_id', 'TEXT');
 
+// Code helper: the one project folder a bot may look at, and whether it may change files without asking.
+addColumn('UmbraBot', 'code_folder', "TEXT NOT NULL DEFAULT ''");
+addColumn('UmbraBot', 'code_auto', 'INTEGER NOT NULL DEFAULT 0');
+// Changes the Code helper suggested, waiting for (or after) your OK. lib/umbra/code.ts
+db.exec(`
+  CREATE TABLE IF NOT EXISTS UmbraCodeEdit (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    bot_id TEXT NOT NULL,
+    root TEXT NOT NULL,
+    path TEXT NOT NULL,
+    find_text TEXT NOT NULL,
+    replace_text TEXT NOT NULL,
+    diff TEXT NOT NULL,
+    status TEXT NOT NULL,
+    note TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // Prism videos: one row per video made from a picture. The files are data/prism/videos/<id>.mp4
 // and <id>.png (the starting picture, shown before the video plays).
 // status: 'working' while it's being made, then 'done' or 'failed' (with the reason in error).

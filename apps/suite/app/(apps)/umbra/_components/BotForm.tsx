@@ -5,20 +5,22 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ALL_TOOL_IDS, BOT_LIMITS, BOT_MODELS, BOT_TOOLS, FLAMES, flameColor } from '@/config/umbra';
+import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, FLAMES, flameColor } from '@/config/umbra';
 import Flame from './Flame';
 import type { Bot, BotNote } from './types';
 
-// New bots start with every tool switched on.
+// New bots start with every tool switched on, except the Code helper (it needs a folder first).
 const EMPTY = {
   name: '',
   flame: FLAMES[0].id as string,
   personality: '',
   purpose: '',
   model: BOT_MODELS[0].id as string,
-  tools: [...ALL_TOOL_IDS] as string[],
+  tools: [...DEFAULT_TOOL_IDS] as string[],
+  codeFolder: '',
+  codeAutoWrite: false,
 };
-type TextField = 'name' | 'flame' | 'personality' | 'purpose' | 'model';
+type TextField = 'name' | 'flame' | 'personality' | 'purpose' | 'model' | 'codeFolder';
 
 export default function BotForm({ botId }: { botId?: string }) {
   const router = useRouter();
@@ -36,7 +38,10 @@ export default function BotForm({ botId }: { botId?: string }) {
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json()).error ?? 'Could not load this Flicker.');
         const bot: Bot = await res.json();
-        setForm({ name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model, tools: bot.tools });
+        setForm({
+          name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model, tools: bot.tools,
+          codeFolder: bot.codeFolder ?? '', codeAutoWrite: Boolean(bot.codeAutoWrite),
+        });
         setLoaded(true);
       })
       .catch((err: Error) => setError(err.message));
@@ -164,6 +169,38 @@ export default function BotForm({ botId }: { botId?: string }) {
                 ))}
               </div>
             </fieldset>
+
+            {form.tools.includes('code') && (
+              <fieldset className="umbra-field umbra-code-settings">
+                <legend className="umbra-label">Code helper</legend>
+                <label className="umbra-field">
+                  <span className="umbra-muted umbra-hint">The project folder it may look at. It can’t see anything outside this folder.</span>
+                  <input
+                    value={form.codeFolder}
+                    onChange={set('codeFolder')}
+                    placeholder={'e.g. C:\Users\you\projects\my-app'}
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    required
+                  />
+                </label>
+                <label className="umbra-tool">
+                  <input
+                    type="checkbox"
+                    checked={form.codeAutoWrite}
+                    onChange={(e) => setForm((f) => ({ ...f, codeAutoWrite: e.target.checked }))}
+                  />
+                  <span>
+                    <span className="umbra-tool-name">Change files without asking</span>
+                    <span className="umbra-tool-description">
+                      Off: every change waits for you to tap Apply. On: changes are written straight away.
+                    </span>
+                  </span>
+                </label>
+                <span className="umbra-muted umbra-hint">Tip: pick the “Qwen 3 Coder” brain above for code.</span>
+              </fieldset>
+            )}
 
             {editing && (
               <section className="umbra-field">

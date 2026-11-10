@@ -2335,6 +2335,47 @@ body {
     transform: rotate(360deg); 
   } }
 /* #endregion animations */
+/* #region umbra code helper */
+.umbra-code-settings { display: flex; flex-direction: column; gap: 0.6rem; }
+.umbra-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+  padding: 0.55rem;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;}
+.umbra-edit-path { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.8rem; color: #c9cbe0; }
+.umbra-edit-diff {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  white-space: pre;
+  color: #b8bad0;}
+.umbra-edit-diff > span { display: block; min-height: 1.45em; padding: 0 0.3rem; }
+.umbra-edit-diff .is-add { color: #8be9a8; background: rgb(60 200 120 / 0.12); }
+.umbra-edit-diff .is-del { color: #ff9b9b; background: rgb(220 70 70 / 0.12); }
+.umbra-edit-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.umbra-edit-actions button {
+  min-height: 36px;
+  padding: 0 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #e5e7f0;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 10px;
+  cursor: pointer;}
+.umbra-edit-actions .umbra-edit-apply { font-weight: 600; color: #0b0b14; background: var(--bot-color); border-color: transparent; }
+.umbra-edit-actions button:disabled { opacity: 0.5; cursor: default; }
+.umbra-edit-status { font-size: 0.8rem; color: #9a9cb8; }
+.umbra-edit.is-applied .umbra-edit-status { color: #8be9a8; }
+.umbra-edit.is-failed .umbra-edit-status { color: #ffb4b4; }
+/* #endregion umbra code helper */
 /* #region chat bar floats over the messages (phones) */
 /* The message list runs to the bottom of the screen, behind the message bar. --bar-h is the bar's
    height (set by hooks/use-bar-height.ts), so the newest message still stops just above the bar. */

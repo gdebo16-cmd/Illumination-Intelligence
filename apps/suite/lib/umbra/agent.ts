@@ -11,12 +11,15 @@ import crypto from 'node:crypto';
 import { gpuQueue } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
 import { toolsFor, type ToolContext, type ToolDef } from './tools';
+import type { CodeEditView } from './code';
 
 /** 'high' for live chat; 'low' for background tasks, so they never make a chat wait. */
 type Priority = 'high' | 'low';
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const MAX_ROUNDS = 6;
+// Working on code takes more looking around (list, search, read, read again…) before answering.
+const MAX_ROUNDS_CODE = 14;
 
 /** One tool use, as shown in the chat. */
 export interface AgentStep {
@@ -27,6 +30,8 @@ export interface AgentStep {
   summary?: string;
   links?: { title: string; url: string }[];
   image?: { url: string; prompt: string };
+  /** Code helper: a suggested file change. */
+  edit?: CodeEditView;
   /** Teams: the teammate who did this step's work, */
   bot?: { id: string; name: string; flame: string };
   /** …the tools that teammate used, */
@@ -87,10 +92,11 @@ export async function runAgent(options: {
   const schemas = [...tools.values()].map((t) => t.schema);
   const messages = [...options.messages];
   const steps: AgentStep[] = [];
+  const maxRounds = options.toolIds.includes('code') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
 
-  for (let round = 0; round <= MAX_ROUNDS; round++) {
+  for (let round = 0; round <= maxRounds; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
-    const lastRound = round === MAX_ROUNDS;
+    const lastRound = round === maxRounds;
     const reply = await askModel(options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high');
     const calls = reply.message?.tool_calls ?? [];
 
@@ -136,6 +142,7 @@ export async function runAgent(options: {
           summary: result.summary,
           links: result.links,
           image: result.image,
+          edit: result.edit,
           bot: result.bot,
           children: result.children,
           detail: result.detail,

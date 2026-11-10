@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
 import Flame from './Flame';
-import type { AgentStep } from './types';
+import type { AgentStep, CodeEdit } from './types';
 
 // The tool steps behind a reply: what the bot did, with links and pictures.
 // In a team, "Asking <teammate>" steps show that teammate's flame, its own steps underneath,
@@ -44,6 +45,7 @@ export function Steps({ steps }: { steps: AgentStep[] }) {
                 ))}
               </span>
             )}
+            {step.edit && <EditCard edit={step.edit} />}
             {step.image && (
               <a href={step.image.url} target="_blank" rel="noreferrer" className="umbra-step-image">
                 {/* eslint-disable-next-line @next/next/no-img-element -- a picture Prism made, served by our own API */}
@@ -54,5 +56,50 @@ export function Steps({ steps }: { steps: AgentStep[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+// A file change the Code helper suggested: the "diff" (red lines go, green lines come in),
+// with buttons to write it to the file or leave the file alone.
+function EditCard({ edit: initial }: { edit: CodeEdit }) {
+  const [edit, setEdit] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  const decide = async (apply: boolean) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/umbra/edits/${edit.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply }),
+      });
+      const data = await res.json();
+      setEdit(res.ok ? data : { ...edit, status: 'failed', note: data.error ?? 'Something went wrong.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const status = { applied: 'Applied', rejected: 'Not applied', failed: 'Couldn’t apply', pending: '' }[edit.status];
+  return (
+    <span className={`umbra-edit is-${edit.status}`}>
+      <span className="umbra-edit-path">{edit.path}</span>
+      <pre className="umbra-edit-diff">
+        {/* The "--- file" / "+++ file" header lines repeat the file name shown above, so skip them. */}
+        {edit.diff.split('\n').filter((line) => !/^(---|\+\+\+) /.test(line)).map((line, i) => (
+          <span key={i} className={line.startsWith('+') ? 'is-add' : line.startsWith('-') ? 'is-del' : undefined}>
+            {line}
+          </span>
+        ))}
+      </pre>
+      {edit.status === 'pending' ? (
+        <span className="umbra-edit-actions">
+          <button type="button" className="umbra-edit-apply" disabled={busy} onClick={() => decide(true)}>Apply</button>
+          <button type="button" disabled={busy} onClick={() => decide(false)}>Don’t apply</button>
+        </span>
+      ) : (
+        <span className="umbra-edit-status">{status}{edit.note ? `: ${edit.note}` : ''}</span>
+      )}
+    </span>
   );
 }
