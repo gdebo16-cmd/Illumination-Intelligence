@@ -26,10 +26,10 @@ export interface PrismModel {
 }
 
 export const PRISM_MODELS = [
-  { id: 'flux2-klein', name: 'FLUX.2 Klein', note: 'The quick one: it paints a picture in 4 steps.', expands: false, vramGB: 8 },
+  { id: 'flux2-klein', name: 'Quicksketch', note: 'The quick one: it paints a picture in 4 steps.', expands: false, vramGB: 8 },
   {
     id: 'flux3-klein',
-    name: 'FLUX.3 Klein',
+    name: 'Masterpiece',
     note: 'The newer one: it paints in 16 steps, so each picture takes longer.',
     expands: true,
     // A guess until it has run here: the painter plus two language models (one is the expander).

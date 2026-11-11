@@ -37,12 +37,13 @@ export const flameColor = (id: string) => FLAMES.find((f) => f.id === id)?.color
 // Local models a bot can use. All of them can use tools (needed from Stage 2 on).
 // The first one is the default for new bots.
 export const BOT_MODELS = [
-  { id: 'qwen3:14b', name: 'Qwen 3 14B: smart all-rounder' },
-  { id: 'qwen3.5:9b', name: 'Qwen 3.5 9B: faster, can see images' },
-  { id: 'gpt-oss:20b', name: 'GPT-OSS 20B: best at multi-step tasks' },
-  { id: 'qwen3:8b', name: 'Qwen 3 8B: quick and light' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 8B: quick and light' },
-  { id: 'qwen3-coder:30b', name: 'Qwen 3 Coder 30B: best for code (slower)' },
+  { id: 'qwen3:14b', name: 'Big Brain Fish: smart all-rounder' },
+  { id: 'qwen3.5:9b', name: 'Little Eyed Fish: quick, can see images' },
+  { id: 'qwen3:8b', name: 'Quick Chatter Fish: quick, a bit smarter' },
+  { id: 'llama3.1:8b', name: 'Little Chatter Fish: quick everyday chat' },
+  { id: 'qwen2.5-coder:7b', name: 'Small Code Fish: quick code help' },
+  { id: 'gpt-oss:20b', name: 'Big City Task Fish: multi-step tasks (heavy)' },
+  { id: 'qwen3-coder:30b', name: 'Deep Sea Code Fish: best code (heavy, slow)' },
 ] as const;
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);

@@ -54,7 +54,7 @@ const Chat = () => {
     const box = inputRef.current;
     if (!box) return;
     box.style.height = 'auto';
-    box.style.height = `${Math.min(box.scrollHeight, 160)}px`;
+    box.style.height = `${Math.min(box.scrollHeight + box.offsetHeight - box.clientHeight, 160)}px`;
   }, [input]);
 
   // Enter adds a new line. Ctrl+Enter (Cmd+Enter on a Mac) sends, like the send button.

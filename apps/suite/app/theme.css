@@ -76,16 +76,16 @@
 [data-theme='eclipse'] {
     --background-color: #000000;
     --text-color: #ffffff;
-    --primary-color: rgba(24, 26, 50, 0.244);
+    --primary-color: rgba(50, 24, 24, 0.244);
     --secondary-color: rgba(0, 0, 0, 0.753);
-    --grad-color-1: #1a1e41;
+    --grad-color-1: #3f0b0b;
     --grad-color-2: #050913;
     --accent-color: #0c1220;
-    --border-color: #242831;
+    --border-color: #312424;
     --edge-color: #030406;
     --chat-user: #c0cae6;
     --chat-assistant: #fcdfab;
-    --load: #3c3c7e;
+    --load: #7e3c3c;
     --placeholder: #3f414567;
     --border-radius: 10px;
     --box-shadow: 0 0 30px 2px rgb(7, 7, 7);

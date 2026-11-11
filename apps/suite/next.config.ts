@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     'illumination.shrimp-bitterling.ts.net',
     '100.98.151.55',
   ],
+  // Local pictures may carry a ?v= version so phones fetch a fresh copy after artwork changes.
+  images: { localPatterns: [{ pathname: '/**' }] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

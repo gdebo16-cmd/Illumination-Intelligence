@@ -2373,3 +2373,9 @@ header > :not(.header-spacer) { pointer-events: auto; }
 .umbra-send { top: auto; bottom: 0.25rem; transform: none; }
 .umbra-send:active { transform: scale(0.92); }
 /* #endregion */
+/* #region chat boxes grow with the text: buttons stay at the bottom, height changes instantly */
+textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
+.input-form { align-items: flex-end; }
+.input-form .send-button { top: auto; bottom: 0.5rem; transform: none; }
+.umbra-input { align-items: flex-end; }
+/* #endregion */
