@@ -7,6 +7,7 @@
 //   { "type": "error", "error": "…" }   something went wrong
 
 import { NextResponse } from 'next/server';
+import { endWork, startWork, workFailed } from '@/lib/umbra/busy';
 import { getCurrentUserId, USERS } from '@/lib/user';
 import { addMessage, getBot, listMessages, listNotes, systemPrompt } from '@/lib/umbra/bots';
 import { runAgent, type ChatMessage } from '@/lib/umbra/agent';
@@ -41,9 +42,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // 4. Run the agent loop, streaming each event to the page as it happens.
   const encoder = new TextEncoder();
+  // If you leave the app, the phone drops this stream. The reply keeps going and is saved anyway;
+  // the chat page picks it up when you come back.
+  const workKey = `bot:${bot.id}`;
+  let gone = false;
+  startWork(workKey);
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: object) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const send = (event: object) => {
+        if ((event as { type?: string }).type === 'error') workFailed(workKey, (event as { error: string }).error);
+        if (gone) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          gone = true;
+        }
+      };
       send({ type: 'sent', message: sent });
       try {
         const result = await runAgent({
@@ -66,8 +80,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               : text || 'Something went wrong.',
         });
       } finally {
-        controller.close();
+        endWork(workKey);
+        if (!gone) {
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        }
       }
+    },
+    cancel() {
+      gone = true;
     },
   });
 

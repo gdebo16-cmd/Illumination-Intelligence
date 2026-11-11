@@ -25,6 +25,9 @@ export default function TeamChat({ teamId }: { teamId: string }) {
   const listRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // A reply is on its way on the server but this page isn't streaming it (you left the app mid-reply).
+  const [waiting, setWaiting] = useState(false);
+  const streaming = useRef(false);
   useBarHeight(barRef, listRef, Boolean(team));
 
   useEffect(() => {
@@ -32,10 +35,47 @@ export default function TeamChat({ teamId }: { teamId: string }) {
       .then(async ([teamRes, msgRes]) => {
         if (!teamRes.ok) throw new Error((await teamRes.json()).error ?? 'Could not load this team.');
         setTeam(await teamRes.json());
-        if (msgRes.ok) setMessages(await msgRes.json());
+        if (msgRes.ok) {
+          setMessages(await msgRes.json());
+          readWork(msgRes);
+        }
       })
       .catch((err: Error) => setError(err.message));
   }, [teamId]);
+
+  // Coming back to the app: reload the saved chat, and keep checking while a reply is still coming.
+  function readWork(res: Response) {
+    const missed = res.headers.get('X-Umbra-Error');
+    if (missed) setError(decodeURIComponent(missed));
+    const busy = res.headers.get('X-Umbra-Busy') === '1';
+    setWaiting(busy);
+    setThinking(busy);
+  }
+  async function syncChat() {
+    if (streaming.current) return;
+    const res = await fetch(`/api/umbra/teams/${teamId}/messages`, { cache: 'no-store' }).catch(() => null);
+    if (!res?.ok || streaming.current) return;
+    setMessages(await res.json());
+    readWork(res);
+  }
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState === 'visible') void syncChat();
+    };
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('pageshow', onShow);
+    return () => {
+      document.removeEventListener('visibilitychange', onShow);
+      window.removeEventListener('pageshow', onShow);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId]);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => void syncChat(), 3000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting, teamId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -78,6 +118,8 @@ export default function TeamChat({ teamId }: { teamId: string }) {
     setError('');
     setLiveSteps([]);
     setThinking(true);
+    streaming.current = true;
+    let dropped = false;
     const draft: BotMessage = { id: `draft-${Date.now()}`, role: 'user', content: text, createdAt: new Date().toISOString() };
     setMessages((m) => [...m, draft]);
 
@@ -109,10 +151,15 @@ export default function TeamChat({ teamId }: { teamId: string }) {
         }
       }
     } catch (err) {
-      setError((err as Error).message || 'The team could not reply.');
+      // A TypeError here means the connection dropped (you left the app). The reply is still being
+      // made on the server, so wait for it instead of showing an error.
+      if (err instanceof TypeError) dropped = true;
+      else setError((err as Error).message || 'The team could not reply.');
     } finally {
-      setThinking(false);
+      streaming.current = false;
       setLiveSteps([]);
+      if (dropped) void syncChat();
+      else setThinking(false);
     }
   };
 

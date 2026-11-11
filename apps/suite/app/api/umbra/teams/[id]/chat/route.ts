@@ -7,6 +7,7 @@
 //   { "type": "error", "error": "…" }
 
 import { NextResponse } from 'next/server';
+import { endWork, startWork, workFailed } from '@/lib/umbra/busy';
 import { USERS } from '@/lib/user';
 import { addTeamMessage, listTeamMessages, runTeam } from '@/lib/umbra/teams';
 import { ownedTeam } from '../../owned';
@@ -31,9 +32,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const sent = addTeamMessage(team.id, 'user', message);
 
   const encoder = new TextEncoder();
+  // If you leave the app, the phone drops this stream. The reply keeps going and is saved anyway;
+  // the chat page picks it up when you come back.
+  const workKey = `team:${team.id}`;
+  let gone = false;
+  startWork(workKey);
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: object) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const send = (event: object) => {
+        if ((event as { type?: string }).type === 'error') workFailed(workKey, (event as { error: string }).error);
+        if (gone) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          gone = true;
+        }
+      };
       send({ type: 'sent', message: sent });
       try {
         const result = await runTeam({
@@ -57,8 +71,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               : text || 'Something went wrong.',
         });
       } finally {
-        controller.close();
+        endWork(workKey);
+        if (!gone) {
+          try {
+            controller.close();
+          } catch {
+            // already closed
+          }
+        }
       }
+    },
+    cancel() {
+      gone = true;
     },
   });
 

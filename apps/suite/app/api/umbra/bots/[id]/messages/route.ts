@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
 import { clearMessages, getBot, listMessages } from '@/lib/umbra/bots';
+import { workHeaders } from '@/lib/umbra/busy';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,7 +18,7 @@ async function ownedBot(params: Params['params']) {
 
 export async function GET(_req: Request, { params }: Params) {
   const found = await ownedBot(params);
-  return 'error' in found ? found.error : NextResponse.json(listMessages(found.bot.id));
+  return 'error' in found ? found.error : NextResponse.json(listMessages(found.bot.id), { headers: workHeaders(`bot:${found.bot.id}`) });
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
