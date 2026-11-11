@@ -17,23 +17,85 @@ export const FLAMES = [
 
 export type FlameId = (typeof FLAMES)[number]['id'];
 
+// ------------------------------------------------------------------ shapes and colors
+//
+// What you pick for a Flicker: one of six shapes, and any color.
+// Every shape has a white picture (the "clean palette"); the app tints it with your color in the
+// browser, so no extra pictures are needed per color. 'art' is the picture's file name in
+// public/umbra/flames. The flame's white picture is the animated 'pearl' one; the other five were
+// painted by Prism in the flames' art style (scripts/make-flicker-designs.py) and are still
+// pictures for now. `words` is how the Flicker is told what it looks like.
+export const SHAPES = [
+  { id: 'flame', name: 'Flame', art: 'pearl', words: 'flame spirit' },
+  { id: 'droplet', name: 'Droplet', art: 'droplet', words: 'water droplet spirit' },
+  { id: 'leaf', name: 'Sprout', art: 'leaf', words: 'leaf sprout spirit' },
+  { id: 'star', name: 'Star', art: 'star', words: 'star spirit' },
+  { id: 'stone', name: 'Crystal', art: 'stone', words: 'crystal spirit' },
+  { id: 'umbra', name: 'Umbra', art: 'umbra', words: 'shadow flame spirit' },
+] as const;
+
+// The color a new Flicker starts with, and the color of an untinted (white) one.
+export const DEFAULT_FLAME_COLOR = '#a77bff';
+const WHITE = '#e8e8f0';
+
+// A Flicker's look is saved as one short piece of text in its "flame" setting:
+//   "star#ff8800"  a shape in a color you picked      (what the picker saves)
+//   "star"         a shape left white
+//   "#ff8800"      a flame in a color you picked
+//   "violet"       one of the eight original flames, drawn with its own full-color pictures
+//                  (Flickers made before the shape picker keep looking exactly as they did)
+function read(flame: unknown): { shape: (typeof SHAPES)[number]; original?: (typeof FLAMES)[number]; tint?: string } | null {
+  const parts = typeof flame === 'string' ? /^([a-z]*)(#[0-9a-f]{6})?$/i.exec(flame) : null;
+  if (!parts || (!parts[1] && !parts[2])) return null;
+  const tint = parts[2]?.toLowerCase();
+  const original = tint ? undefined : FLAMES.find((f) => f.id === parts[1]);
+  if (original) return { shape: SHAPES[0], original };
+  const shape = parts[1] ? SHAPES.find((s) => s.id === parts[1]) : SHAPES[0];
+  return shape ? { shape, tint } : null;
+}
+
+/** True for any look the app knows how to draw. */
+export const isFlame = (flame: unknown): flame is string => read(flame) !== null;
+/** The shape's id, e.g. 'star' (the eight original flames are all 'flame'). */
+export const flameShape = (flame: string): string => (read(flame)?.shape ?? SHAPES[0]).id;
+/** The color you picked, when the white picture should be tinted; nothing for white or an original flame. */
+export const flameTint = (flame: string): string | undefined => read(flame)?.tint;
+/** The accent color that goes with a look (buttons, borders, glow). */
+export function flameColor(flame: string): string {
+  const look = read(flame);
+  return look?.tint ?? look?.original?.color ?? (look ? WHITE : DEFAULT_FLAME_COLOR);
+}
+/** The saved text for a shape in a color. */
+export const makeFlame = (shapeId: string, color: string) => `${shapeId}${color.toLowerCase()}`;
+/** What the Flicker is told it looks like, e.g. "violet flame spirit" or "water droplet spirit". */
+export function flameWords(flame: string): string {
+  const look = read(flame);
+  if (look?.original) return `${look.original.id} flame spirit`;
+  return (look?.shape ?? SHAPES[0]).words;
+}
+
+// The picture file (without its ending) a look is drawn from.
+const flameArt = (flame: string): string => {
+  const look = read(flame);
+  return look?.original?.id ?? (look?.shape ?? SHAPES[0]).art;
+};
+
 // A flicker's pictures. 'idle' is the resting animation; 'dance' plays while its bot is working.
 // Each animation comes as a small .avif (what phones load) and a .webp for older browsers.
 // The .png is the still picture.
 export type FlameClip = 'idle' | 'dance';
-export const flameStill = (id: string) => `/umbra/flames/${id}.png`;
-export const flameAnimation = (id: string, clip: FlameClip = 'idle') => {
-  const file = `/umbra/flames/${id}${clip === 'dance' ? '-dance' : ''}`;
+export const flameStill = (flame: string) => `/umbra/flames/${flameArt(flame)}.png`;
+export const flameAnimation = (flame: string, clip: FlameClip = 'idle') => {
+  const file = `/umbra/flames/${flameArt(flame)}${clip === 'dance' ? '-dance' : ''}`;
   return { avif: `${file}.avif`, webp: `${file}.webp` };
 };
-// Width of a flicker picture for each pixel of height (they all share one shape).
+// Width of a flicker picture for each pixel of height (they all share one picture shape).
 export const FLAME_ASPECT = flameClips.width / flameClips.height;
-// True once a dance clip has been made for this flicker (the script fills in the list).
+/** True when this look has a resting animation (the flame does; the other shapes don't yet). */
+export const hasAnimation = (flame: string) => FLAMES.some((f) => f.id === flameArt(flame));
+// True once a dance clip has been made for this look (the script fills in the list).
 // Until then the app makes the resting animation hop and sway instead.
-export const hasDanceClip = (id: string) => (flameClips.dance as string[]).includes(id);
-export const isFlame = (id: unknown): id is FlameId => FLAMES.some((f) => f.id === id);
-export const flameColor = (id: string) => FLAMES.find((f) => f.id === id)?.color ?? '#a77bff';
-
+export const hasDanceClip = (flame: string) => (flameClips.dance as string[]).includes(flameArt(flame));
 // Local models a bot can use. All of them can use tools (needed from Stage 2 on).
 // The first one is the default for new bots.
 export const BOT_MODELS = [

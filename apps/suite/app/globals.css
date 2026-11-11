@@ -1212,7 +1212,7 @@ textarea.input-field {
 }
 .umbra-flames { 
   display: grid; 
-  grid-template-columns: repeat(8, 1fr); 
+  grid-template-columns: repeat(6, 1fr);
   gap: 0.4rem; 
 }
 .umbra-flame-option {
@@ -1228,8 +1228,38 @@ textarea.input-field {
   border-color: var(--bot-color);
   background: color-mix(in srgb, var(--bot-color) 14%, transparent);
 }
-.umbra-form-actions { 
-  display: flex; 
+/* "Or pick your own color": a small preview flame, a line of text, and the color swatch. */
+.umbra-flame-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgb(255 255 255 / 0.03);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.umbra-flame-custom > span {
+  flex: 1;
+  display: grid;
+}
+.umbra-flame-custom input[type="color"] {
+  width: 3rem;
+  height: 2.5rem;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+}
+/* The colored square itself sits inside the input; these round it and remove its frame. */
+.umbra-flame-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.umbra-flame-custom input[type="color"]::-webkit-color-swatch { border: none; border-radius: 10px; }
+.umbra-flame-custom input[type="color"]::-moz-color-swatch { border: none; border-radius: 10px; }
+.umbra-form-actions {
+  display: flex;
   flex-wrap: wrap; 
   gap: 0.75rem; margin-top: 0.5rem; 
 }
@@ -1814,7 +1844,7 @@ textarea.input-field {
   .umbra-page { padding: 1rem 1rem 2rem; }
   .umbra-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .umbra-card { min-height: 190px; padding: 1rem 0.6rem; }
-  .umbra-flames { grid-template-columns: repeat(4, 1fr); }
+  .umbra-flames { grid-template-columns: repeat(3, 1fr); }
   .umbra-bubble { max-width: 85%; }
   .umbra-chat-purpose { display: none; }}
 @media (max-height: 500px) and (orientation: landscape) {

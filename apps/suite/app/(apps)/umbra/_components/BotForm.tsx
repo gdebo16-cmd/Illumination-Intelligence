@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, FLAMES, flameColor } from '@/config/umbra';
+import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_FLAME_COLOR, DEFAULT_TOOL_IDS, SHAPES, flameColor, flameShape, makeFlame } from '@/config/umbra';
 import { canThink } from '@/config/models';
 import Flame from './Flame';
 import type { Bot, BotNote } from './types';
@@ -13,7 +13,7 @@ import type { Bot, BotNote } from './types';
 // New bots start with every tool switched on, except the Code helper (it needs a folder first).
 const EMPTY = {
   name: '',
-  flame: FLAMES[0].id as string,
+  flame: makeFlame(SHAPES[0].id, DEFAULT_FLAME_COLOR),
   personality: '',
   purpose: '',
   model: BOT_MODELS[0].id as string,
@@ -101,24 +101,38 @@ export default function BotForm({ botId }: { botId?: string }) {
         {loaded && (
           <>
             <fieldset className="umbra-field">
-              <legend className="umbra-label">Pick a flame</legend>
+              <legend className="umbra-label">Pick a shape</legend>
+              {/* Six white shapes (a clean palette). Picking one keeps the color you chose below. */}
               <div className="umbra-flames" role="radiogroup">
-                {FLAMES.map((f) => (
+                {SHAPES.map((s) => (
                   <button
-                    key={f.id}
+                    key={s.id}
                     type="button"
                     role="radio"
-                    aria-checked={form.flame === f.id}
-                    aria-label={f.name}
-                    title={f.name}
+                    aria-checked={flameShape(form.flame) === s.id}
+                    aria-label={s.name}
+                    title={s.name}
                     className="umbra-flame-option"
-                    style={{ '--bot-color': f.color } as React.CSSProperties}
-                    onClick={() => setForm((cur) => ({ ...cur, flame: f.id }))}
+                    onClick={() => setForm((cur) => ({ ...cur, flame: makeFlame(s.id, flameColor(cur.flame)) }))}
                   >
-                    <Flame flame={f.id} size={64} />
+                    <Flame flame={s.id} size={64} />
                   </button>
                 ))}
               </div>
+              {/* Then any color at all: the white shape is tinted to match. */}
+              <label className="umbra-flame-custom">
+                <Flame flame={form.flame} size={56} />
+                <span>
+                  <span className="umbra-tool-name">Pick its color</span>
+                  <span className="umbra-tool-description">Tap the swatch to choose any color. This is how your Flicker will look.</span>
+                </span>
+                <input
+                  type="color"
+                  aria-label="Flicker color"
+                  value={flameColor(form.flame)}
+                  onChange={(e) => setForm((cur) => ({ ...cur, flame: makeFlame(flameShape(cur.flame), e.target.value) }))}
+                />
+              </label>
             </fieldset>
 
             <label className="umbra-field">

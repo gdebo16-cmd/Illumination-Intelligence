@@ -6,7 +6,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
-import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
+import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, flameWords, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
 import { checkCodeFolder, editStatuses } from './code';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 import { canThink } from '@/config/models';
@@ -232,7 +232,8 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
 
   return [
     `You are ${bot.name}, a Flicker (an AI helper) created by ${userName} in Umbra, part of the Illumination Intelligence suite.`,
-    `You appear as a small ${bot.flame} flame spirit.`,
+    // e.g. "violet flame spirit" or "water droplet spirit" (a picked color is named by its look, not its code).
+    `You appear as a small ${flameWords(bot.flame)}.`,
     bot.purpose && `What you're for: ${bot.purpose}`,
     bot.personality && `Your personality and how you talk: ${bot.personality}`,
     'Stay in character. Keep replies conversational and only as long as they need to be.',
