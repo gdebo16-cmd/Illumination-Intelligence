@@ -278,6 +278,7 @@ function askTeammateTool(
       const result = await runAgent({
         model: bot.model,
         toolIds: bot.tools,
+        think: bot.think,
         messages: [
           { role: 'system', content: `${systemPrompt(bot, userName, listNotes(bot.id))}\n\n${teammateBrief(team, team.leader, role)}` },
           { role: 'user', content: `From ${team.leader.name}: ${request}` },
@@ -324,6 +325,7 @@ export async function runTeam(options: {
   return runAgent({
     model: leader.model,
     toolIds: leader.tools,
+    think: leader.think,
     extraTools: team.crew.length ? [askTeammateTool(userId, userName, team, priority)] : [],
     messages: [
       { role: 'system', content: `${systemPrompt(leader, userName, listNotes(leader.id))}\n\n${leaderBrief(team, userName)}` },

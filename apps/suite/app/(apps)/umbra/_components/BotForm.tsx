@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, FLAMES, flameColor } from '@/config/umbra';
+import { canThink } from '@/config/models';
 import Flame from './Flame';
 import type { Bot, BotNote } from './types';
 
@@ -19,6 +20,7 @@ const EMPTY = {
   tools: [...DEFAULT_TOOL_IDS] as string[],
   codeFolder: '',
   codeAutoWrite: false,
+  think: false,
 };
 type TextField = 'name' | 'flame' | 'personality' | 'purpose' | 'model' | 'codeFolder';
 
@@ -40,7 +42,7 @@ export default function BotForm({ botId }: { botId?: string }) {
         const bot: Bot = await res.json();
         setForm({
           name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model, tools: bot.tools,
-          codeFolder: bot.codeFolder ?? '', codeAutoWrite: Boolean(bot.codeAutoWrite),
+          codeFolder: bot.codeFolder ?? '', codeAutoWrite: Boolean(bot.codeAutoWrite), think: Boolean(bot.think),
         });
         setLoaded(true);
       })
@@ -153,6 +155,24 @@ export default function BotForm({ botId }: { botId?: string }) {
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
+            </label>
+
+            {/* Only some brains can think; for the others the switch is greyed out. */}
+            <label className={`umbra-tool ${canThink(form.model) ? '' : 'is-unavailable'}`}>
+              <input
+                type="checkbox"
+                checked={form.think && canThink(form.model)}
+                disabled={!canThink(form.model)}
+                onChange={(e) => setForm((f) => ({ ...f, think: e.target.checked }))}
+              />
+              <span>
+                <span className="umbra-tool-name">Think before answering</span>
+                <span className="umbra-tool-description">
+                  {canThink(form.model)
+                    ? 'Off: answers straight away. On: works through the problem first and shows its thinking in the chat. Better at hard jobs, slower on every reply.'
+                    : 'This brain can’t think step by step. Pick another brain to use this.'}
+                </span>
+              </span>
             </label>
 
             <fieldset className="umbra-field">

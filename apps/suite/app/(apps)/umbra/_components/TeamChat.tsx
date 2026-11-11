@@ -202,7 +202,10 @@ export default function TeamChat({ teamId }: { teamId: string }) {
             <Flame flame={leader.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
               <Steps steps={liveSteps} />
-              <span className="umbra-thinking">{running ? `${running.label}…` : `${leader.name} is thinking…`}</span>
+              {/* A "Thinking" step already says what's happening, with the thinking itself. */}
+              {running?.tool !== 'thinking' && (
+                <span className="umbra-thinking">{running ? `${running.label}…` : `${leader.name} is thinking…`}</span>
+              )}
             </div>
           </div>
         )}

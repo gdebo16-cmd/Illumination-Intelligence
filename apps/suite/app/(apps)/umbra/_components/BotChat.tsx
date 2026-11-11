@@ -205,9 +205,12 @@ export default function BotChat({ botId }: { botId: string }) {
             <Flame flame={bot.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
               <Steps steps={liveSteps} />
-              <span className="umbra-thinking">
-                {runningStep ? `${runningStep.label}…` : `${bot.name} is thinking…`}
-              </span>
+              {/* A "Thinking" step already says what's happening, with the thinking itself. */}
+              {runningStep?.tool !== 'thinking' && (
+                <span className="umbra-thinking">
+                  {runningStep ? `${runningStep.label}…` : `${bot.name} is thinking…`}
+                </span>
+              )}
             </div>
           </div>
         )}

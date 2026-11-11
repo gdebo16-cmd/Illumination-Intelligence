@@ -79,6 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const result = await runAgent({
           model: bot.model,
           toolIds: bot.tools,
+          think: bot.think,
           messages,
           context: { userId, botId: bot.id },
           onStep: (step) => send({ type: 'step', step }),

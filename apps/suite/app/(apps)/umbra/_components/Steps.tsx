@@ -6,7 +6,9 @@ import { MessageContent } from '@/components/MessageContent';
 import Flame from './Flame';
 import type { AgentStep, CodeEdit } from './types';
 
-// The tool steps behind a reply: what the bot did, with links and pictures.
+// The steps behind a reply: what the bot did, with links and pictures.
+// A bot with "Think before answering" on also gets "Thinking" steps: while it reasons, the last
+// few lines of its thinking show live; afterwards the whole thing folds away under "Thought for…".
 // In a team, "Asking <teammate>" steps show that teammate's flame, its own steps underneath,
 // and (folded away) the full answer it gave the leader.
 export function Steps({ steps }: { steps: AgentStep[] }) {
@@ -30,6 +32,15 @@ export function Steps({ steps }: { steps: AgentStep[] }) {
             <span className="umbra-step-label">{step.label}</span>
             {step.children && step.children.length > 0 && <Steps steps={step.children} />}
             {step.summary && step.status !== 'running' && !step.detail && <span className="umbra-step-summary">{step.summary}</span>}
+            {step.thought &&
+              (step.status === 'running' ? (
+                <span className="umbra-thought is-live"><span>{step.thought}</span></span>
+              ) : (
+                <details className="umbra-step-detail">
+                  <summary>Show thinking</summary>
+                  <span className="umbra-thought">{step.thought}</span>
+                </details>
+              ))}
             {step.detail && step.bot && (
               <details className="umbra-step-detail">
                 <summary>{step.bot.name}’s answer</summary>

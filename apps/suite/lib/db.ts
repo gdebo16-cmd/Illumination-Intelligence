@@ -214,6 +214,8 @@ for (const [retired, replacement] of Object.entries(RETIRED_BOT_MODELS)) {
 // Code helper: the one project folder a bot may look at, and whether it may change files without asking.
 addColumn('UmbraBot', 'code_folder', "TEXT NOT NULL DEFAULT ''");
 addColumn('UmbraBot', 'code_auto', 'INTEGER NOT NULL DEFAULT 0');
+// "Think before answering": the bot reasons step by step first, and the chat shows its thinking.
+addColumn('UmbraBot', 'think', 'INTEGER NOT NULL DEFAULT 0');
 // Changes the Code helper suggested, waiting for (or after) your OK. lib/umbra/code.ts
 db.exec(`
   CREATE TABLE IF NOT EXISTS UmbraCodeEdit (

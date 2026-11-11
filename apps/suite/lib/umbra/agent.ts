@@ -5,11 +5,15 @@
 //   3. If it asks to use tools: run them, add the results to the conversation, go back to 1.
 //
 // A bot gets at most MAX_ROUNDS of tool use per message, so it can't loop forever.
+//
+// With "Think before answering" switched on, the model reasons before each of those steps, and
+// its thinking is shown in the chat as it happens: one "Thinking" step per round.
 
 import 'server-only';
 import crypto from 'node:crypto';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
+import { canThink } from '@/config/models';
 import { toolsFor, type ToolContext, type ToolDef } from './tools';
 import type { CodeEditView } from './code';
 
@@ -38,6 +42,8 @@ export interface AgentStep {
   children?: AgentStep[];
   /** …and the full answer it gave the leader. */
   detail?: string;
+  /** A "Thinking" step (tool: 'thinking'): what the bot reasoned before acting or answering. */
+  thought?: string;
 }
 
 interface ChatMessage {
@@ -47,43 +53,113 @@ interface ChatMessage {
   tool_name?: string;
   /** Photos for a model that can see: the pictures themselves, as base64 text (lib/chat-images.ts). */
   images?: string[];
+  /** The model's own reasoning, handed back to it while it is still working on the same message. */
+  thinking?: string;
 }
 
 interface OllamaReply {
   message?: {
     content?: string;
+    thinking?: string;
     tool_calls?: { function: { name: string; arguments: Record<string, unknown> | string } }[];
   };
 }
 
 // "Thinking" models (Qwen 3, Gemma 4, GPT-OSS) reason privately before answering. For a bot that's slow
 // (20-90 s per step) and, in testing, often made them *describe* a tool instead of using it.
-// So bots use the quick, decisive mode: thinking off, or as low as the model allows.
-function thinkSetting(model: string): { think?: boolean | 'low' } {
-  if (model.startsWith('gpt-oss')) return { think: 'low' };
+// So unless a bot has "Think before answering" switched on, it uses the quick, decisive mode:
+// thinking off, or as low as the model allows.
+function thinkSetting(model: string, think: boolean): { think?: boolean | 'low' | 'medium' } {
+  // GPT-OSS can't stop thinking; it takes an effort level instead of on/off.
+  if (model.startsWith('gpt-oss')) return { think: think ? 'medium' : 'low' };
+  if (think) return { think: true };
   if (model.startsWith('qwen3') || model.startsWith('gemma4')) return { think: false };
   return {};
 }
 
-async function askModel(model: string, messages: ChatMessage[], tools: unknown[], priority: Priority, userId: string): Promise<OllamaReply> {
-  return gpuQueue.add(async () => {
-    const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+/**
+ * Ask the model for its next move. With `onThinking`, the model thinks first and the answer is
+ * read as it arrives, so the thinking can be shown live: `onThinking` gets all the thinking so far,
+ * again and again as it grows.
+ */
+async function askModel(
+  model: string,
+  messages: ChatMessage[],
+  tools: unknown[],
+  priority: Priority,
+  userId: string,
+  onThinking?: (thinking: string) => void,
+): Promise<OllamaReply> {
+  const ask = (think: boolean) =>
+    fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         messages,
-        stream: false,
+        stream: think,
         options: { num_ctx: OLLAMA_NUM_CTX },
         keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
-        ...thinkSetting(model),
+        ...thinkSetting(model, think),
         ...(tools.length ? { tools } : {}),
       }),
     });
-    if (!res.ok) throw new Error(`Ollama error ${res.status}: ${await res.text()}`);
-    return (await res.json()) as OllamaReply;
+
+  return gpuQueue.add(async () => {
+    let res = await ask(Boolean(onThinking));
+    let failure = res.ok ? '' : await res.text();
+    // A model that can't think says so; ask it again the ordinary way.
+    if (onThinking && !res.ok && /does not support thinking/i.test(failure)) {
+      onThinking = undefined;
+      res = await ask(false);
+      failure = res.ok ? '' : await res.text();
+    }
+    if (!res.ok) throw new Error(`Ollama error ${res.status}: ${failure}`);
+    if (!onThinking) return (await res.json()) as OllamaReply;
+    return readThinkingReply(res, onThinking);
   }, priority, 'ollama', { userId, model });
 }
+
+/**
+ * Read a reply that arrives a piece at a time (one JSON object per line), putting the pieces
+ * together into one whole reply. Thinking pieces come first, then the answer or tool requests.
+ */
+async function readThinkingReply(res: Response, onThinking: (thinking: string) => void): Promise<OllamaReply> {
+  if (!res.body) throw new Error('Ollama sent an empty reply.');
+  const message: Required<NonNullable<OllamaReply['message']>> = { content: '', thinking: '', tool_calls: [] };
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const take = (line: string) => {
+    if (!line.trim()) return;
+    const piece = JSON.parse(line) as OllamaReply & { error?: string };
+    if (piece.error) throw new Error(`Ollama error: ${piece.error}`);
+    if (piece.message?.thinking) {
+      message.thinking += piece.message.thinking;
+      onThinking(message.thinking);
+    }
+    if (piece.message?.content) message.content += piece.message.content;
+    if (piece.message?.tool_calls?.length) message.tool_calls.push(...piece.message.tool_calls);
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newline;
+    while ((newline = buffer.indexOf('\n')) >= 0) {
+      take(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+    }
+  }
+  take(buffer);
+  return { message };
+}
+
+// How much of the thinking is sent to the chat while it is still growing (the page shows only the
+// last few lines), how often, and how much is kept with the finished message.
+const LIVE_THOUGHT_CHARS = 600;
+const LIVE_THOUGHT_EVERY_MS = 200;
+const SAVED_THOUGHT_CHARS = 12_000;
 
 export async function runAgent(options: {
   model: string;
@@ -94,6 +170,8 @@ export async function runAgent(options: {
   context: ToolContext;
   /** 'low' for background tasks. Default 'high'. */
   priority?: Priority;
+  /** The bot's "Think before answering" switch. Ignored for models that can't think. */
+  think?: boolean;
   /** Called whenever a step starts or finishes, so the chat can show it live. */
   onStep: (step: AgentStep) => void;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
@@ -103,12 +181,48 @@ export async function runAgent(options: {
   const messages = [...options.messages];
   const steps: AgentStep[] = [];
   const maxRounds = options.toolIds.includes('code') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
+  const thinks = Boolean(options.think) && canThink(options.model);
 
   for (let round = 0; round <= maxRounds; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
     const lastRound = round === maxRounds;
-    const reply = await askModel(options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high', options.context.userId);
+
+    // Thinking shows as a step of its own, growing while the model reasons.
+    let thought: AgentStep | undefined;
+    let thinkingFrom = 0;
+    let thinkingUntil = 0;
+    let lastShown = 0;
+    const showThinking = (thinking: string) => {
+      const now = Date.now();
+      if (!thought) {
+        thought = { id: crypto.randomUUID(), tool: 'thinking', label: 'Thinking', status: 'running' };
+        thinkingFrom = now;
+      }
+      thinkingUntil = now;
+      if (now - lastShown < LIVE_THOUGHT_EVERY_MS) return;
+      lastShown = now;
+      options.onStep({ ...thought, thought: thinking.slice(-LIVE_THOUGHT_CHARS) });
+    };
+
+    const reply = await askModel(
+      options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high', options.context.userId,
+      thinks ? showThinking : undefined,
+    );
     const calls = reply.message?.tool_calls ?? [];
+
+    // The thinking is over: keep it with the reply, folded away under how long it took.
+    const thinking = reply.message?.thinking?.trim() ?? '';
+    if (thought && thinking) {
+      const seconds = Math.max(1, Math.round((thinkingUntil - thinkingFrom) / 1000));
+      const done: AgentStep = {
+        ...thought,
+        status: 'done',
+        label: `Thought for ${seconds} second${seconds === 1 ? '' : 's'}`,
+        thought: thinking.length > SAVED_THOUGHT_CHARS ? `${thinking.slice(0, SAVED_THOUGHT_CHARS)}…` : thinking,
+      };
+      steps.push(done);
+      options.onStep({ ...done });
+    }
 
     if (calls.length === 0 || lastRound) {
       return { reply: reply.message?.content?.trim() || '…', steps };
@@ -123,6 +237,7 @@ export async function runAgent(options: {
       role: 'assistant',
       content: reply.message?.content ?? '',
       tool_calls: parsed.map((p) => ({ function: { name: p.name, arguments: p.args } })),
+      ...(thinking ? { thinking } : {}),
     });
 
     for (const call of parsed) {

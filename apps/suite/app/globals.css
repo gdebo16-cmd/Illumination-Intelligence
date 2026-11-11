@@ -2460,3 +2460,26 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
    side it takes the height the page gives it as you type. */
 .umbra-input .umbra-field { flex-direction: row; }
 /* #endregion */
+/* #region Umbra "Think before answering": the bot's thinking, shown as a step */
+/* While it thinks: the last few lines, pinned to the bottom so new words push old ones up and out. */
+.umbra-thought {
+  display: block;
+  color: #9a9cb8;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere; }
+.umbra-thought.is-live {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 4.2em;
+  overflow: hidden;
+  font-style: italic;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.4em);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 1.4em); }
+/* Folded away afterwards; opened, a long one scrolls inside its box. */
+.umbra-step-detail[open] > .umbra-thought { max-height: 16rem; margin-top: 0.4rem; overflow-y: auto; }
+/* The switch in the bot form, for a brain that can't think. */
+.umbra-tool.is-unavailable { opacity: 0.55; }
+/* #endregion */

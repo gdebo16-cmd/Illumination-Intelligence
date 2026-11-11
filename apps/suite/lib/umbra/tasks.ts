@@ -247,6 +247,7 @@ export async function runTask(userId: string, task: Task): Promise<Run> {
       : await runAgent({
           model: bot.model,
           toolIds: bot.tools,
+          think: bot.think,
           messages: [
             { role: 'system', content: systemPrompt(bot, userName, listNotes(bot.id)) },
             { role: 'user', content: job },

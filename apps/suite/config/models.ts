@@ -23,6 +23,11 @@ export const PAGE_MODELS = {
 export const VISION_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b'];
 export const canSeeImages = (modelId: string) => VISION_MODELS.includes(modelId);
 
+// Models that can think a problem through before answering (Ollama lists "thinking" for them in
+// `ollama show <model>`). A Flicker's "Think before answering" switch only works with these.
+export const THINKING_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b', 'gpt-oss:20b'];
+export const canThink = (modelId: string) => THINKING_MODELS.includes(modelId);
+
 // Photos in chat: how many one message can carry, and where the browser loads a saved one from.
 export const MAX_PHOTOS = 4;
 export const chatImageUrl = (id: string) => `/api/chat-images/${id}`;

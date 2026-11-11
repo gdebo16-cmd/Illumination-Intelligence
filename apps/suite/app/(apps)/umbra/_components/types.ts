@@ -10,6 +10,8 @@ export interface Bot {
   tools: string[];
   codeFolder: string;
   codeAutoWrite: boolean;
+  /** Think before answering: reason step by step first, and show the thinking in the chat. */
+  think: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +39,8 @@ export interface AgentStep {
   bot?: { id: string; name: string; flame: string };
   children?: AgentStep[];
   detail?: string;
+  /** A "Thinking" step (tool: 'thinking'): what the bot reasoned before acting or answering. */
+  thought?: string;
 }
 
 export interface BotMessage {

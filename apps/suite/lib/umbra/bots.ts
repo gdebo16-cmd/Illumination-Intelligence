@@ -9,6 +9,7 @@ import db from '@/lib/db';
 import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
 import { checkCodeFolder, editStatuses } from './code';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
+import { canThink } from '@/config/models';
 import type { AgentStep } from './agent';
 
 export interface Bot {
@@ -23,6 +24,8 @@ export interface Bot {
   codeFolder: string;
   /** …and whether it may change files there without asking first. */
   codeAutoWrite: boolean;
+  /** Think before answering: reason step by step first, and show the thinking in the chat. */
+  think: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,19 +47,24 @@ export interface BotNote {
   createdAt: string;
 }
 
-export type BotInput = Pick<Bot, 'name' | 'flame' | 'personality' | 'purpose' | 'model' | 'tools' | 'codeFolder' | 'codeAutoWrite'>;
+export type BotInput = Pick<Bot, 'name' | 'flame' | 'personality' | 'purpose' | 'model' | 'tools' | 'codeFolder' | 'codeAutoWrite' | 'think'>;
 
 const BOT_COLUMNS =
-  'id, name, flame, personality, purpose, model, tools, code_folder AS codeFolder, code_auto AS codeAutoWrite, createdAt, updatedAt';
+  'id, name, flame, personality, purpose, model, tools, code_folder AS codeFolder, code_auto AS codeAutoWrite, think, createdAt, updatedAt';
 
 // The database keeps the tool list as JSON text; turn it back into a list (dropping unknown ids).
-type BotRow = Omit<Bot, 'tools' | 'codeAutoWrite'> & { tools: string; codeAutoWrite: number };
+type BotRow = Omit<Bot, 'tools' | 'codeAutoWrite' | 'think'> & { tools: string; codeAutoWrite: number; think: number };
 const fromRow = (row: BotRow): Bot => {
   let tools: unknown = [];
   try {
     tools = JSON.parse(row.tools);
   } catch {}
-  return { ...row, tools: Array.isArray(tools) ? tools.filter(isToolId) : [], codeAutoWrite: row.codeAutoWrite === 1 };
+  return {
+    ...row,
+    tools: Array.isArray(tools) ? tools.filter(isToolId) : [],
+    codeAutoWrite: row.codeAutoWrite === 1,
+    think: row.think === 1,
+  };
 };
 
 /** Check and tidy what the form sent. Returns an error message, or the cleaned-up bot. */
@@ -72,7 +80,10 @@ export function validateBot(input: Record<string, unknown>): { error: string } |
     tools: Array.isArray(input.tools) ? [...new Set(input.tools.filter(isToolId))] : [...DEFAULT_TOOL_IDS],
     codeFolder: text(input.codeFolder),
     codeAutoWrite: input.codeAutoWrite === true,
+    think: input.think === true,
   };
+  // Only some models can think; for the others the switch stays off.
+  if (!canThink(bot.model)) bot.think = false;
   if (!bot.name) return { error: 'Give your Flicker a name.' };
   if (bot.name.length > BOT_LIMITS.name) return { error: `Keep the name under ${BOT_LIMITS.name} characters.` };
   if (!isFlame(bot.flame)) return { error: 'Pick a flame for your Flicker.' };
@@ -105,11 +116,11 @@ export function createBot(userId: string, input: BotInput): Bot {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO UmbraBot (id, user_id, name, flame, personality, purpose, model, tools, code_folder, code_auto, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO UmbraBot (id, user_id, name, flame, personality, purpose, model, tools, code_folder, code_auto, think, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id, userId, input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools),
-    input.codeFolder, input.codeAutoWrite ? 1 : 0, now, now,
+    input.codeFolder, input.codeAutoWrite ? 1 : 0, input.think ? 1 : 0, now, now,
   );
   return { id, ...input, createdAt: now, updatedAt: now };
 }
@@ -119,10 +130,10 @@ export function updateBot(userId: string, id: string, input: BotInput): Bot | nu
   const now = new Date().toISOString();
   db.prepare(
     `UPDATE UmbraBot SET name = ?, flame = ?, personality = ?, purpose = ?, model = ?, tools = ?, code_folder = ?, code_auto = ?,
-     updatedAt = ? WHERE id = ?`,
+     think = ?, updatedAt = ? WHERE id = ?`,
   ).run(
     input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools),
-    input.codeFolder, input.codeAutoWrite ? 1 : 0, now, id,
+    input.codeFolder, input.codeAutoWrite ? 1 : 0, input.think ? 1 : 0, now, id,
   );
   return getBot(userId, id);
 }
