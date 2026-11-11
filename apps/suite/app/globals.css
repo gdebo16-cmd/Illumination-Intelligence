@@ -2483,3 +2483,52 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
 /* The switch in the bot form, for a brain that can't think. */
 .umbra-tool.is-unavailable { opacity: 0.55; }
 /* #endregion */
+/* #region Flicker and team forms: the top fades like the gallery and chat pages.
+   The form used to scroll inside its own box, which started below the corner logo and cut the
+   fields off in a hard line there. Now the whole page scrolls (as the gallery does), so the fields
+   slide up under the logo and fade out. */
+main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
+/* #endregion */
+/* #region Flicker form: switches instead of tick boxes (tools, "Think before answering",
+   "Change files without asking"). Each card has its name on the left, the switch on the right,
+   and the description underneath across the full width. */
+.umbra-tool {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 0.6rem;
+  row-gap: 0.3rem;
+  align-content: start; }
+.umbra-tool > span { display: contents; }
+.umbra-tool-name { grid-column: 1; grid-row: 1; }
+.umbra-tool-description { grid-column: 1 / -1; grid-row: 2; }
+/* The switch is still a checkbox underneath: a pill-shaped track, with the knob drawn as a white
+   dot that slides from the left to the right when it's on. */
+.umbra-form .umbra-tool input[type="checkbox"] {
+  grid-column: 2;
+  grid-row: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 2.6rem;
+  height: 1.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background-color: rgb(255 255 255 / 0.18);
+  background-image: radial-gradient(circle at center, #fff 0, #fff 0.53rem, transparent 0.58rem);
+  background-repeat: no-repeat;
+  background-size: 1.5rem 1.5rem;
+  background-position: left center;
+  cursor: pointer;
+  transition: background-color 0.18s ease, background-position 0.18s ease; }
+.umbra-form .umbra-tool input[type="checkbox"]:checked {
+  background-color: var(--bot-color);
+  background-position: right center; }
+.umbra-form .umbra-tool input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--bot-color);
+  outline-offset: 2px; }
+.umbra-form .umbra-tool input[type="checkbox"]:disabled { cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .umbra-form .umbra-tool input[type="checkbox"] { transition: none; } }
+/* #endregion */

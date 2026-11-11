@@ -161,6 +161,7 @@ export default function BotForm({ botId }: { botId?: string }) {
             <label className={`umbra-tool ${canThink(form.model) ? '' : 'is-unavailable'}`}>
               <input
                 type="checkbox"
+                role="switch"
                 checked={form.think && canThink(form.model)}
                 disabled={!canThink(form.model)}
                 onChange={(e) => setForm((f) => ({ ...f, think: e.target.checked }))}
@@ -180,7 +181,7 @@ export default function BotForm({ botId }: { botId?: string }) {
               <div className="umbra-tools">
                 {BOT_TOOLS.map((tool) => (
                   <label key={tool.id} className="umbra-tool">
-                    <input type="checkbox" checked={form.tools.includes(tool.id)} onChange={() => toggleTool(tool.id)} />
+                    <input type="checkbox" role="switch" checked={form.tools.includes(tool.id)} onChange={() => toggleTool(tool.id)} />
                     <span>
                       <span className="umbra-tool-name">{tool.name}</span>
                       <span className="umbra-tool-description">{tool.description}</span>
@@ -198,7 +199,7 @@ export default function BotForm({ botId }: { botId?: string }) {
                   <input
                     value={form.codeFolder}
                     onChange={set('codeFolder')}
-                    placeholder={'e.g. C:\Users\you\projects\my-app'}
+                    placeholder={'e.g. C:\\Users\\you\\projects\\my-app'}
                     spellCheck={false}
                     autoCapitalize="off"
                     autoCorrect="off"
@@ -208,6 +209,7 @@ export default function BotForm({ botId }: { botId?: string }) {
                 <label className="umbra-tool">
                   <input
                     type="checkbox"
+                    role="switch"
                     checked={form.codeAutoWrite}
                     onChange={(e) => setForm((f) => ({ ...f, codeAutoWrite: e.target.checked }))}
                   />
