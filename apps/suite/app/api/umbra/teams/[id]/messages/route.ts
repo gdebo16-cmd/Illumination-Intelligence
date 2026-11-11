@@ -3,13 +3,14 @@
 
 import { NextResponse } from 'next/server';
 import { clearTeamMessages, listTeamMessages } from '@/lib/umbra/teams';
+import { workHeaders } from '@/lib/umbra/busy';
 import { ownedTeam } from '../../owned';
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const found = await ownedTeam(params);
-  return 'error' in found ? found.error : NextResponse.json(listTeamMessages(found.team.id));
+  return 'error' in found ? found.error : NextResponse.json(listTeamMessages(found.team.id), { headers: workHeaders(`team:${found.team.id}`) });
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
