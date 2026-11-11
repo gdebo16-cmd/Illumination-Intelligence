@@ -1,7 +1,6 @@
 'use client';
 
 import AppBanner from '@/components/AppBanner';
-import AppLauncher from '@/components/AppLauncher';
 import { useChat } from './ChatContext';
 
 const LumenHeader = () => {
@@ -12,7 +11,8 @@ const LumenHeader = () => {
       <button className="sidebar-toggle" onClick={toggleSidebar}>
         {isSidebarOpen ? '✕' : '☰'}
       </button>
-      <AppLauncher />
+      {/* The app switcher lives next to the message box, on the left. */}
+      <span className="header-spacer" />
     </header>
   );
 };

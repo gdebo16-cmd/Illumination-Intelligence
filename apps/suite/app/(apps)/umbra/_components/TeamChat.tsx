@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
 import QueueNotice from '@/components/QueueNotice';
+import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import Flame from './Flame';
 import { Steps } from './Steps';
@@ -23,6 +24,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
   const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   useBarHeight(barRef, listRef, Boolean(team));
 
   useEffect(() => {
@@ -42,6 +44,31 @@ export default function TeamChat({ teamId }: { teamId: string }) {
   // A step started (new) or changed (a teammate made progress, or it finished).
   const applyStep = (step: AgentStep) =>
     setLiveSteps((list) => (list.some((s) => s.id === step.id) ? list.map((s) => (s.id === step.id ? step : s)) : [...list, step]));
+
+  // Tapping to type: jump the newest messages to just above the bar. iOS raises the keyboard over
+  // a few hundred milliseconds, so jump again as it settles.
+  const jumpToLatest = () => {
+    const go = () => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; };
+    go();
+    setTimeout(go, 150);
+    setTimeout(go, 400);
+  };
+
+  // The box grows with what you type (up to about six lines), then scrolls.
+  useEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = `px`;
+  }, [input]);
+
+  // Enter adds a new line. Ctrl+Enter (Cmd+Enter on a Mac) sends, like the send button.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      barRef.current?.requestSubmit();
+    }
+  };
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,10 +135,15 @@ export default function TeamChat({ teamId }: { teamId: string }) {
 
   const leader = team.leader;
   // What's happening right now: the deepest running step (a teammate's tool, if one is busy).
+  // Also which teammates are busy right now, so their flames can show it.
+  const busyMates = new Set<string>();
   const running = (() => {
     let found: AgentStep | undefined;
     const walk = (list: AgentStep[]) => list.forEach((s) => {
-      if (s.status === 'running') found = s;
+      if (s.status === 'running') {
+        found = s;
+        if (s.bot) busyMates.add(s.bot.id);
+      }
       if (s.children) walk(s.children);
     });
     walk(liveSteps);
@@ -124,8 +156,10 @@ export default function TeamChat({ teamId }: { teamId: string }) {
       <div className="umbra-chat-bar">
         <Link href="/umbra" className="umbra-back" aria-label="Your Flickers">←</Link>
         <div className="umbra-team-flames" aria-hidden>
-          <Flame flame={leader.flame} size={40} />
-          {team.crew.slice(0, 3).map((c) => <Flame key={c.bot.id} flame={c.bot.flame} size={26} still />)}
+          <Flame flame={leader.flame} size={40} mood={thinking ? 'working' : 'idle'} />
+          {team.crew.slice(0, 3).map((c) => (
+            <Flame key={c.bot.id} flame={c.bot.flame} size={26} still mood={busyMates.has(c.bot.id) ? 'working' : 'idle'} />
+          ))}
         </div>
         <div className="umbra-chat-who">
           <span className="umbra-chat-name">{team.name}</span>
@@ -165,7 +199,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
         ))}
         {thinking && (
           <div className="umbra-message assistant">
-            <Flame flame={leader.flame} size={32} className="umbra-message-flame" />
+            <Flame flame={leader.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
               <Steps steps={liveSteps} />
               <span className="umbra-thinking">{running ? `${running.label}…` : `${leader.name} is thinking…`}</span>
@@ -177,16 +211,25 @@ export default function TeamChat({ teamId }: { teamId: string }) {
       </div>
 
       <form ref={barRef} className="umbra-input" onSubmit={send}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Give ${team.name} a job…`}
-          aria-label={`Message ${team.name}`}
-          enterKeyHint="send"
-          autoComplete="off"
-          maxLength={4000}
-        />
-        <button type="submit" disabled={thinking || !input.trim()}>Send</button>
+        <AppLauncher placement="up" />
+        <span className="umbra-field">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={`Give ${team.name} a job…`}
+            aria-label={`Message ${team.name}`}
+            enterKeyHint="enter"
+            autoComplete="off"
+            onFocus={jumpToLatest}
+            onKeyDown={handleKeyDown}
+            maxLength={4000}
+          />
+          <button type="submit" className="umbra-send" aria-label="Send" disabled={thinking || !input.trim()}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+          </button>
+        </span>
       </form>
     </main>
   );

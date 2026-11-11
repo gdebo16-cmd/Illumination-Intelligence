@@ -1,0 +1,198 @@
+# Builds the native iPhone/iPad app (apps/ios-shell) on a GitHub-hosted Mac.
+#
+# Job 1, "unsigned": always runs. Makes Illumination-unsigned.ipa for Sideloadly (free Apple ID).
+# Job 2, "testflight": skipped until the paid Apple Developer account is set up. Turn it on by
+# adding the secrets listed below and the repository variable IOS_SIGNING_ENABLED = true.
+# See apps/ios-shell/README.md.
+name: iOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Address the app opens. Blank = repo variable ILLUMINATION_APP_URL, else apps/ios-shell/app-url.json"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios-shell/**"
+      - ".github/workflows/ios-build.yml"
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Empty falls through to app-url.json "default" inside capacitor.config.ts.
+  ILLUMINATION_APP_URL: ${{ inputs.app_url || vars.ILLUMINATION_APP_URL }}
+
+jobs:
+  unsigned:
+    name: Unsigned .ipa (sideload)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/ios-shell
+    steps:
+      - uses: actions/checkout@v4
+
+      # Capacitor 8 needs Xcode 26 or newer.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/ios-shell/package-lock.json
+
+      - name: Install Capacitor
+        run: npm ci
+
+      - name: Sync web config into the Xcode project
+        run: npm run sync
+
+      - name: Build (no code signing)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            archive | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "^(\*\*|error:|warning: .*(deprecated|signing))" || true
+          test -d "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" || { tail -n 80 "$RUNNER_TEMP/xcodebuild.log"; exit 1; }
+
+      - name: Package Payload/App.app as .ipa
+        run: |
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/ipa/Payload/"
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry "$RUNNER_TEMP/Illumination-unsigned.ipa" Payload
+          ls -lh "$RUNNER_TEMP/Illumination-unsigned.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Illumination-unsigned-ipa
+          path: ${{ runner.temp }}/Illumination-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------------------------
+  # Signed build uploaded to TestFlight. Needs the paid Apple Developer Program ($99/yr).
+  # Off until the repository VARIABLE IOS_SIGNING_ENABLED is "true". Secrets it reads:
+  #   APPLE_TEAM_ID            10-character Team ID (developer.apple.com > Membership)
+  #   ASC_KEY_ID               App Store Connect API key ID (Users and Access > Integrations, Admin role)
+  #   ASC_ISSUER_ID            Issuer ID shown on that same page
+  #   ASC_API_KEY_P8_BASE64    the downloaded AuthKey_XXXX.p8, base64-encoded
+  # Signing is automatic and cloud-managed through the API key, so no .p12 or profile is needed.
+  # The app record (bundle ID com.gdebo.illumination) must exist in App Store Connect first.
+  # ---------------------------------------------------------------------------------------------
+  testflight:
+    name: Signed build to TestFlight
+    if: ${{ vars.IOS_SIGNING_ENABLED == 'true' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/ios-shell
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/ios-shell/package-lock.json
+
+      - name: Check signing secrets are present
+        run: |
+          missing=0
+          for v in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8_BASE64; do
+            if [ -z "${!v}" ]; then echo "::error::Secret $v is not set"; missing=1; fi
+          done
+          exit $missing
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+
+      - name: Install Capacitor
+        run: npm ci
+
+      - name: Sync web config into the Xcode project
+        run: npm run sync
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          key="$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_P8_BASE64" | base64 --decode > "$key"
+          chmod 600 "$key"
+          echo "ASC_KEY_PATH=$key" >> "$GITHUB_ENV"
+
+      - name: Archive (signed)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            archive | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "^(\*\*|error:)" || true
+          test -d "$RUNNER_TEMP/App.xcarchive" || { tail -n 80 "$RUNNER_TEMP/xcodebuild.log"; exit 1; }
+
+      - name: Export and upload to TestFlight
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Remove API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"

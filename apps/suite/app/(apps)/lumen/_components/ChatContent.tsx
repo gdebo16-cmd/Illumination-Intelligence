@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from './ChatContext';
 import { MessageContent } from '@/components/MessageContent';
 import QueueNotice from '@/components/QueueNotice';
+import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import { splitContent, DocumentCard, DocumentPanel } from './documents';
 
@@ -57,6 +58,14 @@ const Chat = () => {
   }, [input]);
 
   // Enter adds a new line. Ctrl+Enter (Cmd+Enter on a Mac) sends, like the send button.
+  // Tapping to type: jump the newest messages to just above the bar. iOS raises the keyboard over
+  // a few hundred milliseconds, so jump again as it settles.
+  const jumpToLatest = () => {
+    const go = () => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; };
+    go();
+    setTimeout(go, 150);
+    setTimeout(go, 400);
+  };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -160,20 +169,24 @@ const Chat = () => {
 
       <div ref={barRef} className="input-container">
         <form ref={formRef} onSubmit={handleSubmit} className="input-form">
+          <AppLauncher placement="up" />
           <textarea
             ref={inputRef}
             rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={jumpToLatest}
             placeholder="Type a prompt..."
             aria-label="Message"
             enterKeyHint="enter"
             autoComplete="off"
             className="input-field"
           />
-          <button type="submit" disabled={loading} className="input-button send-button">
-            ask
+          <button type="submit" disabled={loading} className="input-button send-button" aria-label="Ask">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
           </button>
         </form>
       </div>

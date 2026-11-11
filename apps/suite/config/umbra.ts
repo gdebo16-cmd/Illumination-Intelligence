@@ -1,7 +1,9 @@
 // Umbra settings: the flame avatars and the models a bot can think with.
 // Safe to import from both the browser and the server.
 
-// The eight flame spirits, cut from assets/flames.mp4 by scripts/make-flame-sprites.py.
+import flameClips from './umbra-flame-clips.json';
+
+// The eight flame spirits, cut from assets/flicker-idle.mp4 by scripts/make-flame-sprites.py.
 export const FLAMES = [
   { id: 'violet', name: 'Violet', color: '#a77bff' },
   { id: 'cyan', name: 'Cyan', color: '#4fe3f0' },
@@ -15,7 +17,20 @@ export const FLAMES = [
 
 export type FlameId = (typeof FLAMES)[number]['id'];
 
-export const flameImage = (id: string, animated = true) => `/umbra/flames/${id}.${animated ? 'webp' : 'png'}`;
+// A flicker's pictures. 'idle' is the resting animation; 'dance' plays while its bot is working.
+// Each animation comes as a small .avif (what phones load) and a .webp for older browsers.
+// The .png is the still picture.
+export type FlameClip = 'idle' | 'dance';
+export const flameStill = (id: string) => `/umbra/flames/${id}.png`;
+export const flameAnimation = (id: string, clip: FlameClip = 'idle') => {
+  const file = `/umbra/flames/${id}${clip === 'dance' ? '-dance' : ''}`;
+  return { avif: `${file}.avif`, webp: `${file}.webp` };
+};
+// Width of a flicker picture for each pixel of height (they all share one shape).
+export const FLAME_ASPECT = flameClips.width / flameClips.height;
+// True once a dance clip has been made for this flicker (the script fills in the list).
+// Until then the app makes the resting animation hop and sway instead.
+export const hasDanceClip = (id: string) => (flameClips.dance as string[]).includes(id);
 export const isFlame = (id: unknown): id is FlameId => FLAMES.some((f) => f.id === id);
 export const flameColor = (id: string) => FLAMES.find((f) => f.id === id)?.color ?? '#a77bff';
 

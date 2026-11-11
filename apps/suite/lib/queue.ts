@@ -53,6 +53,15 @@ const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 /** Context window for chat requests. Ollama's default (4096) was silently cutting off long chats. */
 export const OLLAMA_NUM_CTX = Number(process.env.OLLAMA_NUM_CTX) || 16384;
 
+/**
+ * How long Ollama keeps a chat model on the card after Lumen or Umbra last used it, so the next
+ * message doesn't wait for it to load again. Ollama's own default is 5 minutes. Set
+ * OLLAMA_KEEP_ALIVE_APP in apps/suite/.env to change it: "10m", "1h", or a number of seconds.
+ * (The queue still clears models right away when Prism needs this machine's card.)
+ */
+const keepAliveSetting = process.env.OLLAMA_KEEP_ALIVE_APP?.trim() || '10m';
+export const OLLAMA_KEEP_ALIVE: string | number = /^-?\d+$/.test(keepAliveSetting) ? Number(keepAliveSetting) : keepAliveSetting;
+
 type Job = {
   /** The work itself. It's told which machine it got, so it talks to that machine's ComfyUI. */
   run: (worker: GpuWorker) => Promise<unknown>;
@@ -147,6 +156,9 @@ class GpuQueue {
   private low: Job[] = [];
   /** What each machine is doing: machine id -> its job. */
   private running = new Map<string, Job>();
+  /** When each machine last finished a job (see idleSince). */
+  private idleFrom = new Map<string, number>();
+  private readonly startedAt = Date.now();
   private lastUser: string | undefined;
   // next() runs one planning pass at a time; a call during a pass asks for one more pass.
   private planning = false;
@@ -163,6 +175,18 @@ class GpuQueue {
       (priority === 'high' ? this.high : this.low).push(job);
       void this.next();
     });
+  }
+
+  /**
+   * Since when a machine has had nothing to do for us: no job of ours running on it, and no
+   * ComfyUI job waiting in line (it might be about to go there). null while it's in use.
+   * A machine that hasn't run anything since the server started counts from the start.
+   * lib/gpu/idle.ts uses this to free a machine's graphics card after a while.
+   */
+  idleSince(workerId: string): number | null {
+    if (this.running.has(workerId)) return null;
+    if ([...this.high, ...this.low].some((j) => j.engine === 'comfy')) return null;
+    return this.idleFrom.get(workerId) ?? this.startedAt;
   }
 
   /** Where this user's live request is in line, or which machine is running it. */
@@ -268,6 +292,7 @@ class GpuQueue {
     if (job.userId) this.lastUser = job.userId;
     job.worker = worker;
     this.running.set(worker.id, job);
+    this.idleFrom.delete(worker.id);
     const started = Date.now();
     if (job.needs) console.log(`GPU queue: ${job.needs.label} -> ${worker.name}`);
 
@@ -281,6 +306,7 @@ class GpuQueue {
       )
       .finally(() => {
         this.running.delete(worker.id);
+        this.idleFrom.set(worker.id, Date.now());
         forgetStatus(worker.id); // its ComfyUI queue just changed
         void this.next();
       });
@@ -334,5 +360,5 @@ class GpuQueue {
 // Keep a single instance even when Next reloads modules in dev.
 // (The key changes whenever the class changes, so dev mode doesn't keep an outdated copy.
 // Bump it too when lib/gpu/health.ts changes: the old queue keeps using the old copy of it.)
-const g = globalThis as unknown as { gpuQueueV6?: GpuQueue };
-export const gpuQueue = (g.gpuQueueV6 ??= new GpuQueue());
+const g = globalThis as unknown as { gpuQueueV7?: GpuQueue };
+export const gpuQueue = (g.gpuQueueV7 ??= new GpuQueue());

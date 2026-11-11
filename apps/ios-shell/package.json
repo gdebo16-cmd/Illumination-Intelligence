@@ -1,0 +1,21 @@
+{
+  "name": "illumination-ios-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native iPhone/iPad wrapper (Capacitor) around the Illumination suite running on the Raider. The Next.js app in ../suite is untouched by this folder.",
+  "scripts": {
+    "sync": "node scripts/write-app-url.mjs && cap sync ios",
+    "icons": "node scripts/make-ios-assets.mjs",
+    "config": "cap config"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
+    "@capacitor/keyboard": "^8.0.6",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "typescript": "^5"
+  }
+}

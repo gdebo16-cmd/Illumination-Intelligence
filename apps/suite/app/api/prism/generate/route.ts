@@ -11,13 +11,16 @@
 // `expand: false` sends the prompt exactly as typed; otherwise a model with a prompt expander
 // (FLUX.3) rewrites it into a long, detailed one first.
 //
-// Get back: the saved picture's details, including `url` to show it.
+// Get back (status 202, right away): a picture job with status 'working'. The picture is made in
+// the background, so leaving the page (or minimizing the iPhone app) doesn't stop it. The page
+// checks GET /api/prism/jobs until the job is 'done' (its `imageId` is the new picture in
+// GET /api/prism/images) or 'failed' (with an `error`). See lib/prism/imageJobs.ts.
 // An edit keeps the shape of the picture you started from, so width/height are ignored.
 
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
-import { gpuQueue } from '@/lib/queue';
-import { generateImage, imageNeeds, ranOutOfMemory, type ImageRequest } from '@/lib/prism/comfy';
+import { generateImage, imageNeeds, type ImageRequest } from '@/lib/prism/comfy';
+import { startImageJob } from '@/lib/prism/imageJobs';
 import { readImageFile, saveImage } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
 import { PRISM_STYLES } from '@/config/prism-styles';
@@ -76,8 +79,9 @@ export async function POST(req: Request) {
     return bad((err as Error).message || 'Couldn’t read that picture.');
   }
 
-  // 4. Make it. The GPU queue picks a machine that has this model (see lib/gpu/router.ts), and
-  //    unloads Lumen's chat model first if the job runs on this machine's card.
+  // 4. Order it. The GPU queue picks a machine that has this model (see lib/gpu/router.ts), and
+  //    unloads Lumen's chat model first if the job runs on this machine's card. The answer goes
+  //    back straight away; the picture is made and saved (step 5) even if the page is gone.
   const request: ImageRequest = {
     prompt,
     model: model.id,
@@ -88,27 +92,17 @@ export async function POST(req: Request) {
     seed: seed === undefined ? undefined : Math.floor(Math.abs(seed)) % 2 ** 32,
     source,
   };
-  try {
-    const result = await gpuQueue.add((worker) => generateImage(request, worker), 'high', 'comfy', {
-      userId,
-      needs: imageNeeds(request),
-    });
-
-    // 5. Keep it, and tell the page where to find it (and which machine painted it).
-    const saved = saveImage(userId, prompt, style, result, source ? { sourceId: upload ? null : sourceId } : undefined);
-    return NextResponse.json({ ...saved, machine: result.machine });
-  } catch (err) {
-    const message = (err as Error).message ?? 'Unknown error';
-    console.error('Prism generate error:', err);
-    // fetch fails with "fetch failed" when nothing is listening at ComfyUI's address.
-    // ComfyUI says "value_not_in_list" when a recipe names a model file it doesn't have.
-    const friendly = /fetch failed|ECONNREFUSED/i.test(message)
-      ? 'ComfyUI isn’t running. Start it with run_nvidia_gpu.bat and try again.'
-      : /value_not_in_list/.test(message)
-        ? `${model.name} isn’t downloaded into ComfyUI yet. Pick another model, or add its files first.`
-        : ranOutOfMemory(err) // still failing after generateImage's own second try
-          ? 'The computer ran out of memory for this picture. Close a few programs and try again.'
-          : message;
-    return bad(friendly, 502);
-  }
+  const job = startImageJob(userId, {
+    mode: source ? 'edit' : 'create',
+    prompt,
+    model: model.id,
+    modelName: model.name,
+    sourceId: upload ? null : sourceId,
+    needs: imageNeeds(request),
+    run: (worker) => generateImage(request, worker),
+    // 5. Keep it (the page finds it by the job's imageId).
+    save: (result) => saveImage(userId, prompt, style, result, source ? { sourceId: upload ? null : sourceId } : undefined).id,
+    label: 'Prism generate error',
+  });
+  return NextResponse.json(job, { status: 202 });
 }

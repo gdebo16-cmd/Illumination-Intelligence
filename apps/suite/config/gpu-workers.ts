@@ -23,6 +23,12 @@ export interface GpuWorker {
   ramGB: number;
   /** True for this computer: its card is shared with Ollama (Lumen and Umbra's chat). */
   local?: boolean;
+  /**
+   * Free this machine's graphics card after it has had no Prism work for this many minutes
+   * (see lib/gpu/idle.ts). Leave it out to use COMFY_IDLE_UNLOAD_MINUTES from apps/suite/.env
+   * (10 if that isn't set); 0 keeps its models loaded.
+   */
+  idleUnloadMinutes?: number;
 }
 
 const DEFAULT_WORKERS: GpuWorker[] = [

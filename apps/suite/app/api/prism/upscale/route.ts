@@ -1,8 +1,10 @@
 // POST /api/prism/upscale — "make this picture bigger".
 //
 // Send (JSON):  { imageId: "<one of your Prism pictures>", factor?: 2 | 4 }
-// Get back:     a NEW saved picture, `factor` times bigger (2 if left out), with the same prompt
-//               and settings as the original. The original is kept.
+// Get back:     (status 202, right away) a picture job with status 'working'. In the background it
+//               makes a NEW saved picture, `factor` times bigger (2 if left out), with the same
+//               prompt and settings as the original. The original is kept. The page checks
+//               GET /api/prism/jobs until it's done, like a new picture (lib/prism/imageJobs.ts).
 //
 // The work is done by a small upscale model in ComfyUI (see upscaleImage in lib/prism/comfy.ts).
 // It enlarges and sharpens the picture as it is; it doesn't repaint it.
@@ -10,8 +12,8 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { getCurrentUserId } from '@/lib/user';
-import { gpuQueue } from '@/lib/queue';
-import { UPSCALE_FACTORS, UPSCALE_MAX_SIDE, ranOutOfMemory, upscaleImage, upscaleNeeds } from '@/lib/prism/comfy';
+import { UPSCALE_FACTORS, UPSCALE_MAX_SIDE, upscaleImage, upscaleNeeds } from '@/lib/prism/comfy';
+import { startImageJob } from '@/lib/prism/imageJobs';
 import { getImage, readImageFile, saveImage } from '@/lib/prism/images';
 import { findPrismModel } from '@/config/prism-models';
 
@@ -35,39 +37,37 @@ export async function POST(req: Request) {
   if (!original || !file) return bad('That picture wasn’t found.', 404);
   if (Math.max(original.width, original.height) > UPSCALE_MAX_SIDE) return bad('That picture is already as big as Prism makes them.');
 
-  try {
-    const result = await gpuQueue.add((worker) => upscaleImage(file, factor, worker), 'high', 'comfy', {
-      userId,
-      needs: upscaleNeeds(),
-    });
-
+  // Order it; the answer goes back straight away and the work carries on without the page.
+  const model = findPrismModel(original.model);
+  const job = startImageJob(userId, {
+    mode: 'upscale',
+    prompt: original.prompt,
+    model: model.id,
+    modelName: model.name,
+    sourceId: original.id,
+    needs: upscaleNeeds(),
+    run: (worker) => upscaleImage(file, factor, worker),
     // Measure the result rather than assume it, then save it as a new picture that remembers
     // which one it came from. It keeps the original's prompt, style, seed and model.
-    const { width = original.width * factor, height = original.height * factor } = await sharp(result.image).metadata();
-    const saved = saveImage(
-      userId,
-      original.prompt,
-      original.style,
-      {
-        image: result.image,
-        seed: original.seed,
-        width,
-        height,
-        seconds: result.seconds,
-        model: findPrismModel(original.model).id,
-        expandedPrompt: original.expandedPrompt,
-      },
-      { sourceId: original.id, mode: 'upscale' },
-    );
-    return NextResponse.json({ ...saved, machine: result.machine });
-  } catch (err) {
-    const message = (err as Error).message ?? 'Unknown error';
-    console.error('Prism upscale error:', err);
-    const friendly = /fetch failed|ECONNREFUSED/i.test(message)
-      ? 'ComfyUI isn’t running. Start it with run_nvidia_gpu.bat and try again.'
-      : ranOutOfMemory(err)
-        ? 'The computer ran out of memory for this picture. Close a few programs and try again.'
-        : message;
-    return bad(friendly, 502);
-  }
+    save: async (result) => {
+      const { width = original.width * factor, height = original.height * factor } = await sharp(result.image).metadata();
+      return saveImage(
+        userId,
+        original.prompt,
+        original.style,
+        {
+          image: result.image,
+          seed: original.seed,
+          width,
+          height,
+          seconds: result.seconds,
+          model: model.id,
+          expandedPrompt: original.expandedPrompt,
+        },
+        { sourceId: original.id, mode: 'upscale' },
+      ).id;
+    },
+    label: 'Prism upscale error',
+  });
+  return NextResponse.json(job, { status: 202 });
 }

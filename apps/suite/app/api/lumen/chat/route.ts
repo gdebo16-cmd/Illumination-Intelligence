@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import db from '@/lib/db';
 import { buildMemoryBlock, extractMemories, EXTRACT_MODEL } from '@/lib/memory';
 import { getCurrentUserId } from '@/lib/user';
-import { gpuQueue, OLLAMA_NUM_CTX } from '@/lib/queue';
+import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
@@ -114,6 +114,7 @@ export async function POST(req: Request) {
             messages,
             stream: false,
             options: { num_ctx: OLLAMA_NUM_CTX },
+            keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
           }),
         });
         if (!res.ok) {

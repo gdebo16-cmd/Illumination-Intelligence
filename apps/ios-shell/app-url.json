@@ -1,0 +1,4 @@
+{
+  "default": "http://192.168.1.114:3000",
+  "tailscale": "https://illumination.shrimp-bitterling.ts.net"
+}

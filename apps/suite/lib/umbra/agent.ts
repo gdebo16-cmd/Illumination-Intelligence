@@ -8,7 +8,7 @@
 
 import 'server-only';
 import crypto from 'node:crypto';
-import { gpuQueue, OLLAMA_NUM_CTX } from '@/lib/queue';
+import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
 import { toolsFor, type ToolContext, type ToolDef } from './tools';
 import type { CodeEditView } from './code';
@@ -73,6 +73,7 @@ async function askModel(model: string, messages: ChatMessage[], tools: unknown[]
         messages,
         stream: false,
         options: { num_ctx: OLLAMA_NUM_CTX },
+        keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
         ...thinkSetting(model),
         ...(tools.length ? { tools } : {}),
       }),

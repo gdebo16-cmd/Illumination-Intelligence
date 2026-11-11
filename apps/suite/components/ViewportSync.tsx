@@ -17,7 +17,15 @@ export default function ViewportSync() {
     const update = () => {
       // While pinch-zoomed the visible area is smaller on purpose; leave the layout alone.
       if (Math.abs(vv.scale - 1) > 0.01) return;
-      root.style.setProperty('--app-height', `${Math.round(vv.height)}px`);
+      // Saved to the home screen, iOS reports a height that leaves out the status bar, which left
+      // an empty strip at the bottom. With the keyboard closed, use the whole screen instead.
+      const standalone = window.matchMedia('(display-mode: standalone)').matches;
+      const screenH = window.matchMedia('(orientation: portrait)').matches
+        ? Math.max(screen.width, screen.height)
+        : Math.min(screen.width, screen.height);
+      const keyboardClosed = screenH - vv.height < 150;
+      const height = standalone && keyboardClosed ? screenH : vv.height;
+      root.style.setProperty('--app-height', `${Math.round(height)}px`);
       if (window.scrollY !== 0) window.scrollTo(0, 0);
     };
 

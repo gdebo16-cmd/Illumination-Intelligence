@@ -20,7 +20,7 @@ export function Steps({ steps }: { steps: AgentStep[] }) {
           style={step.bot ? ({ '--mate-color': flameColor(step.bot.flame) } as React.CSSProperties) : undefined}
         >
           {step.bot ? (
-            <Flame flame={step.bot.flame} size={26} still={step.status !== 'running'} className="umbra-step-flame" />
+            <Flame flame={step.bot.flame} size={26} still mood={step.status === 'running' ? 'working' : 'idle'} className="umbra-step-flame" />
           ) : (
             <span className="umbra-step-mark" aria-hidden>
               {step.status === 'running' ? '' : step.status === 'done' ? '✓' : '!'}

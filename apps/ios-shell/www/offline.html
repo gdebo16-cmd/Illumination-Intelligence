@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Illumination</title>
+<style>
+html,body{margin:0;height:100%;background:#030406;color:#cfd6e4;font-family:-apple-system,Helvetica,Arial,sans-serif}
+main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;box-sizing:border-box;gap:1rem}
+h1{font-size:1.25rem;margin:0}p{margin:0;opacity:.75;line-height:1.4}
+button{margin-top:.5rem;padding:.75rem 1.5rem;border-radius:999px;border:1px solid #3a4560;background:#111827;color:#e5e7eb;font-size:1rem}
+</style></head>
+<body><main>
+<h1>Can't reach Illumination</h1>
+<p>The app runs on the Raider. Make sure it's on and the server is running, and that this phone is on the home Wi-Fi (or Tailscale is connected).</p>
+<button onclick="if(window.ILLUMINATION_APP_URL)location.replace(window.ILLUMINATION_APP_URL);else location.reload()">Try again</button>
+</main>
+<script src="app-url.js"></script>
+</body></html>

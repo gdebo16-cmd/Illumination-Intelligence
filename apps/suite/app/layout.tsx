@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import HomeIconLink from "@/components/HomeIconLink";
 import ViewportSync from "@/components/ViewportSync";
+import NativeShell from "@/components/NativeShell";
 import ThemeSync from "@/components/ThemeSync";
 import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -36,6 +37,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body>
         <ViewportSync />
+        {/* Native iPhone app only (apps/ios-shell): hides the keyboard toolbar. No-op on the web. */}
+        <NativeShell />
         {/* Reads the address, so it waits for it without holding up the rest of the page. */}
         <Suspense fallback={null}>
           <ThemeSync />

@@ -4,7 +4,9 @@
 // Or start from a picture (upload one, or "Edit this" on one of yours) and either say what to
 // change, or bring it to life as a short video ("Make video").
 // It talks to these API routes:
-//   POST /api/prism/generate   make a picture, or edit one
+//   POST /api/prism/generate   start a picture, or an edit (it's made in the background)
+//   POST /api/prism/upscale    start a bigger copy of a picture (also in the background)
+//   GET  /api/prism/jobs       pictures still being made, and how the latest ones went
 //   GET  /api/prism/images     your recent pictures
 //   GET  /api/prism/models     the picture models, and whether each one is downloaded yet
 //   POST /api/prism/videos     start a video (it's made in the background)
@@ -43,6 +45,27 @@ interface PrismImage {
   createdAt: string;
   url: string;
 }
+
+// A picture being made (or just made) in the background. Pictures used to arrive on the same
+// request that asked for them, so minimizing the iPhone app cut them off. Now the server answers
+// right away with one of these, and the page checks on it until it's 'done' or 'failed'.
+interface ImageJob {
+  id: string;
+  mode: 'create' | 'edit' | 'upscale';
+  prompt: string;
+  sourceId: string | null;
+  status: 'working' | 'done' | 'failed';
+  error: string | null;
+  /** Once it's done: the new picture's id. */
+  imageId: string | null;
+  createdAt: string;
+  /** Seconds since it started, by the server's clock. */
+  age: number;
+}
+
+// ...plus when it started by this device's clock (worked out from `age`), for the timer.
+type TrackedJob = ImageJob & { startedAt: number };
+const track = (job: ImageJob): TrackedJob => ({ ...job, startedAt: Date.now() - job.age * 1000 });
 
 // A picture model in the dropdown. `ready` is false until its files are in ComfyUI;
 // `expands` is true when it has a prompt expander (the "Expand my prompt" switch).
@@ -132,8 +155,15 @@ const Prism = () => {
   const promptBox = useRef<HTMLTextAreaElement>(null);
 
   // What's happening
-  const [busy, setBusy] = useState(false);
-  const [upscaling, setUpscaling] = useState(false); // busy because of the Upscale button
+  // `sending`: a request is on its way to the server. `jobs`: pictures the server is making.
+  const [sending, setSending] = useState<'make' | 'upscale' | null>(null);
+  const [jobs, setJobs] = useState<TrackedJob[]>([]);
+  const jobsRef = useRef<TrackedJob[]>([]); // the same list, for code that runs outside a render
+  const pictureJob = jobs.find((j) => j.status === 'working');
+  const busy = sending !== null || pictureJob !== undefined;
+  const upscaling = sending === 'upscale' || pictureJob?.mode === 'upscale'; // busy because of the Upscale button
+  // Set when the app goes into the background, so a request cut off by that isn't called a failure.
+  const wentAway = useRef(false);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
@@ -148,6 +178,7 @@ const Prism = () => {
   const anyWorking = videos.some((v) => v.status === 'working');
 
   // Load your recent pictures and videos when the page opens.
+  // (Plus any picture still being made, say from before the app was closed.)
   useEffect(() => {
     let cancelled = false;
     fetch('/api/prism/images')
@@ -158,6 +189,7 @@ const Prism = () => {
         setShown((current) => current ?? (list[0] ? { kind: 'image', id: list[0].id } : null));
       })
       .catch(() => {});
+    void loadJobs();
     // Which picture models are downloaded? (The ones that aren't get greyed out.)
     fetch('/api/prism/models')
       .then((res) => (res.ok ? res.json() : null))
@@ -170,6 +202,52 @@ const Prism = () => {
       cancelled = true;
     };
   }, []);
+
+  // Your pictures again; with `show`, show that one big once the list has it.
+  function loadImages(show?: string) {
+    fetch('/api/prism/images', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((list: PrismImage[] | null) => {
+        if (!list) return;
+        setImages(list);
+        if (show && list.some((i) => i.id === show)) setShown({ kind: 'image', id: show });
+        else setShown((current) => current ?? (list[0] ? { kind: 'image', id: list[0].id } : null));
+      })
+      .catch(() => {});
+  }
+
+  function setTracked(list: TrackedJob[]) {
+    jobsRef.current = list;
+    setJobs(list);
+  }
+
+  // Check on the pictures being made. A finished one shows up big; a failed one says why.
+  // Any picture still being made that this page didn't know about (it was reloaded, or the
+  // picture was started on another device) is picked up too. Returns the server's list.
+  async function loadJobs(): Promise<ImageJob[] | null> {
+    let list: ImageJob[];
+    try {
+      const res = await fetch('/api/prism/jobs', { cache: 'no-store' });
+      if (!res.ok) return null;
+      list = await res.json();
+    } catch {
+      return null; // offline for a moment (or still waking up); the next check will catch up
+    }
+    const known = jobsRef.current;
+    const next: TrackedJob[] = [];
+    for (const job of known) {
+      const latest = list.find((j) => j.id === job.id);
+      if (!latest) continue; // too old to be listed any more
+      if (latest.status === 'working') next.push({ ...job, ...latest, startedAt: job.startedAt });
+      else if (latest.status === 'done' && latest.imageId) loadImages(latest.imageId);
+      else if (latest.status === 'failed') setError(latest.error || 'This picture didn’t work.');
+    }
+    for (const job of list) {
+      if (job.status === 'working' && !known.some((k) => k.id === job.id)) next.push(track(job));
+    }
+    setTracked(next);
+    return list;
+  }
 
   function loadVideos() {
     fetch('/api/prism/videos')
@@ -193,13 +271,45 @@ const Prism = () => {
     };
   }, [anyWorking]);
 
-  // While generating a picture, count the seconds so you can see it's working.
+  // While a picture is being made, check on it every couple of seconds.
+  const making = pictureJob !== undefined;
+  useEffect(() => {
+    if (!making) return;
+    const check = setInterval(() => void loadJobs(), 1500);
+    return () => clearInterval(check);
+  }, [making]);
+
+  // Coming back to the app (or the tab): catch up on everything that happened while it was
+  // away. iPhones pause a Home Screen app in the background, so nothing was checked meanwhile.
+  useEffect(() => {
+    const catchUp = () => {
+      if (document.visibilityState !== 'visible') {
+        wentAway.current = true;
+        return;
+      }
+      void loadJobs();
+      loadImages();
+      loadVideos();
+    };
+    document.addEventListener('visibilitychange', catchUp);
+    window.addEventListener('pageshow', catchUp);
+    window.addEventListener('focus', catchUp);
+    return () => {
+      document.removeEventListener('visibilitychange', catchUp);
+      window.removeEventListener('pageshow', catchUp);
+      window.removeEventListener('focus', catchUp);
+    };
+  }, []);
+
+  // While generating a picture, count the seconds so you can see it's working. The count starts
+  // when the server started the picture, so it carries on correctly after the app was away.
+  const startedAt = pictureJob?.startedAt;
   useEffect(() => {
     if (!busy) return;
-    const started = Date.now();
+    const started = startedAt ?? Date.now();
     const timer = setInterval(() => setElapsed((Date.now() - started) / 1000), 100);
     return () => clearInterval(timer);
-  }, [busy]);
+  }, [busy, startedAt]);
 
   // A preview of an uploaded file is a temporary browser address; free it when it's replaced.
   useEffect(() => {
@@ -244,11 +354,26 @@ const Prism = () => {
     });
   };
 
+  // A picture request that didn't get an answer because the app went into the background (the
+  // iPhone cuts requests off then). The server may well have got it, so look before calling it a
+  // failure: a job that started since `sentAt` is ours.
+  const findCutOffJob = async (sentAt: number) => {
+    const list = await loadJobs();
+    const since = (Date.now() - sentAt) / 1000 + 2; // seconds, with a little slack
+    const ours = list?.find((j) => j.age <= since);
+    if (!ours) setError('The app was closed before Prism got your request. Please try again.');
+    else if (ours.status === 'done' && ours.imageId) loadImages(ours.imageId);
+    else if (ours.status === 'failed') setError(ours.error || 'This picture didn’t work.');
+    // ('working': loadJobs has already picked it up, and it'll show when it's done.)
+  };
+
   const generate = async () => {
     if (!prompt.trim() || busy) return;
-    setBusy(true);
+    setSending('make');
     setElapsed(0);
     setError('');
+    wentAway.current = false;
+    const sentAt = Date.now();
     try {
       if (animating) {
         // A video: the server answers right away, and the video is made in the background.
@@ -276,22 +401,28 @@ const Prism = () => {
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
-      setImages((list) => [data, ...list]);
-      setShown({ kind: 'image', id: data.id });
+      // The picture is being made; the checks above show it when it's done.
+      setTracked([track(data as ImageJob), ...jobsRef.current]);
     } catch (err) {
-      setError((err as Error).message || 'Something went wrong.');
+      // Cut off by the app going into the background? Then it may be on its way after all.
+      if (!animating && err instanceof TypeError && (wentAway.current || document.visibilityState !== 'visible')) {
+        await findCutOffJob(sentAt);
+      } else {
+        setError((err as Error).message || 'Something went wrong.');
+      }
     } finally {
-      setBusy(false);
+      setSending(null);
     }
   };
 
   // "Upscale" on the big picture: make a copy twice as big and sharper. The original is kept.
   const upscale = async (image: PrismImage) => {
     if (busy) return;
-    setBusy(true);
-    setUpscaling(true);
+    setSending('upscale');
     setElapsed(0);
     setError('');
+    wentAway.current = false;
+    const sentAt = Date.now();
     try {
       const res = await fetch('/api/prism/upscale', {
         method: 'POST',
@@ -300,13 +431,15 @@ const Prism = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
-      setImages((list) => [data, ...list]);
-      setShown({ kind: 'image', id: data.id });
+      setTracked([track(data as ImageJob), ...jobsRef.current]);
     } catch (err) {
-      setError((err as Error).message || 'Something went wrong.');
+      if (err instanceof TypeError && (wentAway.current || document.visibilityState !== 'visible')) {
+        await findCutOffJob(sentAt);
+      } else {
+        setError((err as Error).message || 'Something went wrong.');
+      }
     } finally {
-      setBusy(false);
-      setUpscaling(false);
+      setSending(null);
     }
   };
 
@@ -342,7 +475,8 @@ const Prism = () => {
     setLength(video.length);
   };
 
-  // Pictures and videos together in the strip at the bottom, newest first.
+  // Pictures and videos together in the strip at the bottom, newest first, after any picture
+  // still being made.
   const recent = [
     ...images.map((image) => ({ kind: 'image' as const, id: image.id, at: image.createdAt, image })),
     ...videos.map((video) => ({ kind: 'video' as const, id: video.id, at: video.createdAt, video })),
@@ -351,9 +485,9 @@ const Prism = () => {
   const buttonText = upscaling
     ? `Upscaling… ${elapsed.toFixed(1)}s`
     : busy
-    ? animating
+    ? animating && !pictureJob
       ? 'Starting…'
-      : `${editing ? 'Editing' : 'Painting'}… ${elapsed.toFixed(1)}s`
+      : `${(pictureJob ? pictureJob.mode === 'edit' : editing) ? 'Editing' : 'Painting'}… ${elapsed.toFixed(1)}s`
     : animating
       ? 'Make video'
       : editing
@@ -581,7 +715,7 @@ const Prism = () => {
                 <span className="prism-caption-actions">
                   <button type="button" onClick={() => reuseVideo(shownVideo)}>Reuse settings</button>
                   {shownVideo.status === 'done' && (
-                    <a href={shownVideo.url} download={`prism-${shownVideo.id.slice(0, 8)}.mp4`}>Download</a>
+                    <SaveButton key={shownVideo.url} url={shownVideo.url} name={`prism-${shownVideo.id.slice(0, 8)}.mp4`} type="video/mp4" />
                   )}
                 </span>
               </figcaption>
@@ -613,7 +747,7 @@ const Prism = () => {
                     </button>
                   )}
                   <button type="button" onClick={() => reuse(shownImage)}>Reuse settings</button>
-                  <a href={shownImage.url} download={`prism-${shownImage.id.slice(0, 8)}.png`}>Download</a>
+                  <SaveButton key={shownImage.url} url={shownImage.url} name={`prism-${shownImage.id.slice(0, 8)}.png`} type="image/png" />
                 </span>
               </figcaption>
             </figure>
@@ -626,8 +760,25 @@ const Prism = () => {
       </div>
 
       {/* ---------------------------------------------------------- recent pictures and videos */}
-      {recent.length > 0 && (
+      {(recent.length > 0 || jobs.length > 0) && (
         <nav className="prism-recent" aria-label="Recent pictures and videos">
+          {/* Pictures being made: the picture they start from (if any), dimmed, with "…" */}
+          {jobs.map((job) => {
+            const from = job.sourceId ? images.find((i) => i.id === job.sourceId) : undefined;
+            return (
+              <button
+                key={`job-${job.id}`}
+                type="button"
+                className="prism-thumb is-working"
+                title={`Being made: ${job.prompt}`}
+                onClick={() => from && setShown({ kind: 'image', id: from.id })}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- one of our own pictures */}
+                {from && <img src={from.url} alt="" />}
+                <span className="prism-thumb-badge" aria-hidden="true">…</span>
+              </button>
+            );
+          })}
           {recent.map((item) => (
             <button
               key={`${item.kind}-${item.id}`}
@@ -671,3 +822,65 @@ function VideoProgress({ video, lengths, now }: { video: PrismVideo; lengths: Le
 }
 
 export default Prism;
+
+// "Save" for a picture or video. On a phone it opens the share sheet, where "Save Image" or
+// "Save Video" puts it in Photos. (A plain download link in the Home Screen app opens a
+// full-screen viewer with no way back.) On a computer it downloads the file like before.
+// The file is fetched as soon as it's shown, so the share sheet can open right on the tap.
+// (Each picture gets a fresh button, key={url}, so it never offers the previous picture's file.)
+function SaveButton({ url, name, type }: { url: string; name: string; type: string }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [canShare, setCanShare] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    fetch(url)
+      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
+      .then((blob) => {
+        if (!live) return;
+        const f = new File([blob], name, { type: blob.type || type });
+        setFile(f);
+        setCanShare(typeof navigator.canShare === 'function' && navigator.canShare({ files: [f] }));
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [url, name, type]);
+
+  const download = (href: string) => {
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const save = async () => {
+    if (file && canShare) {
+      try {
+        await navigator.share({ files: [file] });
+      } catch (err) {
+        // Closing the share sheet isn't an error.
+        if ((err as Error).name !== 'AbortError') download(URL.createObjectURL(file));
+      }
+      return;
+    }
+    if (file) {
+      const href = URL.createObjectURL(file);
+      download(href);
+      setTimeout(() => URL.revokeObjectURL(href), 10_000);
+      return;
+    }
+    setSaving(true);
+    download(url);
+    setSaving(false);
+  };
+
+  const label = canShare ? (type.startsWith('video') ? 'Save video' : 'Save to Photos') : 'Download';
+  return (
+    <button type="button" onClick={() => void save()} disabled={saving}>
+      {label}
+    </button>
+  );
+}

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
 import QueueNotice from '@/components/QueueNotice';
+import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import Flame from './Flame';
 import { Steps } from './Steps';
@@ -22,6 +23,7 @@ export default function BotChat({ botId }: { botId: string }) {
   const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   useBarHeight(barRef, listRef, Boolean(bot));
 
   // Load the bot and its chat.
@@ -43,6 +45,31 @@ export default function BotChat({ botId }: { botId: string }) {
   // A step started (new) or finished (replace the running version).
   const applyStep = (step: AgentStep) =>
     setLiveSteps((list) => (list.some((s) => s.id === step.id) ? list.map((s) => (s.id === step.id ? step : s)) : [...list, step]));
+
+  // Tapping to type: jump the newest messages to just above the bar. iOS raises the keyboard over
+  // a few hundred milliseconds, so jump again as it settles.
+  const jumpToLatest = () => {
+    const go = () => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; };
+    go();
+    setTimeout(go, 150);
+    setTimeout(go, 400);
+  };
+
+  // The box grows with what you type (up to about six lines), then scrolls.
+  useEffect(() => {
+    const box = inputRef.current;
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = `px`;
+  }, [input]);
+
+  // Enter adds a new line. Ctrl+Enter (Cmd+Enter on a Mac) sends, like the send button.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      barRef.current?.requestSubmit();
+    }
+  };
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +144,7 @@ export default function BotChat({ botId }: { botId: string }) {
       {/* Who you're talking to */}
       <div className="umbra-chat-bar">
         <Link href="/umbra" className="umbra-back" aria-label="Your Flickers">←</Link>
-        <Flame flame={bot.flame} size={40} />
+        <Flame flame={bot.flame} size={40} mood={thinking ? 'working' : 'idle'} />
         <div className="umbra-chat-who">
           <span className="umbra-chat-name">{bot.name}</span>
           {bot.purpose && <span className="umbra-chat-purpose">{bot.purpose}</span>}
@@ -152,7 +179,7 @@ export default function BotChat({ botId }: { botId: string }) {
         ))}
         {thinking && (
           <div className="umbra-message assistant">
-            <Flame flame={bot.flame} size={32} className="umbra-message-flame" />
+            <Flame flame={bot.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
               <Steps steps={liveSteps} />
               <span className="umbra-thinking">
@@ -167,16 +194,25 @@ export default function BotChat({ botId }: { botId: string }) {
 
       {/* Your message */}
       <form ref={barRef} className="umbra-input" onSubmit={send}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Message ${bot.name}…`}
-          aria-label={`Message ${bot.name}`}
-          enterKeyHint="send"
-          autoComplete="off"
-          maxLength={4000}
-        />
-        <button type="submit" disabled={thinking || !input.trim()}>Send</button>
+        <AppLauncher placement="up" />
+        <span className="umbra-field">
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={`Message ${bot.name}…`}
+            aria-label={`Message ${bot.name}`}
+            enterKeyHint="enter"
+            autoComplete="off"
+            onFocus={jumpToLatest}
+            onKeyDown={handleKeyDown}
+            maxLength={4000}
+          />
+          <button type="submit" className="umbra-send" aria-label="Send" disabled={thinking || !input.trim()}>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+          </button>
+        </span>
       </form>
     </main>
   );

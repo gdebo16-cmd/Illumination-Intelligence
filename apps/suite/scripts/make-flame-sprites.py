@@ -1,16 +1,31 @@
-"""Cuts assets/flames.mp4 into eight animated flame avatars for Umbra.
+"""Cuts the flicker videos into see-through animated avatars for Umbra.
 
-The video is a 4 x 2 grid of flame spirits on a flat dark background. For each one this:
-  1. crops its cell from every frame,
-  2. removes the background and turns the glow into real transparency
-     (bright = solid, dark = see-through), so the flame floats over anything,
-  3. saves public/umbra/flames/<id>.webp (animated) and <id>.png (still, first frame).
+Each video is one clip holding all eight flickers in a 4 x 2 grid on a black background,
+with a name label under each one:
 
-Needs Python with PyAV, numpy and Pillow. ComfyUI's bundled Python has all three, so from apps/suite:
+    assets/flicker-idle.mp4    resting (needed)
+    assets/flicker-dance.mp4   dancing, shown while a bot is working (optional; add it when it exists)
+
+For each flicker in each video this:
+  1. crops its cell from every frame (the same box for every flicker and both videos,
+     so a flicker never changes size when it switches from resting to dancing),
+  2. removes the black and turns the glow into real transparency
+     (bright = solid, dark = see-through), so the flicker floats over anything,
+  3. saves into public/umbra/flames/:
+       <id>.png          still picture (first resting frame)
+       <id>.avif         resting animation: small, what phones load
+       <id>.webp         the same for older browsers: bigger and half the frames
+       <id>-dance.avif / <id>-dance.webp   only when the dance video exists
+  4. writes config/umbra-flame-clips.json, which tells the app the picture shape
+     and which flickers have a dance clip.
+
+Needs Python with PyAV, numpy and Pillow 11.3 or newer. ComfyUI's bundled Python has all three,
+so from apps/suite:
 
     C:\\Users\\gdebo\\AI\\ComfyUI_windows_portable\\python_embeded\\python.exe -I scripts\\make-flame-sprites.py
 """
 
+import json
 import os
 import sys
 
@@ -20,28 +35,56 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-SRC = os.path.join(ROOT, "assets", "flames.mp4")
+ASSETS = os.path.join(ROOT, "assets")
 OUT = os.path.join(ROOT, "public", "umbra", "flames")
+MANIFEST = os.path.join(ROOT, "config", "umbra-flame-clips.json")
 
-# Cell positions found by scanning the video (x0, x1) per column and (y0, y1) per row, plus margin.
-COLUMNS = [(19, 136), (175, 293), (331, 448), (489, 607)]
-ROWS = [(32, 205), (276, 449)]
-MARGIN = 8
+# clip name -> (video file, ending added to the picture names)
+CLIPS = {
+    "idle": ("flicker-idle.mp4", ""),
+    "dance": ("flicker-dance.mp4", "-dance"),
+}
 
-# Keep every Nth frame. 2 = 12 frames per second: still smooth for a gentle bob, half the file size.
-FRAME_STEP = 2
-
-# Left to right, top row then bottom row.
+# Left to right, top row then bottom row. These ids are saved with each bot, so they stay the
+# same even though the video's labels say Mint / Coral / Sapphire for jade / ember / azure.
 FLAMES = ["violet", "cyan", "amber", "jade", "rose", "ember", "azure", "pearl"]
+GRID_COLUMNS, GRID_ROWS = 4, 2
+# The bottom of each grid cell holds the name label; only this much of the cell (from the top) is flicker.
+CELL_ART_HEIGHT = 0.91
 
-
-# The video's background isn't perfectly even. Anything within this many levels of it counts as
-# background, so no faint rectangle shows around a flame.
+MARGIN = 8          # empty pixels kept around the flickers
+SEEN = 20.0         # how much brighter than the background counts as "part of a flicker"
+# Compression noise makes the black slightly uneven. Anything within this many levels of it counts
+# as background, so no faint rectangle shows around a flicker.
 HAZE = 7.0
+LOOP_BLEND = 4      # the last few frames ease back into the first one, so the loop has no hitch
+AVIF_QUALITY = 50   # about 90 KB per flicker at the full 24 frames per second
+WEBP_FRAME_STEP = 2  # the older-browser copy keeps every 2nd frame
+WEBP_QUALITY = 55
+
+
+def read_frames(path: str) -> tuple[list[np.ndarray], float]:
+    container = av.open(path)
+    stream = container.streams.video[0]
+    fps = float(stream.average_rate or 24)
+    frames = [f.to_ndarray(format="rgb24").astype(np.float32) for f in container.decode(video=0)]
+    container.close()
+    return frames, fps
+
+
+def cells(width: int, height: int) -> list[tuple[int, int, int, int]]:
+    """Each flicker's part of the frame as (x0, y0, x1, y1), label strip left out."""
+    cell_w, cell_h = width // GRID_COLUMNS, height // GRID_ROWS
+    art_h = int(cell_h * CELL_ART_HEIGHT)
+    return [
+        (col * cell_w, row * cell_h, (col + 1) * cell_w, row * cell_h + art_h)
+        for row in range(GRID_ROWS)
+        for col in range(GRID_COLUMNS)
+    ]
 
 
 def unscreen(rgb: np.ndarray, background: np.ndarray) -> np.ndarray:
-    """Dark background -> transparent; glow -> partly transparent; bright core -> solid."""
+    """Black background -> transparent; glow -> partly transparent; bright core -> solid."""
     floor = background + HAZE
     lifted = np.clip((rgb - floor) / (255.0 - floor), 0.0, 1.0)
     alpha = lifted.max(axis=-1, keepdims=True)
@@ -50,37 +93,79 @@ def unscreen(rgb: np.ndarray, background: np.ndarray) -> np.ndarray:
     return (rgba * 255.0 + 0.5).astype(np.uint8)
 
 
-def main() -> None:
+def main() -> int:
+    videos = {}
+    for clip, (filename, _) in CLIPS.items():
+        path = os.path.join(ASSETS, filename)
+        if os.path.exists(path):
+            videos[clip] = read_frames(path)
+    if "idle" not in videos:
+        print(f"Missing {os.path.join(ASSETS, CLIPS['idle'][0])}")
+        return 1
+    sizes = {frames[0].shape[:2] for frames, _ in videos.values()}
+    if len(sizes) > 1:
+        print("The videos must all be the same width and height, with the flickers in the same grid.")
+        return 1
+    height, width = sizes.pop()
+    grid = cells(width, height)
+    cell_w, cell_h = grid[0][2] - grid[0][0], grid[0][3] - grid[0][1]
+
+    # One crop box for everything: the smallest box (inside a cell) that holds every flicker
+    # in every frame of every video.
+    used = np.zeros((cell_h, cell_w), dtype=bool)
+    backgrounds = {}
+    for clip, (frames, _) in videos.items():
+        backgrounds[clip] = frames[0][:8, :8].reshape(-1, 3).mean(axis=0)
+        brightest = np.max(np.stack([f.max(axis=-1) for f in frames]), axis=0)
+        lit = brightest > backgrounds[clip].max() + SEEN
+        for x0, y0, x1, y1 in grid:
+            used |= lit[y0:y1, x0:x1]
+    ys, xs = np.where(used.any(axis=1))[0], np.where(used.any(axis=0))[0]
+    bx0, bx1 = max(0, xs.min() - MARGIN), min(cell_w, xs.max() + MARGIN + 1)
+    by0, by1 = max(0, ys.min() - MARGIN), min(cell_h, ys.max() + MARGIN + 1)
+    box_w, box_h = bx1 - bx0, by1 - by0
+    print(f"Picture size: {box_w} x {box_h}")
+
     os.makedirs(OUT, exist_ok=True)
-    container = av.open(SRC)
-    stream = container.streams.video[0]
-    fps = float(stream.average_rate or 24)
-    frames = [f.to_ndarray(format="rgb24").astype(np.float32) for f in container.decode(video=0)]
-    background = frames[0][:8, :8].reshape(-1, 3).mean(axis=0)
-    frames = frames[::FRAME_STEP]
-    duration_ms = int(round(1000.0 * FRAME_STEP / fps))
-    height, width = frames[0].shape[:2]
+    for clip, (frames, fps) in videos.items():
+        suffix = CLIPS[clip][1]
+        # Ease the tail of the clip into its first frame so it loops smoothly.
+        blend = min(LOOP_BLEND, len(frames) - 1)
+        for i in range(blend):
+            weight = (i + 1) / (blend + 1)
+            index = len(frames) - blend + i
+            frames[index] = frames[index] * (1 - weight) + frames[0] * weight
 
-    for index, name in enumerate(FLAMES):
-        (x0, x1), (y0, y1) = COLUMNS[index % 4], ROWS[index // 4]
-        x0, y0 = max(0, x0 - MARGIN), max(0, y0 - MARGIN)
-        x1, y1 = min(width, x1 + MARGIN + 1), min(height, y1 + MARGIN + 1)
+        for (x0, y0, _, _), name in zip(grid, FLAMES):
+            images = [
+                Image.fromarray(unscreen(f[y0 + by0:y0 + by1, x0 + bx0:x0 + bx1], backgrounds[clip]), "RGBA")
+                for f in frames
+            ]
+            if clip == "idle":
+                images[0].save(os.path.join(OUT, f"{name}.png"), optimize=True)
 
-        images = [Image.fromarray(unscreen(f[y0:y1, x0:x1], background), "RGBA") for f in frames]
-        images[0].save(os.path.join(OUT, f"{name}.png"))
-        images[0].save(
-            os.path.join(OUT, f"{name}.webp"),
-            save_all=True,
-            append_images=images[1:],
-            duration=duration_ms,
-            loop=0,
-            quality=72,
-            alpha_quality=70,
-            method=4,
-            minimize_size=True,
-        )
-        size_kb = os.path.getsize(os.path.join(OUT, f"{name}.webp")) / 1024
-        print(f"{name}: {x1 - x0}x{y1 - y0}, {len(images)} frames, {size_kb:.0f} KB")
+            avif = os.path.join(OUT, f"{name}{suffix}.avif")
+            images[0].save(
+                avif, save_all=True, append_images=images[1:],
+                duration=int(round(1000.0 / fps)), loop=0, quality=AVIF_QUALITY, speed=4,
+            )
+            fewer = images[::WEBP_FRAME_STEP]
+            webp = os.path.join(OUT, f"{name}{suffix}.webp")
+            fewer[0].save(
+                webp, save_all=True, append_images=fewer[1:],
+                duration=int(round(1000.0 * WEBP_FRAME_STEP / fps)), loop=0,
+                quality=WEBP_QUALITY, alpha_quality=70, method=4, minimize_size=True,
+            )
+            print(
+                f"{name}{suffix}: {len(images)} frames, "
+                f"avif {os.path.getsize(avif) / 1024:.0f} KB, webp {os.path.getsize(webp) / 1024:.0f} KB"
+            )
+
+    with open(MANIFEST, "w", encoding="utf-8") as f:
+        json.dump({"width": int(box_w), "height": int(box_h), "dance": FLAMES if "dance" in videos else []}, f, indent=2)
+        f.write("\n")
+    print(f"Wrote {os.path.relpath(MANIFEST, ROOT)}")
+    return 0
 
 
 if __name__ == "__main__":
