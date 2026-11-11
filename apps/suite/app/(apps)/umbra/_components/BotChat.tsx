@@ -9,6 +9,8 @@ import { MessageContent } from '@/components/MessageContent';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
+import { canSeeImages } from '@/config/models';
+import { MessagePhotos, PhotoButton, PhotoTray, releasePhotos, usePhotos } from '@/components/PhotoAttach';
 import Flame from './Flame';
 import { Steps } from './Steps';
 import type { AgentStep, Bot, BotMessage } from './types';
@@ -25,6 +27,9 @@ export default function BotChat({ botId }: { botId: string }) {
   const barRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useBarHeight(barRef, listRef, Boolean(bot));
+  // Photos can only be added when this bot's model can see images.
+  const canSee = bot ? canSeeImages(bot.model) : false;
+  const { photos, problem, add: addPhotos, remove: removePhoto, take: takePhotos, onPaste } = usePhotos(canSee);
 
   // Load the bot and its chat.
   useEffect(() => {
@@ -74,21 +79,33 @@ export default function BotChat({ botId }: { botId: string }) {
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || thinking) return;
+    // A photo can go on its own; otherwise there has to be something written.
+    if ((!text && photos.length === 0) || thinking) return;
+    const sending = takePhotos();
     setInput('');
     setError('');
     setLiveSteps([]);
     setThinking(true);
-    // Show your message straight away; the server's saved copy replaces it.
+    // Show your message straight away (photos as local previews); the server's saved copy replaces it.
     const draft: BotMessage = { id: `draft-${Date.now()}`, role: 'user', content: text, createdAt: new Date().toISOString() };
+    if (sending.length) draft.images = sending.map((p) => p.preview);
     setMessages((m) => [...m, draft]);
 
     try {
-      const res = await fetch(`/api/umbra/bots/${botId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      });
+      let res: Response;
+      if (sending.length) {
+        // Photos go as a form, the way a browser uploads attachments.
+        const form = new FormData();
+        form.append('message', text);
+        for (const photo of sending) form.append('image', photo.file);
+        res = await fetch(`/api/umbra/bots/${botId}/chat`, { method: 'POST', body: form });
+      } else {
+        res = await fetch(`/api/umbra/bots/${botId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+      }
       if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error ?? 'The Flicker could not reply.');
 
       // Read the stream line by line: each line is one event.
@@ -105,7 +122,10 @@ export default function BotChat({ botId }: { botId: string }) {
           buffer = buffer.slice(newline + 1);
           if (!line) continue;
           const event = JSON.parse(line);
-          if (event.type === 'sent') setMessages((m) => m.map((x) => (x.id === draft.id ? event.message : x)));
+          if (event.type === 'sent') {
+            setMessages((m) => m.map((x) => (x.id === draft.id ? event.message : x)));
+            releasePhotos(sending); // the saved copies are shown now
+          }
           else if (event.type === 'step') applyStep(event.step);
           else if (event.type === 'reply') setMessages((m) => [...m, event.message]);
           else if (event.type === 'error') setError(event.error);
@@ -172,7 +192,10 @@ export default function BotChat({ botId }: { botId: string }) {
                   <MessageContent content={m.content} />
                 </>
               ) : (
-                m.content
+                <>
+                  <MessagePhotos images={m.images} withText={Boolean(m.content)} />
+                  {m.content}
+                </>
               )}
             </div>
           </div>
@@ -194,8 +217,9 @@ export default function BotChat({ botId }: { botId: string }) {
 
       {/* Your message */}
       <form ref={barRef} className="umbra-input" onSubmit={send}>
+        <PhotoTray photos={photos} problem={problem} onRemove={removePhoto} />
         <AppLauncher placement="up" />
-        <span className="umbra-field">
+        <span className={`umbra-field ${canSee ? 'has-photo-button' : ''}`}>
           <textarea
             ref={inputRef}
             rows={1}
@@ -207,9 +231,12 @@ export default function BotChat({ botId }: { botId: string }) {
             autoComplete="off"
             onFocus={jumpToLatest}
             onKeyDown={handleKeyDown}
+            onPaste={onPaste}
             maxLength={4000}
           />
-          <button type="submit" className="umbra-send" aria-label="Send" disabled={thinking || !input.trim()}>
+          {/* Only for bots whose model can see images */}
+          {canSee && <PhotoButton onPick={addPhotos} disabled={thinking} />}
+          <button type="submit" className="umbra-send" aria-label="Send" disabled={thinking || (!input.trim() && photos.length === 0)}>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
           </button>
         </span>

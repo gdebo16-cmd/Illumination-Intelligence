@@ -45,6 +45,8 @@ interface ChatMessage {
   content: string;
   tool_calls?: { function: { name: string; arguments: Record<string, unknown> } }[];
   tool_name?: string;
+  /** Photos for a model that can see: the pictures themselves, as base64 text (lib/chat-images.ts). */
+  images?: string[];
 }
 
 interface OllamaReply {

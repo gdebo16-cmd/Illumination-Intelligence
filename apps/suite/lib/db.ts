@@ -6,6 +6,9 @@ import path from 'node:path';
 const DATA_DIR = path.join(process.cwd(), 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, 'dev.db'));
+// `next build` loads this file in several worker processes at once, and each one sets up the tables
+// below. Wait for another process to finish its change instead of failing with "database is locked".
+db.exec('PRAGMA busy_timeout = 10000');
 
 // Initialize tables if they don't exist (new databases get user_id from the start)
 db.exec(`
@@ -142,7 +145,13 @@ db.exec(`
 //   UmbraMessage.steps  the tool steps behind a reply (JSON), shown in the chat
 const addColumn = (table: string, column: string, definition: string) => {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-  if (!columns.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  if (columns.some((c) => c.name === column)) return;
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch (err) {
+    // Another process (see busy_timeout above) added it between our check and our change: fine.
+    if (!/duplicate column name/i.test((err as Error).message)) throw err;
+  }
 };
 addColumn('UmbraBot', 'tools', "TEXT NOT NULL DEFAULT '[]'");
 addColumn('UmbraMessage', 'steps', 'TEXT');
@@ -238,5 +247,21 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_prism_video_user ON PrismVideo (user_id, createdAt);
 `);
+
+// Photos attached to chat messages (Lumen and Umbra). The files are data/chat-images/<id>.jpg.
+// `chat` says which chat a photo belongs to ("lumen:<conversation id>" or "umbra:<bot id>"), so
+// its files can be removed when that chat is deleted. lib/chat-images.ts
+db.exec(`
+  CREATE TABLE IF NOT EXISTS ChatImage (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    chat TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_image_chat ON ChatImage (chat);
+`);
+// The photos sent with a message: a JSON list of ChatImage ids (empty for most messages).
+addColumn('Message', 'images', 'TEXT');
+addColumn('UmbraMessage', 'images', 'TEXT');
 
 export default db;

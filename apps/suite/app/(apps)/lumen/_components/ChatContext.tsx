@@ -17,6 +17,8 @@ import useToggle from '@/hooks/use-toggle';
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  /** Photos sent with the message: saved photo ids (or, just after sending, local previews). */
+  images?: string[];
 }
 
 export interface ConversationItem {

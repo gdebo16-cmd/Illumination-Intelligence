@@ -20,3 +20,13 @@ export const PAGE_MODELS = {
   
   export type PageType = keyof typeof PAGE_MODELS;
   export type ModelItem = (typeof PAGE_MODELS)[PageType][number];
+
+// Models that can look at pictures. The "add a photo" button in Lumen and in a Flicker's chat only
+// shows while one of these is the model in use. Add a model's id here when you install one that
+// can see images (Ollama lists "vision" for it in `ollama show <model>`).
+export const VISION_MODELS: readonly string[] = ['qwen3.5:9b'];
+export const canSeeImages = (modelId: string) => VISION_MODELS.includes(modelId);
+
+// Photos in chat: how many one message can carry, and where the browser loads a saved one from.
+export const MAX_PHOTOS = 4;
+export const chatImageUrl = (id: string) => `/api/chat-images/${id}`;

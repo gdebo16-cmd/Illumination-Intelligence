@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import db from '@/lib/db';
 import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
 import { checkCodeFolder, editStatuses } from './code';
+import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 import type { AgentStep } from './agent';
 
 export interface Bot {
@@ -33,6 +34,8 @@ export interface BotMessage {
   createdAt: string;
   /** For bot replies: the tools it used along the way. */
   steps?: AgentStep[];
+  /** For your messages: ids of the photos sent with it (lib/chat-images.ts). */
+  images?: string[];
 }
 
 export interface BotNote {
@@ -127,6 +130,7 @@ export function updateBot(userId: string, id: string, input: BotInput): Bot | nu
 export function deleteBot(userId: string, id: string): boolean {
   if (!getBot(userId, id)) return false;
   db.prepare('DELETE FROM UmbraMessage WHERE bot_id = ?').run(id);
+  deletePhotos(chatKey.umbra(id));
   db.prepare('DELETE FROM UmbraNote WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
@@ -145,22 +149,25 @@ export function deleteBot(userId: string, id: string): boolean {
 
 // ------------------------------------------------------------------ chat
 
-type MessageRow = Omit<BotMessage, 'steps'> & { steps: string | null };
+type MessageRow = Omit<BotMessage, 'steps' | 'images'> & { steps: string | null; images: string | null };
 
 export function listMessages(botId: string, limit = 200): BotMessage[] {
   // Newest `limit` messages, returned oldest-first for display.
   const rows = db
     .prepare(
-      `SELECT id, role, content, createdAt, steps FROM UmbraMessage
+      `SELECT id, role, content, createdAt, steps, images FROM UmbraMessage
        WHERE bot_id = ? ORDER BY createdAt DESC, rowid DESC LIMIT ?`,
     )
     .all(botId, limit) as unknown as MessageRow[];
-  const messages = rows.reverse().map(({ steps, ...m }): BotMessage => {
+  const messages = rows.reverse().map(({ steps, images, ...m }): BotMessage => {
     let parsed: AgentStep[] | undefined;
     try {
       parsed = steps ? JSON.parse(steps) : undefined;
     } catch {}
-    return parsed?.length ? { ...m, steps: parsed } : m;
+    const message: BotMessage = parsed?.length ? { ...m, steps: parsed } : m;
+    const photos = photoIds(images);
+    if (photos.length) message.images = photos;
+    return message;
   });
   // Code helper: show whether each suggested change was applied since (the saved steps say "pending").
   const editSteps = messages.flatMap((m) => m.steps ?? []).filter((s) => s.edit);
@@ -169,11 +176,20 @@ export function listMessages(botId: string, limit = 200): BotMessage[] {
   return messages;
 }
 
-export function addMessage(botId: string, role: BotMessage['role'], content: string, steps?: AgentStep[]): BotMessage {
+export function addMessage(
+  botId: string,
+  role: BotMessage['role'],
+  content: string,
+  steps?: AgentStep[],
+  /** Ids of photos sent with the message, already saved with savePhotos(). */
+  images?: string[],
+): BotMessage {
   const message: BotMessage = { id: crypto.randomUUID(), role, content, createdAt: new Date().toISOString() };
   if (steps?.length) message.steps = steps;
-  db.prepare('INSERT INTO UmbraMessage (id, bot_id, role, content, createdAt, steps) VALUES (?, ?, ?, ?, ?, ?)').run(
+  if (images?.length) message.images = images;
+  db.prepare('INSERT INTO UmbraMessage (id, bot_id, role, content, createdAt, steps, images) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
     message.id, botId, role, content, message.createdAt, steps?.length ? JSON.stringify(steps) : null,
+    images?.length ? JSON.stringify(images) : null,
   );
   db.prepare('UPDATE UmbraBot SET updatedAt = ? WHERE id = ?').run(message.createdAt, botId);
   return message;
@@ -181,6 +197,7 @@ export function addMessage(botId: string, role: BotMessage['role'], content: str
 
 export function clearMessages(botId: string): void {
   db.prepare('DELETE FROM UmbraMessage WHERE bot_id = ?').run(botId);
+  deletePhotos(chatKey.umbra(botId));
 }
 
 // ------------------------------------------------------------------ notes

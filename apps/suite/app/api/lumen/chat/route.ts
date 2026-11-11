@@ -5,6 +5,10 @@ import { buildMemoryBlock, extractMemories, EXTRACT_MODEL } from '@/lib/memory';
 import { getCurrentUserId } from '@/lib/user';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
+import { canSeeImages } from '@/config/models';
+import {
+  chatKey, photoIds, PhotoError, PHOTO_CONTEXT_CHARS, preparePhotos, savePhotos, uploadedPhotos, withPhotos,
+} from '@/lib/chat-images';
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const DEFAULT_MODEL = 'qwen3-coder:30b';
@@ -14,11 +18,13 @@ const DEFAULT_MODEL = 'qwen3-coder:30b';
 const HISTORY_CHAR_BUDGET = Math.floor(OLLAMA_NUM_CTX * 3 * 0.75);
 
 /** Keep the newest messages that fit in the budget, so Ollama never has to cut off the start. */
-function recentHistory<T extends { content: string }>(history: T[], budget: number): T[] {
+function recentHistory<T extends { content: string; images?: string[] }>(history: T[], budget: number): T[] {
+  // A photo takes up room too.
+  const size = (m: T) => m.content.length + (m.images?.length ?? 0) * PHOTO_CONTEXT_CHARS;
   let used = 0;
   let start = history.length;
-  while (start > 0 && used + history[start - 1].content.length <= budget) {
-    used += history[start - 1].content.length;
+  while (start > 0 && used + size(history[start - 1]) <= budget) {
+    used += size(history[start - 1]);
     start--;
   }
   return history.slice(start);
@@ -32,19 +38,43 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
     }
 
-    // 2. Read the incoming request
-    const { conversationId, prompt, model } = await req.json();
-    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    // 2. Read the incoming request: JSON, or a form when photos are attached
+    let fields: { conversationId?: unknown; prompt?: unknown; model?: unknown };
+    let uploads: File[] = [];
+    if ((req.headers.get('content-type') ?? '').includes('multipart/form-data')) {
+      const form = await req.formData();
+      fields = { conversationId: form.get('conversationId'), prompt: form.get('prompt'), model: form.get('model') };
+      uploads = uploadedPhotos(form);
+    } else {
+      fields = await req.json();
+    }
+    const prompt = typeof fields.prompt === 'string' ? fields.prompt : '';
+    // A photo can be sent on its own; otherwise there has to be something written.
+    if (!prompt.trim() && uploads.length === 0) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    let activeConversationId: string = conversationId;
+    const chatModel: string = (typeof fields.model === 'string' && fields.model) || DEFAULT_MODEL;
+    const canSee = canSeeImages(chatModel);
+    // The photo button is hidden for models that can't see, so this is only a safety net.
+    if (uploads.length > 0 && !canSee) {
+      return NextResponse.json({ error: 'This model can’t see photos. Pick one that can.' }, { status: 400 });
+    }
+    let photos: Buffer[];
+    try {
+      photos = await preparePhotos(uploads);
+    } catch (photoError) {
+      if (photoError instanceof PhotoError) return NextResponse.json({ error: photoError.message }, { status: 400 });
+      throw photoError;
+    }
+
+    let activeConversationId = typeof fields.conversationId === 'string' ? fields.conversationId : '';
     const now = new Date().toISOString();
 
     // 3. Create or validate the conversation
     if (!activeConversationId) {
       activeConversationId = crypto.randomUUID();
-      const title = prompt.length > 30 ? prompt.substring(0, 30) + '...' : prompt;
+      const title = !prompt.trim() ? 'Photo' : prompt.length > 30 ? prompt.substring(0, 30) + '...' : prompt;
 
       db.prepare(
         `INSERT INTO Conversation (id, title, user_id, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)`,
@@ -65,23 +95,26 @@ export async function POST(req: Request) {
     }
 
     // 4. Load previous messages (before saving the new one)
-    const history = db
-      .prepare(
-        `SELECT role, content FROM Message WHERE conversationId = ? ORDER BY createdAt ASC, rowid ASC`,
-      )
-      .all(activeConversationId) as { role: string; content: string }[];
+    const history = (
+      db
+        .prepare(
+          `SELECT role, content, images FROM Message WHERE conversationId = ? ORDER BY createdAt ASC, rowid ASC`,
+        )
+        .all(activeConversationId) as { role: string; content: string; images: string | null }[]
+    ).map((m) => ({ role: m.role, content: m.content, images: photoIds(m.images) }));
 
-    // 5. Save the new user message
+    // 5. Save the new user message, and its photos
+    const images = savePhotos(userId, chatKey.lumen(activeConversationId), photos);
     const insertMsg = db.prepare(
-      `INSERT INTO Message (id, conversationId, role, content, createdAt) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO Message (id, conversationId, role, content, createdAt, images) VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    insertMsg.run(crypto.randomUUID(), activeConversationId, 'user', prompt, now);
+    insertMsg.run(crypto.randomUUID(), activeConversationId, 'user', prompt, now, images.length ? JSON.stringify(images) : null);
 
     // 6. Retrieve relevant long-term memories (async: must be awaited).
     //    A memory failure must never break the chat itself.
     let memoryBlock = '';
     try {
-      memoryBlock = await buildMemoryBlock(db, userId, prompt);
+      if (prompt.trim()) memoryBlock = await buildMemoryBlock(db, userId, prompt);
     } catch (memoryError) {
       console.error('Memory retrieval error:', memoryError);
     }
@@ -91,19 +124,28 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join('\n\n');
 
-    const budget = Math.max(2000, HISTORY_CHAR_BUDGET - systemPrompt.length - prompt.length);
+    const budget = Math.max(
+      2000,
+      HISTORY_CHAR_BUDGET - systemPrompt.length - prompt.length - images.length * PHOTO_CONTEXT_CHARS,
+    );
+    // withPhotos swaps photo ids for the pictures themselves, when this model can see them.
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...recentHistory(history, budget).map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content,
-      })),
-      { role: 'user', content: prompt },
+      ...withPhotos(
+        [
+          ...recentHistory(history, budget).map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+            images: m.images,
+          })),
+          { role: 'user', content: prompt, images },
+        ],
+        canSee,
+      ),
     ];
 
     // 8. Send to Ollama through the queue (live chat has priority over background jobs)
     //    The queue unloads any other model first and retries once if Ollama crashes.
-    const chatModel: string = model || DEFAULT_MODEL;
     const ollamaData = await gpuQueue.add(
       async () => {
         const res = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -138,6 +180,7 @@ export async function POST(req: Request) {
       'assistant',
       reply,
       new Date().toISOString(),
+      null,
     );
 
     // 10. Extract new memories in the background: do not await, so the reply returns immediately
@@ -146,7 +189,7 @@ export async function POST(req: Request) {
       .catch((memoryError) => console.error('Memory extraction error:', memoryError));
 
     // 11. Return the response to the frontend
-    return NextResponse.json({ conversationId: activeConversationId, reply });
+    return NextResponse.json({ conversationId: activeConversationId, reply, images });
   } catch (err: unknown) {
     const error = err as Error;
     console.error('API Chat Error:', error);

@@ -2379,3 +2379,84 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
 .input-form .send-button { top: auto; bottom: 0.5rem; transform: none; }
 .umbra-input { align-items: flex-end; }
 /* #endregion */
+/* #region photos in chat (Lumen and Umbra): the add-photo button, shown only for models that can
+   see images; the tray of photos waiting to be sent; and photos inside sent messages */
+/* The button sits inside the message box, just left of the send arrow. */
+.photo-button {
+  position: absolute;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--text-color, #fff);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.75; }
+.photo-button:hover { opacity: 1; }
+.photo-button:active { transform: scale(0.92); }
+.photo-button:disabled { opacity: 0.35; cursor: default; }
+/* Typed text stops before the two buttons instead of running under them. */
+.input-form .photo-button { right: 3rem; bottom: 0.5rem; }
+.input-form.has-photo-button .input-field { padding-right: 5.75rem; }
+/* On phones Lumen's send arrow is a little taller (a full-size touch target); match it so the two line up. */
+@media (max-width: 768px) { .input-form .photo-button { height: 44px; } }
+.umbra-field .photo-button { right: 2.9rem; bottom: 0.25rem; }
+.umbra-field.has-photo-button > textarea { padding-right: 5.6rem; }
+/* Photos waiting to be sent: small squares above the message box, lined up with its left edge. */
+.photo-tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0 0.6rem 4rem; }
+.umbra-input { flex-wrap: wrap; }
+.umbra-input > .photo-tray { flex: 0 0 100%; padding: 0.25rem 0 0.1rem 3.5rem; }
+.photo-chip { position: relative; flex-shrink: 0; width: 64px; height: 64px; }
+.photo-chip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgb(255 255 255 / 0.2); }
+.photo-chip button {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  background: rgb(0 0 0 / 0.8);
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 50%;
+  cursor: pointer; }
+.photo-problem { font-size: 0.85rem; color: #ffb4b4; }
+/* Photos in a sent message. The fixed height keeps the chat from jumping while they load. */
+.message-photos { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; }
+.message-photos.has-text { margin-bottom: 0.5rem; }
+.message-photos img {
+  display: block;
+  height: 160px;
+  width: auto;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 12px; }
+/* #endregion */
+/* #region message box fixes that showed up next to the photo button */
+/* The send arrow is anchored to the bottom of the box now, so hovering or pressing it must not
+   shift it up by half its height (which left it out of line with the photo button beside it). */
+.input-form .send-button:hover { transform: none; }
+.input-form .send-button:active { transform: scale(0.92); }
+/* Umbra's message box shares the .umbra-field name with the bot form's fields, which stack top to
+   bottom. Stacked, the box's height was set by the layout and it never grew past one line; side by
+   side it takes the height the page gives it as you type. */
+.umbra-input .umbra-field { flex-direction: row; }
+/* #endregion */

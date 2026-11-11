@@ -45,6 +45,8 @@ export interface BotMessage {
   content: string;
   createdAt: string;
   steps?: AgentStep[];
+  /** Photos sent with the message: saved photo ids (or, just after sending, local previews). */
+  images?: string[];
 }
 
 export interface Task {
