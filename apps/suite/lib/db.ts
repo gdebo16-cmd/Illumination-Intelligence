@@ -2,6 +2,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { RETIRED_BOT_MODELS } from '@/config/umbra';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -204,6 +205,11 @@ addColumn('PrismImage', 'model', "TEXT NOT NULL DEFAULT 'flux2-klein'");
 // What the model's prompt expander turned the prompt into (empty when it wasn't used).
 addColumn('PrismImage', 'expanded_prompt', 'TEXT');
 addColumn('UmbraRun', 'team_id', 'TEXT');
+
+// Flickers set to a model that has left the list move to the one that replaced it.
+for (const [retired, replacement] of Object.entries(RETIRED_BOT_MODELS)) {
+  db.prepare('UPDATE UmbraBot SET model = ? WHERE model = ?').run(replacement, retired);
+}
 
 // Code helper: the one project folder a bot may look at, and whether it may change files without asking.
 addColumn('UmbraBot', 'code_folder', "TEXT NOT NULL DEFAULT ''");

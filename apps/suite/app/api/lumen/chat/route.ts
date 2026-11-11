@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '@/lib/db';
-import { buildMemoryBlock, extractMemories, EXTRACT_MODEL } from '@/lib/memory';
+import { buildMemoryBlock, extractMemories, extractModelFor } from '@/lib/memory';
 import { getCurrentUserId } from '@/lib/user';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
@@ -183,9 +183,14 @@ export async function POST(req: Request) {
       null,
     );
 
-    // 10. Extract new memories in the background: do not await, so the reply returns immediately
+    // 10. Extract new memories in the background: do not await, so the reply returns immediately.
+    //     It uses the model that just answered (already on the card), with the same context size.
+    const memoryModel = extractModelFor(chatModel);
     gpuQueue
-      .add(() => extractMemories(db, userId, activeConversationId), 'low', 'ollama', { userId, model: EXTRACT_MODEL })
+      .add(() => extractMemories(db, userId, activeConversationId, memoryModel, OLLAMA_NUM_CTX), 'low', 'ollama', {
+        userId,
+        model: memoryModel,
+      })
       .catch((memoryError) => console.error('Memory extraction error:', memoryError));
 
     // 11. Return the response to the frontend

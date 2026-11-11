@@ -37,16 +37,23 @@ export const flameColor = (id: string) => FLAMES.find((f) => f.id === id)?.color
 // Local models a bot can use. All of them can use tools (needed from Stage 2 on).
 // The first one is the default for new bots.
 export const BOT_MODELS = [
-  { id: 'qwen3:14b', name: 'Big Brain Fish: smart all-rounder' },
+  { id: 'gemma4:12b', name: 'Big Brain Fish: smart all-rounder, can see images' },
   { id: 'qwen3.5:9b', name: 'Little Eyed Fish: quick, can see images' },
-  { id: 'qwen3:8b', name: 'Quick Chatter Fish: quick, a bit smarter' },
-  { id: 'llama3.1:8b', name: 'Little Chatter Fish: quick everyday chat' },
   { id: 'qwen2.5-coder:7b', name: 'Small Code Fish: quick code help' },
   { id: 'gpt-oss:20b', name: 'Big City Task Fish: multi-step tasks (heavy)' },
   { id: 'qwen3-coder:30b', name: 'Deep Sea Code Fish: best code (heavy, slow)' },
 ] as const;
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);
+
+// Models that used to be in the list, and the one that took each one's place. A Flicker still set
+// to an old model is moved to the new one when the app starts (lib/db.ts), so it keeps working
+// and its settings can still be saved.
+export const RETIRED_BOT_MODELS: Record<string, string> = {
+  'qwen3:14b': 'gemma4:12b', // the old Big Brain Fish
+  'qwen3:8b': 'qwen3.5:9b', // Quick Chatter Fish
+  'llama3.1:8b': 'qwen3.5:9b', // Little Chatter Fish
+};
 
 // Tools a bot can be given (Stage 2). The creator shows these as checkboxes.
 // The code behind each one lives in lib/umbra/tools.ts.

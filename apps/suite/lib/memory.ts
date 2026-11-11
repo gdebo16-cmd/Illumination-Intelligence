@@ -3,7 +3,11 @@
 import 'server-only';
 
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
-export const EXTRACT_MODEL = process.env.MEMORY_EXTRACT_MODEL ?? 'qwen3:8b'; // ideally the model already loaded
+// The model that reads a chat for things worth remembering. Normally it's the model the chat just
+// used: that one is already on the graphics card, so nothing has to be unloaded and loaded again
+// around every message. Set MEMORY_EXTRACT_MODEL in .env to always use one particular model.
+const FIXED_EXTRACT_MODEL = process.env.MEMORY_EXTRACT_MODEL?.trim() || null;
+export const extractModelFor = (chatModel: string) => FIXED_EXTRACT_MODEL ?? chatModel;
 const EMBED_MODEL = process.env.MEMORY_EMBED_MODEL ?? 'nomic-embed-text';
 
 // Minimal shape of node:sqlite's DatabaseSync, so this file needs no extra types.
@@ -96,7 +100,17 @@ function cosine(a: Float32Array, b: Float32Array): number {
 }
 
 // ---------------------------------------------------------------- extraction
-export async function extractMemories(db: Db, userId: string, conversationId: string): Promise<void> {
+/**
+ * `model` is the one to ask (see extractModelFor). `numCtx` is the context window to ask for:
+ * pass the same size the chat uses, because Ollama loads a model again when the size changes.
+ */
+export async function extractMemories(
+  db: Db,
+  userId: string,
+  conversationId: string,
+  model: string,
+  numCtx: number,
+): Promise<void> {
   const state = db
     .prepare('SELECT last_row_id FROM memory_extractions WHERE conversation_id = ?')
     .get(conversationId) as { last_row_id: number } | undefined;
@@ -120,10 +134,10 @@ export async function extractMemories(db: Db, userId: string, conversationId: st
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: EXTRACT_MODEL,
+      model,
       stream: false,
       format: OPS_SCHEMA, // structured output keeps the JSON valid
-      options: { temperature: 0, num_ctx: 8192 },
+      options: { temperature: 0, num_ctx: numCtx },
       messages: [
         { role: 'system', content: EXTRACTION_SYSTEM },
         { role: 'user', content: `EXISTING MEMORIES:\n${existing}\n\nNEW CONVERSATION:\n${transcript}` },
@@ -246,4 +260,4 @@ export async function buildMemoryBlock(
   ).run(...usedIds);
 
   return `Things you know about the user (use only when relevant; don't mention that you have notes):\n${lines.join('\n')}`;
-}
+}

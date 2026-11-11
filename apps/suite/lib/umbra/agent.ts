@@ -56,12 +56,12 @@ interface OllamaReply {
   };
 }
 
-// "Thinking" models (Qwen 3, GPT-OSS) reason privately before answering. For a bot that's slow
+// "Thinking" models (Qwen 3, Gemma 4, GPT-OSS) reason privately before answering. For a bot that's slow
 // (20-90 s per step) and, in testing, often made them *describe* a tool instead of using it.
 // So bots use the quick, decisive mode: thinking off, or as low as the model allows.
 function thinkSetting(model: string): { think?: boolean | 'low' } {
   if (model.startsWith('gpt-oss')) return { think: 'low' };
-  if (model.startsWith('qwen3')) return { think: false };
+  if (model.startsWith('qwen3') || model.startsWith('gemma4')) return { think: false };
   return {};
 }
 
