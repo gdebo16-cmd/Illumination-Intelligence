@@ -22,6 +22,10 @@ npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Backup copies of files (BotChat.tsx.bak, .bak2, …) stay out of git.
+*.bak
+*.bak[0-9]*
+
 # OS
 .DS_Store
 Thumbs.db
