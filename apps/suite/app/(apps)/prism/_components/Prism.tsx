@@ -160,6 +160,7 @@ const Prism = () => {
   // The prompt expander's switch. It only does something for a model that has one (FLUX.3).
   const [expand, setExpand] = useState(true);
   const [style, setStyle] = useState<string>(PRISM_STYLES[0].id);
+  const pickedStyle = PRISM_STYLES.find((s) => s.id === style);
   const [shape, setShape] = useState<(typeof SHAPES)[number]['id']>('square');
   const [source, setSource] = useState<Source | null>(null);
   const [make, setMake] = useState<Make>('edit');
@@ -586,6 +587,14 @@ const Prism = () => {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            {/* A style with a LoRA (a trained add-on) only fits the model it was trained on */}
+            {pickedStyle?.lora && (
+              <p className="prism-note">
+                {pickedStyle.lora.model === model
+                  ? 'This style was trained on your own art.'
+                  : `This style was trained for ${findPrismModel(pickedStyle.lora.model).name}. With this model you only get its words, so the look will be weaker.`}
+              </p>
+            )}
 
             <span className="sidebar-separator" id="prism-shape-label">Shape</span>
             {editing ? (

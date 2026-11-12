@@ -23,6 +23,7 @@ export const LOADERS: Record<string, string> = {
   CLIPLoader: 'clip_name',
   VAELoader: 'vae_name',
   UpscaleModelLoader: 'model_name', // Prism's Upscale button
+  LoraLoaderModelOnly: 'lora_name', // an art style's LoRA (config/prism-styles.ts)
 };
 
 const ONLINE_FOR_MS = 3_000; // re-check a machine that answered after this long

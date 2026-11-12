@@ -14,7 +14,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { applyStyle } from '../../config/prism-styles.ts';
+import { applyStyle, styleLora } from '../../config/prism-styles.ts';
 import { PRISM_MODELS, findPrismModel, type PrismModelId } from '../../config/prism-models.ts';
 import { GPU_WORKERS, LOCAL_WORKER, type GpuWorker } from '../../config/gpu-workers.ts';
 import { LOADERS, checkWorkers } from '../gpu/health.ts';
@@ -35,7 +35,26 @@ const BOX = {
   typed: '21', // PrimitiveStringMultiline: your prompt, as you typed it
   expander: '24', // ComfySwitchNode: the expander's on/off switch
   told: '25', // PreviewAny: the prompt the painter ends up with (expanded or not)
+  // Not in any recipe file: added by addLora() when the art style has a LoRA.
+  model: '1', // UNETLoader: the painting model itself
+  lora: '40', // LoraLoaderModelOnly: the model with the style's LoRA on top
 };
+
+/**
+ * Put a style's LoRA on top of the painting model: add a box that loads it, then point every
+ * box that used the plain model (box 1) at the new box instead.
+ */
+function addLora(workflow: Workflow, lora: { file: string; strength: number }): void {
+  for (const box of Object.values(workflow)) {
+    for (const [setting, value] of Object.entries(box.inputs)) {
+      if (Array.isArray(value) && value[0] === BOX.model && value[1] === 0) box.inputs[setting] = [BOX.lora, 0];
+    }
+  }
+  workflow[BOX.lora] = {
+    class_type: 'LoraLoaderModelOnly',
+    inputs: { model: [BOX.model, 0], lora_name: lora.file, strength_model: lora.strength },
+  };
+}
 
 // What Prism needs to know about one model's recipes.
 interface ModelRecipes {
@@ -143,6 +162,9 @@ export function buildWorkflow(
   const [promptBox, promptSetting] = recipe.prompt;
   workflow[promptBox].inputs[promptSetting] = applyStyle(request.prompt, request.style);
   workflow[BOX.seed].inputs[recipe.seedSetting] = seed;
+  // An art style can bring a LoRA, when it has one made for this model (config/prism-styles.ts).
+  const lora = styleLora(request.style, model);
+  if (lora) addLora(workflow, lora);
   // The prompt expander is on unless you ask for your prompt exactly as typed.
   const expanding = recipe.expander && request.expand !== false;
   if (recipe.expander) workflow[BOX.expander].inputs.switch = expanding;
@@ -181,10 +203,12 @@ export function modelFiles(workflow: Workflow): string[] {
 export function imageNeeds(request: ImageRequest): GpuNeeds {
   const model = findPrismModel(request.model);
   const recipe = RECIPES[model.id];
+  const lora = styleLora(request.style, model.id);
   return {
     label: `${model.name} ${request.source ? 'edit' : 'picture'}`,
     vramGB: model.vramGB,
-    files: modelFiles(readRecipe(request.source ? recipe.edit : recipe.create)),
+    // The machine also needs the style's LoRA file, when the style has one for this model.
+    files: [...modelFiles(readRecipe(request.source ? recipe.edit : recipe.create)), ...(lora ? [lora.file] : [])],
   };
 }
 
