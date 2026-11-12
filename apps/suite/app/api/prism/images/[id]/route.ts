@@ -2,7 +2,18 @@
 
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
-import { readImageFile } from '@/lib/prism/images';
+import { deleteImage, readImageFile } from '@/lib/prism/images';
+
+// DELETE /api/prism/images/<id> — delete that picture for good (the ✕ on its thumbnail).
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  }
+  const { id } = await params;
+  if (!deleteImage(userId, id)) return NextResponse.json({ error: 'Picture not found.' }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const userId = await getCurrentUserId();

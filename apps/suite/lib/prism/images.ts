@@ -103,6 +103,18 @@ export function getImage(userId: string, id: string): PrismImage | null {
   return row ? withUrl(row) : null;
 }
 
+/**
+ * Delete one picture for good: its row and its PNG file. Only if it belongs to this profile.
+ * Returns false when there's no such picture. (Edits, bigger copies and videos made from it
+ * are separate pictures with their own files, so they stay.)
+ */
+export function deleteImage(userId: string, id: string): boolean {
+  const gone = db.prepare('DELETE FROM PrismImage WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
+  // The id comes from the address; only touch the file once the row proved it's a real picture.
+  if (gone) fs.rmSync(path.join(IMAGE_DIR, `${id}.png`), { force: true });
+  return gone;
+}
+
 /** The PNG file for one picture, only if it belongs to this profile. */
 export function readImageFile(userId: string, id: string): Buffer | null {
   const row = db.prepare('SELECT user_id FROM PrismImage WHERE id = ?').get(id) as { user_id: string } | undefined;

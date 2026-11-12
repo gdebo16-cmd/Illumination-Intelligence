@@ -135,6 +135,23 @@ export function lengthChoices(): LengthChoice[] {
   });
 }
 
+/**
+ * Delete one video for good: its row, the MP4 and its starting picture. Only if it belongs to
+ * this profile. A video that's still being made can't be deleted (the job would finish and
+ * leave a file behind with no record of it); that gives 'working'.
+ */
+export function deleteVideo(userId: string, id: string): 'deleted' | 'working' | 'missing' {
+  const row = db.prepare('SELECT status FROM PrismVideo WHERE id = ? AND user_id = ?').get(id, userId) as
+    | { status: PrismVideo['status'] }
+    | undefined;
+  if (!row) return 'missing';
+  if (row.status === 'working') return 'working';
+  db.prepare('DELETE FROM PrismVideo WHERE id = ? AND user_id = ?').run(id, userId);
+  fs.rmSync(path.join(VIDEO_DIR, `${id}.mp4`), { force: true });
+  fs.rmSync(path.join(VIDEO_DIR, `${id}.png`), { force: true });
+  return 'deleted';
+}
+
 /** One video's file (the MP4, or its starting picture), only if it belongs to this profile. */
 export function videoFilePath(userId: string, id: string, kind: 'video' | 'poster'): string | null {
   const row = db.prepare('SELECT user_id FROM PrismVideo WHERE id = ?').get(id) as { user_id: string } | undefined;

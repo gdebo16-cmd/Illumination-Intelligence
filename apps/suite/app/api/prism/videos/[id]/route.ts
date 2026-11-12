@@ -7,7 +7,20 @@
 import fs from 'node:fs';
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
-import { videoFilePath } from '@/lib/prism/videos';
+import { deleteVideo, videoFilePath } from '@/lib/prism/videos';
+
+// DELETE /api/prism/videos/<id> — delete that video for good (the ✕ on its thumbnail).
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const userId = await getCurrentUserId();
+  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  const { id } = await params;
+  const outcome = deleteVideo(userId, id);
+  if (outcome === 'missing') return NextResponse.json({ error: 'Video not found.' }, { status: 404 });
+  if (outcome === 'working') {
+    return NextResponse.json({ error: 'This video is still being made. Delete it once it’s finished.' }, { status: 409 });
+  }
+  return NextResponse.json({ ok: true });
+}
 
 // A finished video never changes, so the browser can keep it.
 const CACHE = 'private, max-age=31536000, immutable';

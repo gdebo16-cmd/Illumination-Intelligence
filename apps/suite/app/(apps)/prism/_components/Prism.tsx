@@ -13,7 +13,7 @@
 //   POST /api/prism/videos     start a video (it's made in the background)
 //   GET  /api/prism/videos     your videos, and the length choices with their usual wait
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import { DEFAULT_PRISM_MODEL, PRISM_MODELS, findPrismModel } from '@/config/prism-models';
 import AppHeader from '@/components/AppHeader';
@@ -69,6 +69,17 @@ interface ImageJob {
 
 // ...plus when it started by this device's clock (worked out from `age`), for the timer.
 type TrackedJob = ImageJob & { startedAt: number };
+// "Is the window wide?" (a computer or a tablet on its side, not a phone). React keeps asking
+// the browser, so the answer stays right when the window is resized.
+const WIDE_SCREEN = '(min-width: 1024px)';
+const watchWide = (onChange: () => void) => {
+  const query = window.matchMedia(WIDE_SCREEN);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+};
+const isWideNow = () => window.matchMedia(WIDE_SCREEN).matches;
+const isWideOnServer = () => false; // the server can't see the window; the browser corrects it
+
 const track = (job: ImageJob): TrackedJob => ({ ...job, startedAt: Date.now() - job.age * 1000 });
 
 // A picture model in the dropdown. `ready` is false until its files are in ComfyUI;
@@ -160,10 +171,10 @@ const Prism = () => {
 
   // The side panel (settings and your pictures). It starts open on a wide screen and closed on
   // a phone, where it slides over the page.
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  useEffect(() => {
-    if (window.innerWidth >= 1024) setSidebarOpen(true);
-  }, []);
+  // Until you open or close it yourself (sidebarChoice), it simply follows the screen width.
+  const isWide = useSyncExternalStore(watchWide, isWideNow, isWideOnServer);
+  const [sidebarChoice, setSidebarOpen] = useState<boolean | null>(null);
+  const sidebarOpen = sidebarChoice ?? isWide;
   /** Show a picture or video big. On a phone that also closes the panel, which would cover it. */
   const show = (next: Shown) => {
     setShown(next);
@@ -193,6 +204,67 @@ const Prism = () => {
   const shownVideo = shown?.kind === 'video' ? videos.find((v) => v.id === shown.id) : undefined;
   const anyWorking = videos.some((v) => v.status === 'working');
 
+  // ---- Fetching from the server. These are wrapped in useCallback so each one stays the very
+  // same function for the life of the page; the effects below can then list them as things
+  // they use without re-running every time the page redraws.
+
+  // Your pictures again; with `show`, show that one big once the list has it.
+  const loadImages = useCallback((show?: string) => {
+    fetch('/api/prism/images', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((list: PrismImage[] | null) => {
+        if (!list) return;
+        setImages(list);
+        if (show && list.some((i) => i.id === show)) setShown({ kind: 'image', id: show });
+        else setShown((current) => current ?? (list[0] ? { kind: 'image', id: list[0].id } : null));
+      })
+      .catch(() => {});
+  }, []);
+
+  const setTracked = useCallback((list: TrackedJob[]) => {
+    jobsRef.current = list;
+    setJobs(list);
+  }, []);
+
+  // Check on the pictures being made. A finished one shows up big; a failed one says why.
+  // Any picture still being made that this page didn't know about (it was reloaded, or the
+  // picture was started on another device) is picked up too. Returns the server's list.
+  const loadJobs = useCallback(async (): Promise<ImageJob[] | null> => {
+    let list: ImageJob[];
+    try {
+      const res = await fetch('/api/prism/jobs', { cache: 'no-store' });
+      if (!res.ok) return null;
+      list = await res.json();
+    } catch {
+      return null; // offline for a moment (or still waking up); the next check will catch up
+    }
+    const known = jobsRef.current;
+    const next: TrackedJob[] = [];
+    for (const job of known) {
+      const latest = list.find((j) => j.id === job.id);
+      if (!latest) continue; // too old to be listed any more
+      if (latest.status === 'working') next.push({ ...job, ...latest, startedAt: job.startedAt });
+      else if (latest.status === 'done' && latest.imageId) loadImages(latest.imageId);
+      else if (latest.status === 'failed') setError(latest.error || 'This picture didn’t work.');
+    }
+    for (const job of list) {
+      if (job.status === 'working' && !known.some((k) => k.id === job.id)) next.push(track(job));
+    }
+    setTracked(next);
+    return list;
+  }, [loadImages, setTracked]);
+
+  const loadVideos = useCallback(() => {
+    fetch('/api/prism/videos')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { videos: PrismVideo[]; lengths: LengthChoice[] } | null) => {
+        if (!data) return;
+        setVideos(data.videos);
+        setLengths(data.lengths);
+      })
+      .catch(() => {});
+  }, []);
+
   // Load your recent pictures and videos when the page opens.
   // (Plus any picture still being made, say from before the app was closed.)
   useEffect(() => {
@@ -217,64 +289,7 @@ const Prism = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Your pictures again; with `show`, show that one big once the list has it.
-  function loadImages(show?: string) {
-    fetch('/api/prism/images', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((list: PrismImage[] | null) => {
-        if (!list) return;
-        setImages(list);
-        if (show && list.some((i) => i.id === show)) setShown({ kind: 'image', id: show });
-        else setShown((current) => current ?? (list[0] ? { kind: 'image', id: list[0].id } : null));
-      })
-      .catch(() => {});
-  }
-
-  function setTracked(list: TrackedJob[]) {
-    jobsRef.current = list;
-    setJobs(list);
-  }
-
-  // Check on the pictures being made. A finished one shows up big; a failed one says why.
-  // Any picture still being made that this page didn't know about (it was reloaded, or the
-  // picture was started on another device) is picked up too. Returns the server's list.
-  async function loadJobs(): Promise<ImageJob[] | null> {
-    let list: ImageJob[];
-    try {
-      const res = await fetch('/api/prism/jobs', { cache: 'no-store' });
-      if (!res.ok) return null;
-      list = await res.json();
-    } catch {
-      return null; // offline for a moment (or still waking up); the next check will catch up
-    }
-    const known = jobsRef.current;
-    const next: TrackedJob[] = [];
-    for (const job of known) {
-      const latest = list.find((j) => j.id === job.id);
-      if (!latest) continue; // too old to be listed any more
-      if (latest.status === 'working') next.push({ ...job, ...latest, startedAt: job.startedAt });
-      else if (latest.status === 'done' && latest.imageId) loadImages(latest.imageId);
-      else if (latest.status === 'failed') setError(latest.error || 'This picture didn’t work.');
-    }
-    for (const job of list) {
-      if (job.status === 'working' && !known.some((k) => k.id === job.id)) next.push(track(job));
-    }
-    setTracked(next);
-    return list;
-  }
-
-  function loadVideos() {
-    fetch('/api/prism/videos')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { videos: PrismVideo[]; lengths: LengthChoice[] } | null) => {
-        if (!data) return;
-        setVideos(data.videos);
-        setLengths(data.lengths);
-      })
-      .catch(() => {});
-  }
+  }, [loadJobs, loadVideos]);
 
   // While a video is being made, check on it every few seconds, and tick the clock every second.
   useEffect(() => {
@@ -285,7 +300,7 @@ const Prism = () => {
       clearInterval(check);
       clearInterval(tick);
     };
-  }, [anyWorking]);
+  }, [anyWorking, loadVideos]);
 
   // While a picture is being made, check on it every couple of seconds.
   const making = pictureJob !== undefined;
@@ -293,7 +308,7 @@ const Prism = () => {
     if (!making) return;
     const check = setInterval(() => void loadJobs(), 1500);
     return () => clearInterval(check);
-  }, [making]);
+  }, [making, loadJobs]);
 
   // Coming back to the app (or the tab): catch up on everything that happened while it was
   // away. iPhones pause a Home Screen app in the background, so nothing was checked meanwhile.
@@ -315,7 +330,7 @@ const Prism = () => {
       window.removeEventListener('pageshow', catchUp);
       window.removeEventListener('focus', catchUp);
     };
-  }, []);
+  }, [loadJobs, loadImages, loadVideos]);
 
   // While generating a picture, count the seconds so you can see it's working. The count starts
   // when the server started the picture, so it carries on correctly after the app was away.
@@ -510,6 +525,28 @@ const Prism = () => {
         ? 'Edit picture'
         : 'Generate';
 
+  /** Delete one of your pictures or videos for good (the ✕ on its thumbnail), after asking. */
+  const remove = async (kind: Shown['kind'], id: string) => {
+    if (!window.confirm(`Delete this ${kind === 'video' ? 'video' : 'picture'}? This can't be undone.`)) return;
+    try {
+      const res = await fetch(`/api/prism/${kind === 'video' ? 'videos' : 'images'}/${id}`, { method: 'DELETE' });
+      // 404 means it is already gone, so drop it from the list either way.
+      if (!res.ok && res.status !== 404) {
+        setError((await res.json().catch(() => null))?.error ?? 'Could not delete it. Please try again.');
+        return;
+      }
+      const left = recent.filter((item) => !(item.kind === kind && item.id === id));
+      if (kind === 'video') setVideos((list) => list.filter((v) => v.id !== id));
+      else setImages((list) => list.filter((i) => i.id !== id));
+      // If it was the one shown big, show the newest of what's left.
+      if (shown?.kind === kind && shown.id === id) setShown(left[0] ? { kind: left[0].kind, id: left[0].id } : null);
+      // If it was the picture you were about to edit or animate, take it off the prompt box.
+      if (kind === 'image' && source?.kind === 'image' && source.image.id === id) setSource(null);
+    } catch {
+      setError('Could not delete it. Please check the connection and try again.');
+    }
+  };
+
   return (
     <div className={`site-container ${sidebarOpen ? 'sidebar-open' : ''}`}>
       {/* ------------------------------------------------------------ the side panel */}
@@ -598,8 +635,8 @@ const Prism = () => {
               );
             })}
             {recent.map((item) => (
+              <div className="prism-thumb-wrap" key={`${item.kind}-${item.id}`}>
               <button
-                key={`${item.kind}-${item.id}`}
                 type="button"
                 className={`prism-thumb ${item.kind === 'video' ? `is-video is-${item.video.status}` : ''}`}
                 aria-current={shown?.kind === item.kind && shown.id === item.id}
@@ -614,6 +651,19 @@ const Prism = () => {
                   </span>
                 )}
               </button>
+              {/* Delete it for good. Not offered while a video is still being made. */}
+              {!(item.kind === 'video' && item.video.status === 'working') && (
+                <button
+                  type="button"
+                  className="prism-thumb-delete"
+                  aria-label={item.kind === 'video' ? 'Delete this video' : 'Delete this picture'}
+                  title="Delete"
+                  onClick={() => void remove(item.kind, item.id)}
+                >
+                  ✕
+                </button>
+              )}
+              </div>
             ))}
           </nav>
         )}
@@ -622,7 +672,7 @@ const Prism = () => {
       <div className="content-area">
         <AppHeader
           appId="prism"
-          left={<SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen((open) => !open)} label="settings and pictures" />}
+          left={<SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} label="settings and pictures" />}
         />
     <main className="prism">
       <QueueNotice active={busy} />
