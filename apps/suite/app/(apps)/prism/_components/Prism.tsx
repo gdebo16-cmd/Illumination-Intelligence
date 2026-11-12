@@ -1,6 +1,7 @@
 'use client';
 
-// Prism's page: describe a picture, pick a model, style and shape, press Generate.
+// Prism's page: describe a picture and press Generate. The side panel (☰) holds the model,
+// art style and shape pickers, and the pictures and videos you've made.
 // Or start from a picture (upload one, or "Edit this" on one of yours) and either say what to
 // change, or bring it to life as a short video ("Make video").
 // It talks to these API routes:
@@ -15,7 +16,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import { DEFAULT_PRISM_MODEL, PRISM_MODELS, findPrismModel } from '@/config/prism-models';
+import AppHeader from '@/components/AppHeader';
 import QueueNotice from '@/components/QueueNotice';
+import Sidebar from '@/components/Sidebar';
+import SidebarToggle from '@/components/SidebarToggle';
 
 // The shapes you can pick. Sizes are in steps of 16 pixels, as the model needs.
 const SHAPES = [
@@ -153,6 +157,18 @@ const Prism = () => {
   const animating = source !== null && make === 'video';
   const fileInput = useRef<HTMLInputElement>(null);
   const promptBox = useRef<HTMLTextAreaElement>(null);
+
+  // The side panel (settings and your pictures). It starts open on a wide screen and closed on
+  // a phone, where it slides over the page.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  useEffect(() => {
+    if (window.innerWidth >= 1024) setSidebarOpen(true);
+  }, []);
+  /** Show a picture or video big. On a phone that also closes the panel, which would cover it. */
+  const show = (next: Shown) => {
+    setShown(next);
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  };
 
   // What's happening
   // `sending`: a request is on its way to the server. `jobs`: pictures the server is making.
@@ -495,6 +511,119 @@ const Prism = () => {
         : 'Generate';
 
   return (
+    <div className={`site-container ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* ------------------------------------------------------------ the side panel */}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} title="Studio" className="prism-sidebar">
+        {animating ? (
+          <p className="prism-note">Videos use their own model, so there is nothing to pick here while you make one.</p>
+        ) : (
+          <>
+            <label className="sidebar-separator" htmlFor="prism-model">Model</label>
+            <select id="prism-model" className="prism-select" value={model} onChange={(e) => setModel(e.target.value)}>
+              {models.map((m) => (
+                <option key={m.id} value={m.id} disabled={!m.ready}>
+                  {m.ready ? m.name : `${m.name} (not downloaded yet)`}
+                </option>
+              ))}
+            </select>
+            <p className="prism-note">{pickedModel?.note}</p>
+
+            {/* Only for a model with a prompt expander (FLUX.3) */}
+            {pickedModel?.expands && (
+              <label className="prism-check">
+                <input type="checkbox" checked={expand} onChange={(e) => setExpand(e.target.checked)} />
+                <span>
+                  Expand my prompt
+                  <span>
+                    {editing
+                      ? 'A helper looks at your picture and writes out the change in detail. This model works best that way.'
+                      : 'A helper rewrites your prompt into a long, detailed one. This model paints best from those.'}
+                  </span>
+                </span>
+              </label>
+            )}
+
+            <label className="sidebar-separator" htmlFor="prism-style">Art style</label>
+            <select id="prism-style" className="prism-select" value={style} onChange={(e) => setStyle(e.target.value)}>
+              {PRISM_STYLES.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+
+            <span className="sidebar-separator" id="prism-shape-label">Shape</span>
+            {editing ? (
+              <p className="prism-note">The result keeps your picture’s shape.</p>
+            ) : (
+              <div className="prism-shapes" role="radiogroup" aria-labelledby="prism-shape-label">
+                {SHAPES.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={shape === s.id}
+                    className="prism-shape"
+                    onClick={() => setShape(s.id)}
+                  >
+                    {/* A little outline in the shape's proportions */}
+                    <span className="prism-shape-icon" style={{ aspectRatio: `${s.width} / ${s.height}` }} />
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Everything you've made, newest first. Tap one to see it big. */}
+        <span className="sidebar-separator">Your pictures</span>
+        {recent.length === 0 && jobs.length === 0 ? (
+          <p className="prism-note">Nothing yet. Your pictures and videos will collect here.</p>
+        ) : (
+          <nav className="prism-gallery" aria-label="Your pictures and videos">
+            {/* Pictures being made: the picture they start from (if any), dimmed, with "…" */}
+            {jobs.map((job) => {
+              const from = job.sourceId ? images.find((i) => i.id === job.sourceId) : undefined;
+              return (
+                <button
+                  key={`job-${job.id}`}
+                  type="button"
+                  className="prism-thumb is-working"
+                  title={`Being made: ${job.prompt}`}
+                  onClick={() => from && show({ kind: 'image', id: from.id })}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- one of our own pictures */}
+                  {from && <img src={from.url} alt="" />}
+                  <span className="prism-thumb-badge" aria-hidden="true">…</span>
+                </button>
+              );
+            })}
+            {recent.map((item) => (
+              <button
+                key={`${item.kind}-${item.id}`}
+                type="button"
+                className={`prism-thumb ${item.kind === 'video' ? `is-video is-${item.video.status}` : ''}`}
+                aria-current={shown?.kind === item.kind && shown.id === item.id}
+                title={item.kind === 'video' ? `Video: ${item.video.prompt}` : item.image.prompt}
+                onClick={() => show({ kind: item.kind, id: item.id })}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- small thumbnails of our own pictures */}
+                <img src={item.kind === 'video' ? item.video.poster : item.image.url} alt={item.kind === 'video' ? item.video.prompt : item.image.prompt} loading="lazy" />
+                {item.kind === 'video' && (
+                  <span className="prism-thumb-badge" aria-hidden="true">
+                    {item.video.status === 'working' ? '…' : item.video.status === 'failed' ? '!' : '▶'}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        )}
+      </Sidebar>
+
+      <div className="content-area">
+        <AppHeader
+          appId="prism"
+          left={<SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen((open) => !open)} label="settings and pictures" />}
+        />
     <main className="prism">
       <QueueNotice active={busy} />
       <div className="prism-workspace">
@@ -506,50 +635,6 @@ const Prism = () => {
             void generate();
           }}
         >
-          {/* Optional: a picture to start from */}
-          <span className="prism-label" id="prism-source-label">
-            Start from a picture <span className="prism-optional">(optional)</span>
-          </span>
-          <div
-            className={`prism-source ${source ? 'has-picture' : ''}`}
-            role="group"
-            aria-labelledby="prism-source-label"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              pickFile(e.dataTransfer.files[0]);
-            }}
-          >
-            {source ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element -- a local preview or one of our own pictures */}
-                <img src={source.kind === 'upload' ? source.preview : source.image.url} alt="The starting picture" />
-                <span className="prism-source-text">
-                  {source.kind === 'upload' ? source.file.name : 'One of your pictures'}
-                  <span>{animating ? 'Prism will bring it to life.' : 'Prism will change it the way you describe.'}</span>
-                </span>
-                <button type="button" className="prism-source-remove" onClick={() => setSource(null)} aria-label="Remove the picture">
-                  ✕
-                </button>
-              </>
-            ) : (
-              <button type="button" className="prism-source-add" onClick={() => fileInput.current?.click()}>
-                + Add a picture to edit or animate
-                <span>or drop one here</span>
-              </button>
-            )}
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => {
-                pickFile(e.target.files?.[0]);
-                e.target.value = ''; // so picking the same file again still counts
-              }}
-            />
-          </div>
-
           {/* With a picture: change it, or make a video from it */}
           {source && (
             <div className="prism-modes" role="radiogroup" aria-label="What to make">
@@ -562,34 +647,7 @@ const Prism = () => {
             </div>
           )}
 
-          <label className="prism-label" htmlFor="prism-prompt">
-            {animating ? 'What should move?' : editing ? 'What should change?' : 'Describe your picture'}
-          </label>
-          <textarea
-            ref={promptBox}
-            id="prism-prompt"
-            className="prism-prompt"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              // Ctrl+Enter (or Cmd+Enter on a Mac) generates without reaching for the mouse.
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                void generate();
-              }
-            }}
-            placeholder={
-              animating
-                ? 'the waves roll in, the lighthouse beam sweeps across the sea, the camera stays still'
-                : editing
-                  ? 'make it nighttime, with a full moon'
-                  : 'a lighthouse on a sea cliff at night, stars, glowing beam'
-            }
-            rows={4}
-            maxLength={2000}
-          />
-
-          {animating ? (
+          {animating && (
             <>
               <span className="prism-label" id="prism-length-label">Video length</span>
               <div className="prism-lengths" role="radiogroup" aria-labelledby="prism-length-label">
@@ -612,69 +670,92 @@ const Prism = () => {
                 The time is how long making it takes. You can leave the page; your video will be waiting here.
               </p>
             </>
-          ) : (
-            <>
-              <label className="prism-label" htmlFor="prism-model">Model</label>
-              <select id="prism-model" className="prism-select" value={model} onChange={(e) => setModel(e.target.value)}>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id} disabled={!m.ready}>
-                    {m.ready ? m.name : `${m.name} (not downloaded yet)`}
-                  </option>
-                ))}
-              </select>
-              <p className="prism-note">{pickedModel?.note}</p>
-
-              {/* Only for a model with a prompt expander (FLUX.3) */}
-              {pickedModel?.expands && (
-                <label className="prism-check">
-                  <input type="checkbox" checked={expand} onChange={(e) => setExpand(e.target.checked)} />
-                  <span>
-                    Expand my prompt
-                    <span>
-                      {editing
-                        ? 'A helper looks at your picture and writes out the change in detail. This model works best that way.'
-                        : 'A helper rewrites your prompt into a long, detailed one. This model paints best from those.'}
-                    </span>
-                  </span>
-                </label>
-              )}
-
-              <label className="prism-label" htmlFor="prism-style">Art style</label>
-              <select id="prism-style" className="prism-select" value={style} onChange={(e) => setStyle(e.target.value)}>
-                {PRISM_STYLES.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-
-              {editing ? (
-                <p className="prism-note">The result keeps your picture’s shape.</p>
-              ) : (
-                <>
-                  <span className="prism-label" id="prism-shape-label">Shape</span>
-                  <div className="prism-shapes" role="radiogroup" aria-labelledby="prism-shape-label">
-                    {SHAPES.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={shape === s.id}
-                        className="prism-shape"
-                        onClick={() => setShape(s.id)}
-                      >
-                        {/* A little outline in the shape's proportions */}
-                        <span className="prism-shape-icon" style={{ aspectRatio: `${s.width} / ${s.height}` }} />
-                        {s.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
           )}
 
-          <button type="submit" className="prism-generate" disabled={busy || !prompt.trim()}>
-            {buttonText}
-          </button>
+          {/* The prompt box. Everything for one request lives inside it: the picture you start
+              from (optional), what you type, the "+ Picture" button and the round Generate
+              button (like the message box in Lumen). You can also drop a picture onto it. */}
+          <div
+            className={`prism-prompt-box ${source ? 'has-picture' : ''}`}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              pickFile(e.dataTransfer.files[0]);
+            }}
+          >
+            {source && (
+              <div className="prism-attached">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a local preview or one of our own pictures */}
+                <img src={source.kind === 'upload' ? source.preview : source.image.url} alt="The starting picture" />
+                <span className="prism-attached-text">
+                  {source.kind === 'upload' ? source.file.name : 'One of your pictures'}
+                  <span>{animating ? 'Prism will bring it to life.' : 'Prism will change it the way you describe.'}</span>
+                </span>
+                <button type="button" className="prism-attached-remove" onClick={() => setSource(null)} aria-label="Remove the picture">
+                  ✕
+                </button>
+              </div>
+            )}
+            <textarea
+              ref={promptBox}
+              id="prism-prompt"
+              className="prism-prompt"
+              aria-label={animating ? 'What should move?' : editing ? 'What should change?' : 'Describe your picture'}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                // Ctrl+Enter (or Cmd+Enter on a Mac) generates without reaching for the mouse.
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  void generate();
+                }
+              }}
+              placeholder={
+                animating
+                  ? 'What should move? e.g. the waves roll in, the lighthouse beam sweeps across the sea'
+                  : editing
+                    ? 'What should change? e.g. make it nighttime, with a full moon'
+                    : 'Describe your picture, e.g. a lighthouse on a sea cliff at night, stars, glowing beam'
+              }
+              rows={4}
+              maxLength={2000}
+            />
+            <button
+              type="button"
+              className="prism-attach"
+              onClick={() => fileInput.current?.click()}
+              title="Add a picture to edit or animate (or drop one here)"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <circle cx="9" cy="10" r="1.6" />
+                <path d="M21 16l-5-5-8 8" />
+              </svg>
+              {source ? 'Change picture' : 'Add a picture'}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                pickFile(e.target.files?.[0]);
+                e.target.value = ''; // so picking the same file again still counts
+              }}
+            />
+            <button type="submit" className="prism-generate" disabled={busy || !prompt.trim()} aria-label={buttonText} title={buttonText}>
+              {busy ? (
+                <span className="prism-spinner" aria-hidden="true" />
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {/* While it works: what it's doing and for how long (the button only shows a spinner) */}
+          {busy && <p className="prism-status" role="status">{buttonText}</p>}
+
           {error && <p className="prism-error" role="alert">{error}</p>}
         </form>
 
@@ -759,47 +840,9 @@ const Prism = () => {
         </section>
       </div>
 
-      {/* ---------------------------------------------------------- recent pictures and videos */}
-      {(recent.length > 0 || jobs.length > 0) && (
-        <nav className="prism-recent" aria-label="Recent pictures and videos">
-          {/* Pictures being made: the picture they start from (if any), dimmed, with "…" */}
-          {jobs.map((job) => {
-            const from = job.sourceId ? images.find((i) => i.id === job.sourceId) : undefined;
-            return (
-              <button
-                key={`job-${job.id}`}
-                type="button"
-                className="prism-thumb is-working"
-                title={`Being made: ${job.prompt}`}
-                onClick={() => from && setShown({ kind: 'image', id: from.id })}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- one of our own pictures */}
-                {from && <img src={from.url} alt="" />}
-                <span className="prism-thumb-badge" aria-hidden="true">…</span>
-              </button>
-            );
-          })}
-          {recent.map((item) => (
-            <button
-              key={`${item.kind}-${item.id}`}
-              type="button"
-              className={`prism-thumb ${item.kind === 'video' ? `is-video is-${item.video.status}` : ''}`}
-              aria-current={shown?.kind === item.kind && shown.id === item.id}
-              title={item.kind === 'video' ? `Video: ${item.video.prompt}` : item.image.prompt}
-              onClick={() => setShown({ kind: item.kind, id: item.id })}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- small thumbnails of our own pictures */}
-              <img src={item.kind === 'video' ? item.video.poster : item.image.url} alt={item.kind === 'video' ? item.video.prompt : item.image.prompt} loading="lazy" />
-              {item.kind === 'video' && (
-                <span className="prism-thumb-badge" aria-hidden="true">
-                  {item.video.status === 'working' ? '…' : item.video.status === 'failed' ? '!' : '▶'}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-      )}
     </main>
+      </div>
+    </div>
   );
 };
 
