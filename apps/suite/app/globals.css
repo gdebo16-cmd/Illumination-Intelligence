@@ -2731,9 +2731,17 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 
 /* #region astra */
 .astra {
-  padding: var(--header-h) 1.25rem 2rem;
+  /* Bottom: clear the floating app picker (about 64px tall from the bottom edge) with a little gap,
+     so the last row can be scrolled up above it and clicked. */
+  padding: var(--header-h) 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
   color: var(--text-color);
+  /* The window itself never scrolls (every app's <main> is overflow: hidden), so Astra scrolls here. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* still scrolls; the bar just isn't drawn */
 }
+.astra::-webkit-scrollbar { display: none; }
 .astra h1 {
   margin: 0 0 1rem;
 }
@@ -2812,6 +2820,16 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 .astra-action.is-disabled { opacity: 0.4; cursor: default; }
 .astra-action.is-disabled:hover { background: transparent; }
 
+/* The pen thickness slider, with a sample line that shows the thickness. */
+.astra-pen { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; font-size: 0.9rem; }
+.astra-pen input { width: 8rem; accent-color: #5ad1c4; }
+.astra-pen svg { width: 4rem; height: 1.25rem; }
+
+/* The character grid, in sections: Capitals, Lowercase, Numbers, Punctuation. */
+.astra-group { margin-bottom: 1.25rem; }
+.astra-group h2 { display: flex; align-items: baseline; gap: 0.6rem; margin: 0 0 0.5rem; font-size: 1rem; }
+.astra-group h2 span { font-size: 0.8rem; font-weight: 400; opacity: 0.65; }
+
 /* Uploading a whole alphabet sheet (uses the pad's window, made wider). */
 .astra-pad.astra-sheet { width: min(56rem, 100%); }
 .astra-sheet-tips { margin: 0 0 1rem; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.5; opacity: 0.85; }
@@ -2873,6 +2891,45 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 }
 .astra-sheet-tile.is-skipped svg { opacity: 0.3; }
 .astra-sheet-tile.is-doubled { border-color: #e0484f; }
+.astra-sheet-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: -0.5rem 0 1rem; }
+.astra-sheet-presets button {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+.astra-sheet-presets button:hover { border-color: #5ad1c4; }
+
+/* Making characters with AI */
+.astra-ai-groups { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin: 0 0 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.9rem; }
+.astra-ai-groups legend { padding: 0 0.3rem; }
+.astra-ai-groups label { display: flex; align-items: center; gap: 0.35rem; }
+.astra-ai-groups input { accent-color: #5ad1c4; }
+.astra-sheet-grid.astra-ai-grid { grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); }
+.astra-sheet-tile { min-width: 0; }
+.astra-ai-status { font-size: 0.8rem; text-align: center; }
+.astra-ai-error { font-size: 0.7rem; color: #e0484f; }
+.astra-ai-tile.is-drawing svg { animation: astra-pulse 1.2s ease-in-out infinite; }
+.astra-ai-tile.is-waiting svg { opacity: 0.3; }
+.astra-ai-tile-buttons { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-size: 0.8rem; }
+.astra-ai-tile-buttons label { display: flex; align-items: center; gap: 0.25rem; }
+.astra-ai-tile-buttons input { accent-color: #5ad1c4; }
+.astra-ai-tile-buttons button {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.35rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.astra-ai-tile-buttons button:disabled { opacity: 0.4; cursor: default; }
+@keyframes astra-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .astra-ai-tile.is-drawing svg { animation: none; } }
 
 /* "Try it out": type a sentence and see it in your font. */
 .astra-preview { margin-top: 2rem; }
@@ -2890,7 +2947,10 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
   resize: vertical;
 }
 .astra-preview textarea:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 1px; }
-.astra-preview-size { display: flex; align-items: center; gap: 0.6rem; margin: 0.75rem 0; font-size: 0.9rem; }
+.astra-preview-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin: 0.75rem 0; }
+.astra-preview-size { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.astra-preview-kerning { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+.astra-preview-kerning input { accent-color: #5ad1c4; }
 .astra-preview-size input { width: 12rem; max-width: 50vw; accent-color: #5ad1c4; }
 .astra-preview-output { overflow-x: auto; padding: 0.5rem 0; }
 .astra-preview-output svg { display: block; max-width: none; }
@@ -2941,6 +3001,9 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 }
 .astra-pad-ghost { fill: currentColor; opacity: 0.08; pointer-events: none; font-family: system-ui, sans-serif; }
 .astra-pad-guide { stroke: #5ad1c4; stroke-width: 3; stroke-dasharray: 16 12; opacity: 0.5; pointer-events: none; }
+.astra-pad-guide.is-faint { opacity: 0.22; stroke-dasharray: 6 12; }
+.astra-pad h2 .astra-pad-char { color: #5ad1c4; }
+.astra-pad h2 .astra-pad-name { display: block; margin-top: 0.15rem; font-size: 0.8rem; font-weight: 400; opacity: 0.65; }
 .astra-pad-canvas.is-tracing { opacity: 0.5; cursor: progress; }
 .astra-pad-problem { margin: 0.75rem 0 0; color: #e0484f; font-size: 0.9rem; }
 .astra-pad-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }

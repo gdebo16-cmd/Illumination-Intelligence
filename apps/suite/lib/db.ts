@@ -285,5 +285,7 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_astra_font_user ON AstraFont (user_id, updatedAt);
 `);
+// How thick a font's pen strokes are (config/astra.ts DEFAULT_PEN_WIDTH for fonts made before this).
+addColumn('AstraFont', 'pen_width', 'INTEGER NOT NULL DEFAULT 60');
 
 export default db;

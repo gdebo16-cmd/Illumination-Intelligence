@@ -1,15 +1,18 @@
-// lib/astra/fonts.ts — Astra's fonts: list, create, rename, delete, and save drawn letters.
+// lib/astra/fonts.ts — Astra's fonts: list, create, change (name, pen), delete, and save characters.
 // Each font belongs to one profile (user_id), so everyone only sees their own.
 
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
 import {
+  DEFAULT_PEN_WIDTH,
   GLYPH_SIZE,
+  MAX_PEN_WIDTH,
   MAX_POINTS,
   MAX_SHAPE_POINTS,
   MAX_SHAPES,
   MAX_STROKES,
+  MIN_PEN_WIDTH,
   isEmptyGlyph,
   type Glyph,
   type Glyphs,
@@ -19,13 +22,15 @@ import {
 export interface Font {
   id: string;
   name: string;
-  /** The drawn letters. Letters not drawn yet are left out. */
+  /** The characters made so far, keyed by the character itself ("A", "a", "7", "?"). */
   glyphs: Glyphs;
+  /** How thick this font's pen strokes are, on the 1000 grid. */
+  penWidth: number;
   createdAt: string;
   updatedAt: string;
 }
 
-const COLUMNS = 'id, name, glyphs, createdAt, updatedAt';
+const COLUMNS = 'id, name, glyphs, pen_width AS penWidth, createdAt, updatedAt';
 const NAME_LIMIT = 60;
 
 // The database keeps the letters as JSON text; turn that back into an object.
@@ -96,30 +101,39 @@ export function getFont(userId: string, id: string): Font | null {
   return row ? fromRow(row) : null;
 }
 
+/** Tidy a pen thickness the page sent: a whole number within the allowed range. Null if it isn't a number. */
+export function cleanPenWidth(input: unknown): number | null {
+  if (typeof input !== 'number' || !Number.isFinite(input)) return null;
+  return Math.round(Math.min(MAX_PEN_WIDTH, Math.max(MIN_PEN_WIDTH, input)));
+}
+
 /** Make a new, empty font. */
 export function createFont(userId: string, name: string): Font {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  db.prepare('INSERT INTO AstraFont (id, user_id, name, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)')
-    .run(id, userId, name, now, now);
-  return { id, name, glyphs: {}, createdAt: now, updatedAt: now };
+  db.prepare('INSERT INTO AstraFont (id, user_id, name, pen_width, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, userId, name, DEFAULT_PEN_WIDTH, now, now);
+  return { id, name, glyphs: {}, penWidth: DEFAULT_PEN_WIDTH, createdAt: now, updatedAt: now };
 }
 
-/** Give a font a new name. Returns the updated font, or null if it wasn't found. */
-export function renameFont(userId: string, id: string, name: string): Font | null {
-  const result = db
-    .prepare('UPDATE AstraFont SET name = ?, updatedAt = ? WHERE user_id = ? AND id = ?')
-    .run(name, new Date().toISOString(), userId, id);
-  return result.changes > 0 ? getFont(userId, id) : null;
+/** Change a font's name and/or pen thickness. Returns the updated font, or null if it wasn't found. */
+export function updateFont(userId: string, id: string, changes: { name?: string; penWidth?: number }): Font | null {
+  const font = getFont(userId, id);
+  if (!font) return null;
+  const name = changes.name ?? font.name;
+  const penWidth = changes.penWidth ?? font.penWidth;
+  db.prepare('UPDATE AstraFont SET name = ?, pen_width = ?, updatedAt = ? WHERE user_id = ? AND id = ?')
+    .run(name, penWidth, new Date().toISOString(), userId, id);
+  return getFont(userId, id);
 }
 
-/** Save one letter (nothing drawn or traced = erase it). Returns the updated font, or null if it wasn't found. */
-export function saveGlyph(userId: string, id: string, letter: string, glyph: Glyph): Font | null {
+/** Save one character (nothing drawn or traced = erase it). Returns the updated font, or null if it wasn't found. */
+export function saveGlyph(userId: string, id: string, char: string, glyph: Glyph): Font | null {
   const font = getFont(userId, id);
   if (!font) return null;
   const glyphs = { ...font.glyphs };
-  if (isEmptyGlyph(glyph)) delete glyphs[letter];
-  else glyphs[letter] = glyph;
+  if (isEmptyGlyph(glyph)) delete glyphs[char];
+  else glyphs[char] = glyph;
   db.prepare('UPDATE AstraFont SET glyphs = ?, updatedAt = ? WHERE user_id = ? AND id = ?')
     .run(JSON.stringify(glyphs), new Date().toISOString(), userId, id);
   return { ...font, glyphs };

@@ -1,14 +1,16 @@
 // lib/astra/font-file.ts — turn an Astra font into a real TrueType font file (.ttf) you can install.
 //
 // A .ttf file is a set of tables, each answering one question a computer asks about the font:
-//   glyf + loca  the letter outlines, and where each one starts in the file
-//   cmap         which letter shape to use for each key you type (A and a both use your A)
-//   hmtx         how wide each letter is
+//   glyf + loca  the character outlines, and where each one starts in the file
+//   cmap         which shape to use for each key you type (a lowercase letter not made yet uses its capital)
+//   hmtx         how wide each character is
+//   kern         pairs that sit closer together, like "AV" (config/astra-geometry.ts works them out)
 //   head, hhea, maxp, OS/2, post, name   sizes, line spacing, limits, and the font's name
 //
-// Font files can only hold filled outlines. Traced pictures already are outlines; pen strokes are
-// lines, so each one is turned into overlapping pieces: a bar along every segment of the stroke and
-// a round dot at every point (which gives the rounded ends and joints the pad draws).
+// Font files can only hold filled outlines. Traced pictures already are outlines (saved with the same
+// smooth curves the page draws). Pen strokes are lines, so each one is turned into overlapping pieces:
+// a bar along every segment of the stroke and a round dot at every point (which gives the rounded
+// ends and joints the pad draws).
 //
 // Coordinates: the pad's grid has y going DOWN with the baseline at 800. Fonts have y going UP with
 // the baseline at 0, so a grid point (x, y) becomes (x, 800 - y). Outlines go clockwise around ink
@@ -18,44 +20,51 @@ import 'server-only';
 import {
   BASELINE,
   CAP_LINE,
+  CHARACTERS,
   GLYPH_SIZE,
-  LETTERS,
-  PEN_WIDTH,
   SIDE_SPACE,
   SPACE_WIDTH,
+  X_LINE,
+  fallbackFor,
   type Glyph,
   type Glyphs,
   type Point,
 } from '@/config/astra';
+import { curveFlags, kernBetween, profilesOf } from '@/config/astra-geometry';
 
 const UNITS_PER_EM = GLYPH_SIZE;
 const ASCENDER = BASELINE; // the top of the grid
 const DESCENDER = BASELINE - GLYPH_SIZE; // the bottom of the grid (negative: below the baseline)
 const CAP_HEIGHT = BASELINE - CAP_LINE;
+const X_HEIGHT = BASELINE - X_LINE;
 const DOT_SIDES = 16; // how many straight sides make up a round dot
 const STROKE_TOLERANCE = 2; // simplify pen strokes this much (grid units) before outlining them
+const MAX_KERN_PAIRS = 10000; // the kern table can't hold many more than this
 
-type Contour = Point[];
+/** One closed outline: its points, and for each one whether the outline goes through it (true)
+ *  or curves past it (false: a TrueType "off-curve" point). */
+type Contour = { points: Point[]; on: boolean[] };
 type OutlineGlyph = { contours: Contour[]; advance: number };
 
-// ── Turning letters into outlines ───────────────────────────────────────────────────────────────
+// ── Turning characters into outlines ────────────────────────────────────────────────────────────
 
 /** Signed area: positive = counter-clockwise (with y going up). */
-function area(contour: Contour): number {
+function area(points: Point[]): number {
   let twice = 0;
-  for (let i = 0; i < contour.length; i++) {
-    const [x1, y1] = contour[i];
-    const [x2, y2] = contour[(i + 1) % contour.length];
+  for (let i = 0; i < points.length; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % points.length];
     twice += x1 * y2 - x2 * y1;
   }
   return twice / 2;
 }
 
-const clockwise = (contour: Contour) => (area(contour) > 0 ? [...contour].reverse() : contour);
+const clockwise = (points: Point[]) => (area(points) > 0 ? [...points].reverse() : points);
+const straight = (points: Point[]): Contour => ({ points, on: points.map(() => true) });
 
 /** Round to whole units and drop repeated points (including a last point equal to the first). */
-function tidy(contour: Contour): Contour {
-  const rounded = contour.map(([x, y]): Point => [Math.round(x), Math.round(y)]);
+function tidy(points: Point[]): Point[] {
+  const rounded = points.map(([x, y]): Point => [Math.round(x), Math.round(y)]);
   return rounded.filter((p, i) => {
     const before = rounded[(i - 1 + rounded.length) % rounded.length];
     return rounded.length === 1 || p[0] !== before[0] || p[1] !== before[1];
@@ -94,11 +103,11 @@ function simplifyStroke(points: Point[]): Point[] {
 }
 
 /** One pen stroke (already in font coordinates) → overlapping filled pieces. */
-function outlineStroke(points: Point[]): Contour[] {
-  const radius = PEN_WIDTH / 2;
-  const pieces: Contour[] = [];
+function outlineStroke(points: Point[], penWidth: number): Contour[] {
+  const radius = penWidth / 2;
+  const pieces: Point[][] = [];
   for (const [cx, cy] of points) {
-    const dot: Contour = [];
+    const dot: Point[] = [];
     for (let i = 0; i < DOT_SIDES; i++) {
       const angle = (i / DOT_SIDES) * Math.PI * 2;
       dot.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
@@ -114,32 +123,36 @@ function outlineStroke(points: Point[]): Contour[] {
     const ny = ((bx - ax) / length) * radius;
     pieces.push([[ax + nx, ay + ny], [bx + nx, by + ny], [bx - nx, by - ny], [ax - nx, ay - ny]]);
   }
-  return pieces.map((piece) => clockwise(tidy(piece))).filter((piece) => piece.length >= 3);
+  return pieces.map((piece) => clockwise(tidy(piece))).filter((piece) => piece.length >= 3).map(straight);
 }
 
-/** One letter → outlines in font coordinates, placed SIDE_SPACE from the left, plus its width. */
-function outlineGlyph(glyph: Glyph): OutlineGlyph | null {
+/** One character → outlines in font coordinates, placed SIDE_SPACE from the left, plus its width. */
+function outlineGlyph(glyph: Glyph, penWidth: number): OutlineGlyph | null {
   const toFont = ([x, y]: Point): Point => [x, BASELINE - y];
   const contours: Contour[] = [
-    // Traced shapes are already clockwise around ink once y is flipped.
-    ...glyph.shapes.map((shape) => tidy(shape.map(toFont))).filter((c) => c.length >= 3),
-    ...glyph.strokes.flatMap((stroke) => outlineStroke(simplifyStroke(stroke).map(toFont))),
+    // Traced shapes are already clockwise around ink once y is flipped; they keep their smooth curves.
+    ...glyph.shapes
+      .map((shape) => tidy(shape.map(toFont)))
+      .filter((points) => points.length >= 3)
+      .map((points) => ({ points, on: curveFlags(points) })),
+    ...glyph.strokes.flatMap((stroke) => outlineStroke(simplifyStroke(stroke).map(toFont), penWidth)),
   ];
   if (contours.length === 0) return null;
-  const left = Math.min(...contours.flat().map((p) => p[0]));
-  const right = Math.max(...contours.flat().map((p) => p[0]));
+  const xs = contours.flatMap((c) => c.points.map((p) => p[0]));
+  const left = Math.min(...xs);
+  const right = Math.max(...xs);
   const shift = SIDE_SPACE - left;
   return {
-    contours: contours.map((contour) => contour.map(([x, y]): Point => [x + shift, y])),
+    contours: contours.map((c) => ({ ...c, points: c.points.map(([x, y]): Point => [x + shift, y]) })),
     advance: Math.round(right - left + 2 * SIDE_SPACE),
   };
 }
 
 /** The box shown for a character the font doesn't have: a rectangle with a rectangular hole. */
 function notdefGlyph(): OutlineGlyph {
-  const outer: Contour = [[100, 0], [100, CAP_HEIGHT], [500, CAP_HEIGHT], [500, 0]]; // clockwise
-  const inner: Contour = [[150, 50], [450, 50], [450, CAP_HEIGHT - 50], [150, CAP_HEIGHT - 50]]; // the other way
-  return { contours: [outer, inner], advance: 600 };
+  const outer: Point[] = [[100, 0], [100, CAP_HEIGHT], [500, CAP_HEIGHT], [500, 0]]; // clockwise
+  const inner: Point[] = [[150, 50], [450, 50], [450, CAP_HEIGHT - 50], [150, CAP_HEIGHT - 50]]; // the other way
+  return { contours: [straight(outer), straight(inner)], advance: 600 };
 }
 
 // ── Writing bytes ───────────────────────────────────────────────────────────────────────────────
@@ -171,6 +184,7 @@ function checksum(data: Uint8Array): number {
 }
 
 const log2Floor = (n: number) => Math.floor(Math.log2(n));
+const pointsOf = (glyph: OutlineGlyph | null) => (glyph ? glyph.contours.flatMap((c) => c.points) : []);
 
 // ── The tables ──────────────────────────────────────────────────────────────────────────────────
 
@@ -180,15 +194,16 @@ function glyfTable(glyphs: (OutlineGlyph | null)[]) {
   for (const glyph of glyphs) {
     offsets.push(glyf.length);
     if (!glyph) continue; // an empty glyph (the space) takes no room
-    const points = glyph.contours.flat();
+    const points = pointsOf(glyph);
     const xs = points.map((p) => p[0]);
     const ys = points.map((p) => p[1]);
     glyf.i16(glyph.contours.length)
       .i16(Math.min(...xs)).i16(Math.min(...ys)).i16(Math.max(...xs)).i16(Math.max(...ys));
     let end = -1;
-    for (const contour of glyph.contours) glyf.u16((end += contour.length));
+    for (const contour of glyph.contours) glyf.u16((end += contour.points.length));
     glyf.u16(0); // no hinting instructions
-    for (let i = 0; i < points.length; i++) glyf.u8(0x01); // every point is on the outline (straight lines)
+    // One flag per point: 1 = the outline goes through it, 0 = it curves past it.
+    for (const contour of glyph.contours) for (const on of contour.on) glyf.u8(on ? 0x01 : 0x00);
     // Each point is stored as the step from the point before it.
     let last = 0;
     for (const [x] of points) { glyf.i16(x - last); last = x; }
@@ -220,6 +235,18 @@ function cmapTable(map: Map<number, number>) {
   return new Bytes().u16(0).u16(2).u16(0).u16(3).u32(20).u16(3).u16(1).u32(20).bytes(sub.done()).done();
 }
 
+/** The kern table: a sorted list of (left glyph, right glyph, how much closer). */
+function kernTable(pairs: { left: number; right: number; value: number }[]) {
+  const n = pairs.length;
+  const searchRange = 6 * 2 ** log2Floor(Math.max(1, n));
+  const table = new Bytes()
+    .u16(0).u16(1) // version, one subtable
+    .u16(0).u16(14 + 6 * n).u16(0x0001) // subtable version, length, "horizontal kerning pairs"
+    .u16(n).u16(searchRange).u16(log2Floor(Math.max(1, n))).u16(n * 6 - searchRange);
+  for (const pair of pairs) table.u16(pair.left).u16(pair.right).i16(pair.value);
+  return table.done();
+}
+
 function nameTable(family: string, postscript: string, made: Date) {
   const records: [number, string][] = [
     [1, family],
@@ -244,29 +271,48 @@ function nameTable(family: string, postscript: string, made: Date) {
   return table.bytes(strings.done()).done();
 }
 
-/** Build the .ttf file for a font. Returns null if no letters have been made yet. */
-export function buildFontFile(name: string, glyphs: Glyphs): Uint8Array | null {
-  const letters = LETTERS.filter((letter) => glyphs[letter]);
-  const outlined = letters.map((letter) => ({ letter, glyph: outlineGlyph(glyphs[letter]) }))
-    .filter((entry): entry is { letter: string; glyph: OutlineGlyph } => entry.glyph !== null);
+/** Build the .ttf file for a font. Returns null if no characters have been made yet. */
+export function buildFontFile(name: string, glyphs: Glyphs, penWidth: number): Uint8Array | null {
+  const outlined = CHARACTERS.filter((char) => glyphs[char])
+    .map((char) => ({ char, glyph: outlineGlyph(glyphs[char], penWidth) }))
+    .filter((entry): entry is { char: string; glyph: OutlineGlyph } => entry.glyph !== null);
   if (outlined.length === 0) return null;
 
-  // Glyph 0 must be the "missing character" box, then the space, then the letters.
+  // Glyph 0 must be the "missing character" box, then the space, then the characters.
   const all: (OutlineGlyph | null)[] = [notdefGlyph(), null, ...outlined.map((e) => e.glyph)];
   const advances = [600, SPACE_WIDTH, ...outlined.map((e) => e.glyph.advance)];
+  const glyphIndex = new Map(outlined.map((entry, i) => [entry.char, i + 2]));
   const charMap = new Map<number, number>([[0x20, 1]]);
-  outlined.forEach((entry, i) => {
-    charMap.set(entry.letter.charCodeAt(0), i + 2); // A
-    charMap.set(entry.letter.toLowerCase().charCodeAt(0), i + 2); // a uses the same shape, until lowercase exists
-  });
+  for (const char of CHARACTERS) {
+    // Each character uses its own shape, or its stand-in (a lowercase letter not made yet uses its capital).
+    const fallback = fallbackFor(char);
+    const index = glyphIndex.get(char) ?? (fallback ? glyphIndex.get(fallback) : undefined);
+    if (index !== undefined) charMap.set(char.codePointAt(0)!, index);
+  }
 
-  const points = all.flatMap((g) => (g ? g.contours.flat() : []));
+  // Kerning, between every pair of characters that were made.
+  const profiles = profilesOf(Object.fromEntries(outlined.map((e) => [e.char, glyphs[e.char]])), penWidth);
+  const pairs: { left: number; right: number; value: number }[] = [];
+  for (const first of outlined) {
+    for (const second of outlined) {
+      const a = profiles.get(first.char);
+      const b = profiles.get(second.char);
+      const value = a && b ? kernBetween(a, b) : 0;
+      if (value) pairs.push({ left: glyphIndex.get(first.char)!, right: glyphIndex.get(second.char)!, value });
+    }
+  }
+  const kept = pairs
+    .sort((p, q) => p.value - q.value) // strongest first, in case there are too many
+    .slice(0, MAX_KERN_PAIRS)
+    .sort((p, q) => p.left - q.left || p.right - q.right);
+
+  const points = all.flatMap(pointsOf);
   const xMin = Math.min(...points.map((p) => p[0]));
   const yMin = Math.min(...points.map((p) => p[1]));
   const xMax = Math.max(...points.map((p) => p[0]));
   const yMax = Math.max(...points.map((p) => p[1]));
-  const leftSides = all.map((g) => (g ? Math.min(...g.contours.flat().map((p) => p[0])) : 0));
-  const rightEdges = all.map((g) => (g ? Math.max(...g.contours.flat().map((p) => p[0])) : 0));
+  const leftSides = all.map((g) => (g ? Math.min(...pointsOf(g).map((p) => p[0])) : 0));
+  const rightEdges = all.map((g) => (g ? Math.max(...pointsOf(g).map((p) => p[0])) : 0));
   const made = new Date();
   const family = name.trim() || 'Astra Font';
   const postscript = (family.replace(/[^A-Za-z0-9-]/g, '') || 'AstraFont').slice(0, 63);
@@ -293,7 +339,7 @@ export function buildFontFile(name: string, glyphs: Glyphs): Uint8Array | null {
       .done(),
     maxp: new Bytes()
       .u32(0x00010000).u16(all.length)
-      .u16(Math.max(...all.map((g) => (g ? g.contours.flat().length : 0))))
+      .u16(Math.max(...all.map((g) => pointsOf(g).length)))
       .u16(Math.max(...all.map((g) => (g ? g.contours.length : 0))))
       .u16(0).u16(0).u16(2).u16(0).u16(0).u16(0).u16(0).u16(0).u16(0).u16(0).u16(0)
       .done(),
@@ -308,7 +354,7 @@ export function buildFontFile(name: string, glyphs: Glyphs): Uint8Array | null {
       .i16(ASCENDER).i16(DESCENDER).i16(0)
       .u16(Math.max(ASCENDER, yMax)).u16(Math.max(-DESCENDER, -yMin))
       .u32(1).u32(0) // Latin 1 code page
-      .i16(Math.round(CAP_HEIGHT * 0.7)).i16(CAP_HEIGHT).u16(0).u16(0x20).u16(0)
+      .i16(X_HEIGHT).i16(CAP_HEIGHT).u16(0).u16(0x20).u16(0)
       .done(),
     hmtx: hmtx.done(),
     cmap: cmapTable(charMap),
@@ -317,6 +363,7 @@ export function buildFontFile(name: string, glyphs: Glyphs): Uint8Array | null {
     name: nameTable(family, postscript, made),
     post: new Bytes().u32(0x00030000).u32(0).i16(-100).i16(50).u32(0).u32(0).u32(0).u32(0).u32(0).done(),
   };
+  if (kept.length > 0) tables.kern = kernTable(kept);
 
   // The file: a directory listing every table (sorted by tag), then the tables, each padded to 4 bytes.
   const tags = Object.keys(tables).sort();

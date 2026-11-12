@@ -1,9 +1,9 @@
-// PATCH  /api/astra/fonts/<id> — rename a font: { name }
+// PATCH  /api/astra/fonts/<id> — change a font: { name?, penWidth? }
 // DELETE /api/astra/fonts/<id> — delete it
 
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
-import { cleanName, deleteFont, renameFont } from '@/lib/astra/fonts';
+import { cleanName, cleanPenWidth, deleteFont, updateFont } from '@/lib/astra/fonts';
 
 type Params = { params: Promise<{ id: string }> };
 const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
@@ -13,9 +13,18 @@ export async function PATCH(req: Request, { params }: Params) {
   const userId = await getCurrentUserId();
   if (!userId) return noProfile();
   const body = await req.json().catch(() => ({}));
-  const name = cleanName(body.name);
-  if (!name) return NextResponse.json({ error: 'A font needs a name.' }, { status: 400 });
-  const font = renameFont(userId, (await params).id, name);
+  const changes: { name?: string; penWidth?: number } = {};
+  if ('name' in body) {
+    const name = cleanName(body.name);
+    if (!name) return NextResponse.json({ error: 'A font needs a name.' }, { status: 400 });
+    changes.name = name;
+  }
+  if ('penWidth' in body) {
+    const penWidth = cleanPenWidth(body.penWidth);
+    if (penWidth === null) return NextResponse.json({ error: 'The pen thickness must be a number.' }, { status: 400 });
+    changes.penWidth = penWidth;
+  }
+  const font = updateFont(userId, (await params).id, changes);
   return font ? NextResponse.json(font) : notFound();
 }
 

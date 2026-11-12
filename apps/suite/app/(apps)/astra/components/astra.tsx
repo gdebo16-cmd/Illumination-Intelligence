@@ -1,24 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
 import SidebarToggle from "@/components/SidebarToggle";
 import GlyphPad, { GlyphArt } from "./glyph-pad";
 import FontPreview from "./font-preview";
 import SheetImport, { type SheetLetter } from "./sheet-import";
-import { EMPTY_GLYPH, GLYPH_SIZE, LETTERS, type Glyph, type Glyphs } from "@/config/astra";
+import AiAlphabet from "./ai-alphabet";
+import {
+  CHARACTER_GROUPS,
+  EMPTY_GLYPH,
+  GLYPH_SIZE,
+  MAX_PEN_WIDTH,
+  MIN_PEN_WIDTH,
+  type Glyph,
+  type Glyphs,
+} from "@/config/astra";
 
 // What a font looks like when it comes back from /api/astra/fonts (see lib/astra/fonts.ts).
 type Font = {
   id: string;
   name: string;
   glyphs: Glyphs;
+  penWidth: number;
   createdAt: string;
   updatedAt: string;
 };
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
+/** The address for saving one character: its number, so characters like / ? # are safe in a web address. */
+const glyphUrl = (fontId: string, char: string) => `/api/astra/fonts/${fontId}/glyphs/${char.codePointAt(0)}`;
 
 const Astra = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,9 +39,11 @@ const Astra = () => {
   const [nameDraft, setNameDraft] = useState(""); // what's typed in the name box right now
   const [loaded, setLoaded] = useState(false); // has the saved list arrived yet?
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null); // the letter open in the drawing pad
+  const [editing, setEditing] = useState<string | null>(null); // the character open in the drawing pad
   const [savingGlyph, setSavingGlyph] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false); // the alphabet sheet upload
+  const [sheetOpen, setSheetOpen] = useState(false); // the sheet upload
+  const [aiOpen, setAiOpen] = useState(false); // making characters with AI
+  const penTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selected = fonts.find((font) => font.id === selectedId);
 
@@ -81,48 +95,65 @@ const Astra = () => {
       return setError("Couldn't rename the font.");
     }
     const renamed: Font = await res.json();
-    setFonts(fonts.map((font) => (font.id === renamed.id ? renamed : font)));
+    setFonts((all) => all.map((font) => (font.id === renamed.id ? { ...renamed, penWidth: font.penWidth } : font)));
     setNameDraft(renamed.name);
   };
 
-  // Save the letter made in the pad. The pad stays open if saving fails, so the drawing isn't lost.
+  // Save the character made in the pad. The pad stays open if saving fails, so the drawing isn't lost.
   const saveGlyph = async (letter: string, glyph: Glyph) => {
     if (!selected) return;
     setError(null);
     setSavingGlyph(true);
-    const res = await fetch(`/api/astra/fonts/${selected.id}/glyphs/${letter}`, {
+    const res = await fetch(glyphUrl(selected.id, letter), {
       method: "PUT",
       headers: JSON_HEADERS,
       body: JSON.stringify(glyph),
     }).catch(() => null);
     setSavingGlyph(false);
-    if (!res?.ok) return setError(`Couldn't save the letter ${letter}.`);
+    if (!res?.ok) return setError(`Couldn't save ${letter}.`);
     const updated: Font = await res.json();
-    setFonts(fonts.map((font) => (font.id === updated.id ? updated : font)));
+    // Keep the pen thickness shown here: a change to it may still be on its way to the server.
+    setFonts((all) => all.map((font) => (font.id === updated.id ? { ...updated, penWidth: font.penWidth } : font)));
     setEditing(null);
   };
 
-  // Save the letters from an alphabet sheet, one at a time. Each replaces that whole letter.
+  // Save characters from a sheet or from AI, one at a time. Each replaces that whole character.
   // Gives an error message if one fails (the ones before it are already saved), or null.
   const saveSheet = async (letters: SheetLetter[]): Promise<string | null> => {
     if (!selected) return "No font is open.";
     let latest: Font | null = null;
     let failed: string | null = null;
     for (const { letter, shapes } of letters) {
-      const res = await fetch(`/api/astra/fonts/${selected.id}/glyphs/${letter}`, {
+      const res = await fetch(glyphUrl(selected.id, letter), {
         method: "PUT",
         headers: JSON_HEADERS,
         body: JSON.stringify({ strokes: [], shapes }),
       }).catch(() => null);
       if (!res?.ok) {
-        failed = `Couldn't save the letter ${letter}. The letters before it were saved.`;
+        failed = `Couldn't save ${letter}. The ones before it were saved.`;
         break;
       }
       latest = await res.json();
     }
     const saved = latest;
-    if (saved) setFonts((all) => all.map((font) => (font.id === saved.id ? saved : font)));
+    if (saved) setFonts((all) => all.map((font) => (font.id === saved.id ? { ...saved, penWidth: font.penWidth } : font)));
     return failed;
+  };
+
+  // The pen thickness slider: show the change straight away, save it once you stop moving it.
+  const changePen = (penWidth: number) => {
+    if (!selected) return;
+    const id = selected.id;
+    setFonts((all) => all.map((font) => (font.id === id ? { ...font, penWidth } : font)));
+    if (penTimer.current) clearTimeout(penTimer.current);
+    penTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/astra/fonts/${id}`, {
+        method: "PATCH",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ penWidth }),
+      }).catch(() => null);
+      if (!res?.ok) setError("Couldn't save the pen thickness.");
+    }, 400);
   };
 
   const removeFont = async (font: Font) => {
@@ -188,42 +219,69 @@ const Astra = () => {
               />
               <div className="astra-actions">
                 <button type="button" className="astra-action" onClick={() => setSheetOpen(true)}>
-                  Upload alphabet sheet
+                  Upload a sheet
+                </button>
+                <button type="button" className="astra-action" onClick={() => setAiOpen(true)}>
+                  Make with AI
                 </button>
                 {Object.keys(selected.glyphs).length > 0 ? (
                   <a className="astra-action" href={`/api/astra/fonts/${selected.id}/download`} download>
                     Download font (.ttf)
                   </a>
                 ) : (
-                  <span className="astra-action is-disabled" title="Make at least one letter first">
+                  <span className="astra-action is-disabled" title="Make at least one character first">
                     Download font (.ttf)
                   </span>
                 )}
+                <label className="astra-pen" title="How thick drawn pen strokes are, in every character of this font">
+                  Pen thickness
+                  <input
+                    type="range"
+                    min={MIN_PEN_WIDTH}
+                    max={MAX_PEN_WIDTH}
+                    step={5}
+                    value={selected.penWidth}
+                    onChange={(e) => changePen(Number(e.target.value))}
+                  />
+                  <svg viewBox="0 0 200 40" aria-hidden="true">
+                    <line x1={20} y1={20} x2={180} y2={20} stroke="currentColor" strokeLinecap="round" strokeWidth={selected.penWidth / 5} />
+                  </svg>
+                </label>
               </div>
-              <div className="astra-glyph-grid">
-                {LETTERS.map((letter) => {
-                  const glyph = selected.glyphs[letter];
-                  return (
-                    <button
-                      key={letter}
-                      type="button"
-                      className={`astra-glyph-slot ${glyph ? "is-drawn" : ""}`}
-                      aria-label={glyph ? `Redo ${letter}` : `Make ${letter}`}
-                      onClick={() => setEditing(letter)}
-                    >
-                      {glyph ? (
-                        <svg className="astra-glyph-art" viewBox={`0 0 ${GLYPH_SIZE} ${GLYPH_SIZE}`} aria-hidden="true">
-                          <GlyphArt glyph={glyph} />
-                        </svg>
-                      ) : (
-                        letter
-                      )}
-                      {glyph && <span className="astra-glyph-label">{letter}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <FontPreview glyphs={selected.glyphs} onMake={setEditing} />
+              {CHARACTER_GROUPS.map((group) => (
+                <section key={group.id} className="astra-group" aria-label={group.name}>
+                  <h2>
+                    {group.name}
+                    <span>
+                      {group.characters.filter((char) => selected.glyphs[char]).length} of {group.characters.length}
+                    </span>
+                  </h2>
+                  <div className="astra-glyph-grid">
+                    {group.characters.map((char) => {
+                      const glyph = selected.glyphs[char];
+                      return (
+                        <button
+                          key={char}
+                          type="button"
+                          className={`astra-glyph-slot ${glyph ? "is-drawn" : ""}`}
+                          aria-label={glyph ? `Redo ${char}` : `Make ${char}`}
+                          onClick={() => setEditing(char)}
+                        >
+                          {glyph ? (
+                            <svg className="astra-glyph-art" viewBox={`0 0 ${GLYPH_SIZE} ${GLYPH_SIZE}`} aria-hidden="true">
+                              <GlyphArt glyph={glyph} penWidth={selected.penWidth} />
+                            </svg>
+                          ) : (
+                            char
+                          )}
+                          {glyph && <span className="astra-glyph-label">{char}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+              <FontPreview glyphs={selected.glyphs} penWidth={selected.penWidth} onMake={setEditing} />
               {sheetOpen && (
                 <SheetImport
                   key={selected.id}
@@ -232,11 +290,20 @@ const Astra = () => {
                   onClose={() => setSheetOpen(false)}
                 />
               )}
+              {aiOpen && (
+                <AiAlphabet
+                  key={selected.id}
+                  glyphs={selected.glyphs}
+                  onSave={saveSheet}
+                  onClose={() => setAiOpen(false)}
+                />
+              )}
               {editing && (
                 <GlyphPad
                   key={`${selected.id}-${editing}`}
                   letter={editing}
                   initial={selected.glyphs[editing] ?? EMPTY_GLYPH}
+                  penWidth={selected.penWidth}
                   saving={savingGlyph}
                   onSave={(glyph) => saveGlyph(editing, glyph)}
                   onCancel={() => setEditing(null)}

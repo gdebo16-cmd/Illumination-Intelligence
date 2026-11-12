@@ -1,6 +1,6 @@
 "use client";
 
-// The drawing pad: a big square where you make one letter, two ways:
+// The drawing pad: a big square where you make one character, two ways:
 //   • draw it with the mouse, a pen or a finger (pen strokes), or
 //   • upload a picture of it, which is traced into filled shapes (see trace.ts).
 // You can mix them: upload a picture, then touch it up with the pen.
@@ -11,23 +11,28 @@ import { useRef, useState, type ChangeEvent, type DragEvent, type PointerEvent }
 import {
   BASELINE,
   CAP_LINE,
+  DEFAULT_PEN_WIDTH,
+  DESCENT_LINE,
   EMPTY_GLYPH,
   GLYPH_SIZE,
-  PEN_WIDTH,
+  X_LINE,
+  characterName,
   isEmptyGlyph,
   type Glyph,
   type Point,
 } from "@/config/astra";
+import { shapePath } from "@/config/astra-geometry";
 import { traceImage } from "./trace";
 
-/** Draws a letter inside an <svg>. Used by the pad, and by the small previews in the letter grid. */
-export function GlyphArt({ glyph }: { glyph: Glyph }) {
+/** Draws a character inside an <svg>. Used by the pad, the character grid, the preview and the uploads.
+ *  Traced shapes are drawn as smooth curves; pen strokes use the font's pen thickness. */
+export function GlyphArt({ glyph, penWidth = DEFAULT_PEN_WIDTH }: { glyph: Glyph; penWidth?: number }) {
   // All the traced shapes go in one path, so a hole (drawn the other way around) cuts out of its letter.
-  const shapes = glyph.shapes.map((shape) => `M${shape.map(([x, y]) => `${x} ${y}`).join("L")}Z`).join("");
+  const shapes = glyph.shapes.map(shapePath).join("");
   return (
     <>
       {shapes && <path d={shapes} fill="currentColor" fillRule="nonzero" />}
-      <g fill="none" stroke="currentColor" strokeWidth={PEN_WIDTH} strokeLinecap="round" strokeLinejoin="round">
+      <g fill="none" stroke="currentColor" strokeWidth={penWidth} strokeLinecap="round" strokeLinejoin="round">
         {glyph.strokes.map((stroke, i) => {
           // A single tap is just one point; repeat it so it still shows up as a dot.
           const points = stroke.length === 1 ? [stroke[0], stroke[0]] : stroke;
@@ -38,17 +43,32 @@ export function GlyphArt({ glyph }: { glyph: Glyph }) {
   );
 }
 
+/** The guide lines, from the top: capitals, x-height (short lowercase), baseline, and tails. */
+export function GuideLines() {
+  return (
+    <>
+      <line className="astra-pad-guide is-faint" x1={0} x2={GLYPH_SIZE} y1={X_LINE} y2={X_LINE} />
+      <line className="astra-pad-guide is-faint" x1={0} x2={GLYPH_SIZE} y1={DESCENT_LINE} y2={DESCENT_LINE} />
+      <line className="astra-pad-guide" x1={0} x2={GLYPH_SIZE} y1={CAP_LINE} y2={CAP_LINE} />
+      <line className="astra-pad-guide" x1={0} x2={GLYPH_SIZE} y1={BASELINE} y2={BASELINE} />
+    </>
+  );
+}
+
 type Props = {
+  /** The character being made, e.g. "A", "g" or "?". */
   letter: string;
-  /** What's already made for this letter (empty if nothing yet). */
+  /** What's already made for it (empty if nothing yet). */
   initial: Glyph;
+  /** This font's pen thickness. */
+  penWidth: number;
   /** True while the page is saving, so the buttons can wait. */
   saving: boolean;
   onSave: (glyph: Glyph) => void;
   onCancel: () => void;
 };
 
-export default function GlyphPad({ letter, initial, saving, onSave, onCancel }: Props) {
+export default function GlyphPad({ letter, initial, penWidth, saving, onSave, onCancel }: Props) {
   const [glyph, setGlyph] = useState<Glyph>(initial);
   const [history, setHistory] = useState<Glyph[]>([]); // earlier versions, for Undo
   const [tracing, setTracing] = useState(false);
@@ -112,7 +132,7 @@ export default function GlyphPad({ letter, initial, saving, onSave, onCancel }: 
     setProblem(null);
     setTracing(true);
     try {
-      const shapes = await traceImage(file);
+      const shapes = await traceImage(file, letter);
       change({ ...glyph, shapes });
     } catch (err) {
       setProblem((err as Error).message);
@@ -133,8 +153,11 @@ export default function GlyphPad({ letter, initial, saving, onSave, onCancel }: 
 
   return (
     <div className="astra-pad-backdrop">
-      <div className="astra-pad" role="dialog" aria-modal="true" aria-label={`Make the letter ${letter}`}>
-        <h2>Draw {letter}, or upload a picture of it</h2>
+      <div className="astra-pad" role="dialog" aria-modal="true" aria-label={`Make ${characterName(letter)}`}>
+        <h2>
+          Draw <span className="astra-pad-char">{letter}</span>, or upload a picture of it
+          <span className="astra-pad-name">{characterName(letter)}</span>
+        </h2>
         <svg
           className={`astra-pad-canvas ${tracing ? "is-tracing" : ""}`}
           viewBox={`0 0 ${GLYPH_SIZE} ${GLYPH_SIZE}`}
@@ -155,9 +178,8 @@ export default function GlyphPad({ letter, initial, saving, onSave, onCancel }: 
           >
             {letter}
           </text>
-          <line className="astra-pad-guide" x1={0} x2={GLYPH_SIZE} y1={CAP_LINE} y2={CAP_LINE} />
-          <line className="astra-pad-guide" x1={0} x2={GLYPH_SIZE} y1={BASELINE} y2={BASELINE} />
-          <GlyphArt glyph={glyph} />
+          <GuideLines />
+          <GlyphArt glyph={glyph} penWidth={penWidth} />
         </svg>
         {problem && <p className="astra-pad-problem" role="alert">{problem}</p>}
         <input ref={fileInput} type="file" accept="image/*" hidden onChange={pictureChosen} />

@@ -1,54 +1,98 @@
 // trace.ts — turn an uploaded picture into filled shapes for the font.
 //
-// traceImage: a picture of ONE letter. traceSheet: a picture of a whole alphabet, split into letters.
+// traceImage: a picture of ONE character. traceSheet: a picture of many, split into characters.
 // It all happens in the browser:
 //   1. Shrink the picture to a working size and turn it grey.
 //   2. Decide which pixels are "ink": the darker side of an automatically chosen cut-off
 //      (or the lighter side, for a light letter on a dark background).
 //   3. Walk around the edges of the ink to get outlines (holes, like the middle of an O, too).
 //   4. Throw away specks of dust, then smooth the jagged pixel steps and drop extra points.
-//   5. Scale and move the outlines so the letter sits between the cap line and the baseline.
-// A sheet adds a step between 4 and 5: sort the outlines into letters, rows, and reading order.
+//      (The page and the font file then draw the outline as smooth curves: config/astra-geometry.ts.)
+//   5. Scale and move the outlines so the character sits where it belongs (config/astra.ts characterBox).
+// A sheet adds a step between 4 and 5: sort the outlines into characters, rows, and reading order.
 
-import { BASELINE, CAP_LINE, GLYPH_SIZE, MAX_SHAPE_POINTS, MAX_SHAPES, type Point, type Shape } from "@/config/astra";
+import {
+  BASELINE,
+  CAP_LINE,
+  GLYPH_SIZE,
+  MAX_SHAPE_POINTS,
+  MAX_SHAPES,
+  characterBox,
+  type Point,
+  type Shape,
+} from "@/config/astra";
 
 /** The longest side of the picture while tracing, in pixels. Bigger = finer detail, but slower. */
-const WORK_SIZE = 400;
-/** A sheet holds many letters, so it's traced bigger. */
-const SHEET_WORK_SIZE = 1600;
-/** At most this many points across all the shapes of one letter. */
+const WORK_SIZE = 800;
+/** A sheet holds many characters, so it's traced bigger. */
+const SHEET_WORK_SIZE = 2400;
+/** At most this many points across all the shapes of one character. */
 const MAX_TOTAL_POINTS = 6000;
-/** At most this many letters on one sheet. */
-const MAX_SHEET_LETTERS = 60;
+/** At most this many characters on one sheet. */
+const MAX_SHEET_LETTERS = 120;
 
-/** Trace a picture of one letter. */
-export async function traceImage(file: File): Promise<Shape[]> {
+/** Trace a picture of one character, placed where that character belongs on the grid. */
+export async function traceImage(file: File, char: string): Promise<Shape[]> {
   const { ink, width, height } = await loadInk(file, WORK_SIZE);
   const outlines = withoutSpecks(traceOutlines(ink, width, height))
     .sort((a, b) => Math.abs(b.area) - Math.abs(a.area))
     .slice(0, MAX_SHAPES);
-  const shapes = fitToGrid(simplifyLetter(outlines.map((o) => smooth(o.points))));
+  const shapes = fitToGrid(simplifyLetter(outlines.map((o) => smooth(o.points))), char);
   if (shapes.length === 0) {
-    throw new Error("Couldn't find a letter in that picture. A dark letter on a plain light background works best.");
+    throw new Error("Couldn't find a character in that picture. A dark shape on a plain light background works best.");
   }
   return shapes;
 }
 
-/** Trace a picture of many letters written in rows. Gives the letters in reading order (rows top to
- *  bottom, each row left to right), each already placed on the letter grid. */
-export async function traceSheet(file: File): Promise<Shape[][]> {
+/** One character found on a sheet, still in the picture's own pixels (placed later by placeSheet,
+ *  once you've said which character it is). */
+export type SheetPiece = { outlines: Point[][]; box: Box; row: number };
+
+/** Trace a picture of many characters written in rows. Gives them in reading order (rows top to
+ *  bottom, each row left to right). */
+export async function traceSheet(file: File): Promise<SheetPiece[]> {
   const { ink, width, height } = await loadInk(file, SHEET_WORK_SIZE);
   const rows = readingOrder(withoutSpecks(traceOutlines(ink, width, height)));
-  const count = rows.reduce((sum, row) => sum + row.letters.length, 0);
+  const count = rows.reduce((sum, row) => sum + row.length, 0);
   if (count === 0) {
     throw new Error("Couldn't find any letters in that picture. Dark letters on plain light paper work best.");
   }
   if (count > MAX_SHEET_LETTERS) {
     throw new Error(`Found ${count} separate marks, which is too many. Try a cleaner photo with just the letters.`);
   }
-  return rows.flatMap((row) =>
-    row.letters.map((outlines) => placeOnRow(simplifyLetter(outlines.map(smooth)), row)),
+  return rows.flatMap((row, r) =>
+    row.map((piece) => ({ outlines: simplifyLetter(piece.outlines.map(smooth)), box: piece.box, row: r })),
   );
+}
+
+/** Place every piece of a sheet on the grid, given which character each one is ("" = skipped).
+ *  Characters in a row are written at one size on one baseline, so each row gets one scale (worked
+ *  out from what its characters are: an "a" is shorter than an "A") and one baseline (from the
+ *  characters that sit on it, not tails like g or y). That keeps your handwriting's proportions. */
+export function placeSheet(pieces: SheetPiece[], picks: string[]): Shape[][] {
+  const placed: Shape[][] = pieces.map(() => []);
+  const rows = new Map<number, number[]>();
+  pieces.forEach((piece, i) => rows.set(piece.row, [...(rows.get(piece.row) ?? []), i]));
+  for (const indexes of rows.values()) {
+    const scales: number[] = [];
+    const baselines: number[] = [];
+    for (const i of indexes) {
+      if (!picks[i]) continue;
+      const { top, bottom } = characterBox(picks[i]);
+      scales.push((bottom - top) / Math.max(1, pieces[i].box.bottom - pieces[i].box.top));
+      if (bottom === BASELINE) baselines.push(pieces[i].box.bottom);
+    }
+    const heights = indexes.map((i) => pieces[i].box.bottom - pieces[i].box.top);
+    const scale = scales.length > 0 ? middle(scales) : (BASELINE - CAP_LINE) / Math.max(1, middle(heights));
+    const baseline = baselines.length > 0 ? middle(baselines) : middle(indexes.map((i) => pieces[i].box.bottom));
+    for (const i of indexes) {
+      const { box, outlines } = pieces[i];
+      const fit = Math.min(scale, (GLYPH_SIZE * 0.95) / Math.max(1, box.right - box.left));
+      const centre = (box.left + box.right) / 2;
+      placed[i] = toGrid(outlines, ([x, y]) => [GLYPH_SIZE / 2 + (x - centre) * fit, BASELINE + (y - baseline) * fit]);
+    }
+  }
+  return placed;
 }
 
 // ── 1. Load the picture ─────────────────────────────────────────────────────────────────────────
@@ -304,9 +348,9 @@ const overlap = (a1: number, a2: number, b1: number, b2: number) =>
 const middle = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
 type Piece = { outlines: Point[][]; box: Box };
-type Row = { letters: Point[][][]; capHeight: number; baseline: number };
 
-function readingOrder(outlines: Outline[]): Row[] {
+/** Sort the outlines into characters, in rows, each row left to right. */
+function readingOrder(outlines: Outline[]): Piece[][] {
   // Each piece of ink with its holes: a hole belongs to the smallest piece of ink around it.
   const inks = outlines
     .filter((o) => o.area > 0)
@@ -332,25 +376,51 @@ function readingOrder(outlines: Outline[]): Row[] {
   }
 
   return rows.map((row) => {
-    // Left to right. Pieces stacked above each other (like a letter drawn with a gap in it) are one letter.
+    // Left to right. Pieces stacked above each other (the dot on an i, the parts of a : or a broken
+    // stroke) are one character.
     row.pieces.sort((a, b) => a.box.left - b.box.left);
-    const letters: Piece[] = [];
+    const characters: Piece[] = [];
     for (const piece of row.pieces) {
-      const last = letters[letters.length - 1];
+      const last = characters[characters.length - 1];
       if (last && overlap(piece.box.left, piece.box.right, last.box.left, last.box.right) >= 0.5) {
         last.outlines.push(...piece.outlines);
         last.box = joinBoxes(last.box, piece.box);
       } else {
-        letters.push({ outlines: [...piece.outlines], box: piece.box });
+        characters.push({ outlines: [...piece.outlines], box: piece.box });
       }
     }
-    // Capitals in a row share a height and a baseline: use the typical ones, so a Q's tail doesn't count.
-    return {
-      letters: letters.map((letter) => letter.outlines),
-      capHeight: Math.max(1, middle(letters.map((l) => l.box.bottom - l.box.top))),
-      baseline: middle(letters.map((l) => l.box.bottom)),
-    };
+    return joinDots(characters);
   });
+}
+
+/** A small mark right above or below its neighbour belongs to it, even if it's off to one side:
+ *  the dot on an i or j written a little to the right, say. (Small marks level with their
+ *  neighbours, like a full stop or a comma, are characters of their own.) */
+function joinDots(characters: Piece[]): Piece[] {
+  const height = (p: Piece) => p.box.bottom - p.box.top;
+  const typical = middle(characters.map(height));
+  const result = [...characters];
+  for (let i = 0; i < result.length; i++) {
+    const mark = result[i];
+    if (height(mark) >= typical * 0.4) continue;
+    const owners = [i - 1, i + 1]
+      .filter((j) => j >= 0 && j < result.length && height(result[j]) >= typical * 0.4)
+      .map((j) => {
+        const other = result[j].box;
+        const sideGap = Math.max(0, Math.max(mark.box.left, other.left) - Math.min(mark.box.right, other.right));
+        const level = Math.min(mark.box.bottom, other.bottom) - Math.max(mark.box.top, other.top) > 0;
+        return { j, sideGap, level };
+      })
+      .filter((o) => !o.level && o.sideGap < typical * 0.35)
+      .sort((a, b) => a.sideGap - b.sideGap);
+    if (owners.length === 0) continue;
+    const owner = result[owners[0].j];
+    owner.outlines.push(...mark.outlines);
+    owner.box = joinBoxes(owner.box, mark.box);
+    result.splice(i, 1);
+    i--;
+  }
+  return result;
 }
 
 // ── 5. Place it on the letter grid ──────────────────────────────────────────────────────────────
@@ -371,29 +441,17 @@ function toGrid(outlines: Point[][], move: (p: Point) => Point): Shape[] {
     .filter((points) => points.length >= 3);
 }
 
-/** One letter on its own: as tall as a capital (cap line to baseline), unless that would make it
- *  wider than the square; centred across, with its bottom on the baseline. */
-function fitToGrid(outlines: Point[][]): Shape[] {
+/** One character on its own: its ink fills that character's usual height (characterBox), unless
+ *  that would make it wider than the square; centred across. */
+function fitToGrid(outlines: Point[][], char: string): Shape[] {
   if (outlines.length === 0) return [];
   const box = boxOf(outlines.flat());
+  const target = characterBox(char);
   const scale = Math.min(
-    (BASELINE - CAP_LINE) / Math.max(1, box.bottom - box.top),
+    (target.bottom - target.top) / Math.max(1, box.bottom - box.top),
     (GLYPH_SIZE * 0.9) / Math.max(1, box.right - box.left),
   );
   const offsetX = (GLYPH_SIZE - (box.right - box.left) * scale) / 2 - box.left * scale;
-  const offsetY = BASELINE - box.bottom * scale;
+  const offsetY = target.bottom - box.bottom * scale;
   return toGrid(outlines, ([x, y]) => [x * scale + offsetX, y * scale + offsetY]);
-}
-
-/** A letter from a sheet: scaled by its row, so letters keep their sizes compared with each other;
- *  sitting on the row's baseline (a Q's tail can hang below), centred across. */
-function placeOnRow(outlines: Point[][], row: Row): Shape[] {
-  if (outlines.length === 0) return [];
-  const box = boxOf(outlines.flat());
-  const scale = Math.min(
-    (BASELINE - CAP_LINE) / row.capHeight,
-    (GLYPH_SIZE * 0.95) / Math.max(1, box.right - box.left),
-  );
-  const centre = (box.left + box.right) / 2;
-  return toGrid(outlines, ([x, y]) => [GLYPH_SIZE / 2 + (x - centre) * scale, BASELINE + (y - row.baseline) * scale]);
 }

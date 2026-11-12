@@ -12,8 +12,8 @@ export async function GET(_req: Request, { params }: Params) {
   if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
   const font = getFont(userId, (await params).id);
   if (!font) return NextResponse.json({ error: 'Font not found.' }, { status: 404 });
-  const file = buildFontFile(font.name, font.glyphs);
-  if (!file) return NextResponse.json({ error: 'Make at least one letter first.' }, { status: 400 });
+  const file = buildFontFile(font.name, font.glyphs, font.penWidth);
+  if (!file) return NextResponse.json({ error: 'Make at least one character first.' }, { status: 400 });
 
   // The file name: plain letters and numbers for older programs, the real name for newer ones.
   const plainName = font.name.replace(/[^A-Za-z0-9 _-]/g, '').trim() || 'Astra font';
