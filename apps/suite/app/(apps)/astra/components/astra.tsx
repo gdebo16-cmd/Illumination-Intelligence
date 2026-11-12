@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
 import SidebarToggle from "@/components/SidebarToggle";
 import GlyphPad, { GlyphArt } from "./glyph-pad";
+import FontPreview from "./font-preview";
 import { EMPTY_GLYPH, GLYPH_SIZE, LETTERS, type Glyph, type Glyphs } from "@/config/astra";
 
 // What a font looks like when it comes back from /api/astra/fonts (see lib/astra/fonts.ts).
@@ -183,6 +184,7 @@ const Astra = () => {
                   );
                 })}
               </div>
+              <FontPreview glyphs={selected.glyphs} onMake={setEditing} />
               {editing && (
                 <GlyphPad
                   key={`${selected.id}-${editing}`}

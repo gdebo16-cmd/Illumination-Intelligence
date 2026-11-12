@@ -2793,6 +2793,39 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
   opacity: 0.6;
 }
 
+/* "Try it out": type a sentence and see it in your font. */
+.astra-preview { margin-top: 2rem; }
+.astra-preview h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.astra-preview textarea {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+  resize: vertical;
+}
+.astra-preview textarea:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 1px; }
+.astra-preview-size { display: flex; align-items: center; gap: 0.6rem; margin: 0.75rem 0; font-size: 0.9rem; }
+.astra-preview-size input { width: 12rem; max-width: 50vw; accent-color: #5ad1c4; }
+.astra-preview-output { overflow-x: auto; padding: 0.5rem 0; }
+.astra-preview-output svg { display: block; max-width: none; }
+.astra-preview-missing { fill: currentColor; opacity: 0.18; font-family: system-ui, sans-serif; }
+.astra-preview-todo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.5rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+.astra-preview-todo button {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.astra-preview-todo button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
 /* The drawing pad, opened on top of the page. */
 .astra-pad-backdrop {
   position: fixed;

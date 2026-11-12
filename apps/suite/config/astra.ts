@@ -32,3 +32,32 @@ export type Glyphs = Record<string, Glyph>;
 
 export const EMPTY_GLYPH: Glyph = { strokes: [], shapes: [] };
 export const isEmptyGlyph = (glyph: Glyph) => glyph.strokes.length === 0 && glyph.shapes.length === 0;
+
+// ── Spacing: how much room each letter takes up in a line of text ──
+
+/** Empty room kept on each side of a letter, so neighbours don't touch. */
+export const SIDE_SPACE = 60;
+/** How wide a space between words is. */
+export const SPACE_WIDTH = 320;
+/** How wide a letter that hasn't been made yet is, in the preview. */
+export const MISSING_WIDTH = 600;
+
+/** The leftmost and rightmost ink of a letter on the grid (pen strokes count their thickness).
+ *  Null if there's no ink at all. A letter's width in text is this span plus SIDE_SPACE on each side. */
+export function inkSpan(glyph: Glyph): { left: number; right: number } | null {
+  let left = Infinity;
+  let right = -Infinity;
+  for (const stroke of glyph.strokes) {
+    for (const [x] of stroke) {
+      left = Math.min(left, x - PEN_WIDTH / 2);
+      right = Math.max(right, x + PEN_WIDTH / 2);
+    }
+  }
+  for (const shape of glyph.shapes) {
+    for (const [x] of shape) {
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+  }
+  return left <= right ? { left, right } : null;
+}
