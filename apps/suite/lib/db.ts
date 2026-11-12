@@ -272,4 +272,18 @@ db.exec(`
 addColumn('Message', 'images', 'TEXT');
 addColumn('UmbraMessage', 'images', 'TEXT');
 
+// Astra: the fonts each profile makes. `glyphs` will hold the drawn letters as JSON
+// (empty for now; the drawing pad fills it in later).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS AstraFont (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    glyphs TEXT NOT NULL DEFAULT '{}',
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_astra_font_user ON AstraFont (user_id, updatedAt);
+`);
+
 export default db;

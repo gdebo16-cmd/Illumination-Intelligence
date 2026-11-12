@@ -2740,16 +2740,123 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 .astra-empty {
   margin: 0;
 }
+/* The font's name, which you can click and type into to rename it */
+.astra-name {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 0 1rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+}
+.astra-name:hover { border-color: color-mix(in srgb, currentColor 30%, transparent); }
+.astra-name:focus-visible { outline: none; border-color: currentColor; }
+.astra-error {
+  margin: 0 0 1rem;
+  color: #e0484f;
+}
 .astra-glyph-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(4rem, 1fr));
   gap: 0.5rem;
 }
+/* Each letter box is a button that opens the drawing pad. */
 .astra-glyph-slot {
+  position: relative;
   border: 1px solid currentColor;
+  border-radius: 0.375rem;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.astra-glyph-slot:not(.is-drawn) { opacity: 0.55; }
+.astra-glyph-slot:hover { background: color-mix(in srgb, currentColor 10%, transparent); opacity: 1; }
+.astra-glyph-slot:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 2px; }
+.astra-glyph-art { width: 85%; height: 85%; }
+.astra-glyph-label {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.3rem;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+/* The drawing pad, opened on top of the page. */
+.astra-pad-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+}
+.astra-pad {
+  width: min(32rem, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--grad-color-2);
+  color: var(--text-color);
+  box-shadow: var(--box-shadow);
+}
+.astra-pad h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.astra-pad-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  touch-action: none; /* a finger draws instead of scrolling the page */
+  user-select: none;
+  cursor: crosshair;
+}
+.astra-pad-ghost { fill: currentColor; opacity: 0.08; pointer-events: none; font-family: system-ui, sans-serif; }
+.astra-pad-guide { stroke: #5ad1c4; stroke-width: 3; stroke-dasharray: 16 12; opacity: 0.5; pointer-events: none; }
+.astra-pad-canvas.is-tracing { opacity: 0.5; cursor: progress; }
+.astra-pad-problem { margin: 0.75rem 0 0; color: #e0484f; font-size: 0.9rem; }
+.astra-pad-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.astra-pad-spacer { flex: 1; }
+.astra-pad-buttons button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+.astra-pad-buttons button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.astra-pad-buttons button:disabled { opacity: 0.4; cursor: default; }
+.astra-pad-buttons .astra-pad-save { background: #5ad1c4; border-color: #5ad1c4; color: #04201d; font-weight: 600; }
+.astra-pad-buttons .astra-pad-save:hover:not(:disabled) { background: #7fe0d5; }
+
+.astra-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.astra-sidebar-content button {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
 }
 /* #endregion astra */
 
