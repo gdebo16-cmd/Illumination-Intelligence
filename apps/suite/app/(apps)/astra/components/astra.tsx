@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import SidebarToggle from "@/components/SidebarToggle";
 import GlyphPad, { GlyphArt } from "./glyph-pad";
 import FontPreview from "./font-preview";
+import SheetImport, { type SheetLetter } from "./sheet-import";
 import { EMPTY_GLYPH, GLYPH_SIZE, LETTERS, type Glyph, type Glyphs } from "@/config/astra";
 
 // What a font looks like when it comes back from /api/astra/fonts (see lib/astra/fonts.ts).
@@ -28,6 +29,7 @@ const Astra = () => {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null); // the letter open in the drawing pad
   const [savingGlyph, setSavingGlyph] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false); // the alphabet sheet upload
 
   const selected = fonts.find((font) => font.id === selectedId);
 
@@ -100,6 +102,29 @@ const Astra = () => {
     setEditing(null);
   };
 
+  // Save the letters from an alphabet sheet, one at a time. Each replaces that whole letter.
+  // Gives an error message if one fails (the ones before it are already saved), or null.
+  const saveSheet = async (letters: SheetLetter[]): Promise<string | null> => {
+    if (!selected) return "No font is open.";
+    let latest: Font | null = null;
+    let failed: string | null = null;
+    for (const { letter, shapes } of letters) {
+      const res = await fetch(`/api/astra/fonts/${selected.id}/glyphs/${letter}`, {
+        method: "PUT",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ strokes: [], shapes }),
+      }).catch(() => null);
+      if (!res?.ok) {
+        failed = `Couldn't save the letter ${letter}. The letters before it were saved.`;
+        break;
+      }
+      latest = await res.json();
+    }
+    const saved = latest;
+    if (saved) setFonts((all) => all.map((font) => (font.id === saved.id ? saved : font)));
+    return failed;
+  };
+
   const removeFont = async (font: Font) => {
     if (!window.confirm(`Delete "${font.name}"? This can't be undone.`)) return;
     setError(null);
@@ -161,6 +186,20 @@ const Astra = () => {
                 onBlur={saveName}
                 onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               />
+              <div className="astra-actions">
+                <button type="button" className="astra-action" onClick={() => setSheetOpen(true)}>
+                  Upload alphabet sheet
+                </button>
+                {Object.keys(selected.glyphs).length > 0 ? (
+                  <a className="astra-action" href={`/api/astra/fonts/${selected.id}/download`} download>
+                    Download font (.ttf)
+                  </a>
+                ) : (
+                  <span className="astra-action is-disabled" title="Make at least one letter first">
+                    Download font (.ttf)
+                  </span>
+                )}
+              </div>
               <div className="astra-glyph-grid">
                 {LETTERS.map((letter) => {
                   const glyph = selected.glyphs[letter];
@@ -185,6 +224,14 @@ const Astra = () => {
                 })}
               </div>
               <FontPreview glyphs={selected.glyphs} onMake={setEditing} />
+              {sheetOpen && (
+                <SheetImport
+                  key={selected.id}
+                  glyphs={selected.glyphs}
+                  onSave={saveSheet}
+                  onClose={() => setSheetOpen(false)}
+                />
+              )}
               {editing && (
                 <GlyphPad
                   key={`${selected.id}-${editing}`}

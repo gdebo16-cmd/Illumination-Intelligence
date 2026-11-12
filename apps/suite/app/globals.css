@@ -2793,6 +2793,87 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
   opacity: 0.6;
 }
 
+/* The buttons above the letter grid: upload a sheet, download the font. */
+.astra-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1rem; }
+.astra-action {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #5ad1c4;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #5ad1c4;
+  background: transparent;
+  text-decoration: none;
+  cursor: pointer;
+}
+.astra-action:hover { background: rgba(90, 209, 196, 0.12); }
+.astra-action:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 2px; }
+.astra-action.is-disabled { opacity: 0.4; cursor: default; }
+.astra-action.is-disabled:hover { background: transparent; }
+
+/* Uploading a whole alphabet sheet (uses the pad's window, made wider). */
+.astra-pad.astra-sheet { width: min(56rem, 100%); }
+.astra-sheet-tips { margin: 0 0 1rem; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.5; opacity: 0.85; }
+.astra-sheet-order { display: grid; gap: 0.35rem; margin-bottom: 1rem; font-size: 0.9rem; }
+.astra-sheet-order input {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  letter-spacing: 0.08em;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+}
+.astra-sheet-drop {
+  display: grid;
+  place-items: center;
+  min-height: 9rem;
+  padding: 1rem;
+  border: 2px dashed rgba(90, 209, 196, 0.5);
+  border-radius: 0.75rem;
+  text-align: center;
+}
+.astra-sheet-drop.is-busy { cursor: progress; opacity: 0.7; }
+.astra-sheet-drop button {
+  padding: 0;
+  border: none;
+  font: inherit;
+  color: #5ad1c4;
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.astra-sheet-help, .astra-sheet-note { margin: 0 0 0.75rem; font-size: 0.9rem; }
+.astra-sheet-note { color: #e3b84f; }
+.astra-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.5rem;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.astra-sheet-tile {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+}
+.astra-sheet-tile svg { width: 100%; aspect-ratio: 1; }
+.astra-sheet-tile select {
+  width: 100%;
+  padding: 0.2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.35rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  background: var(--grad-color-2);
+}
+.astra-sheet-tile.is-skipped svg { opacity: 0.3; }
+.astra-sheet-tile.is-doubled { border-color: #e0484f; }
+
 /* "Try it out": type a sentence and see it in your font. */
 .astra-preview { margin-top: 2rem; }
 .astra-preview h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
