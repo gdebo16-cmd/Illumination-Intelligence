@@ -20,19 +20,23 @@ export type FlameId = (typeof FLAMES)[number]['id'];
 // ------------------------------------------------------------------ shapes and colors
 //
 // What you pick for a Flicker: one of six shapes, and any color.
-// Every shape has a white picture (the "clean palette"); the app tints it with your color in the
-// browser, so no extra pictures are needed per color. 'art' is the picture's file name in
-// public/umbra/flames. The flame's white picture is the animated 'pearl' one; the other five were
-// painted by Prism in the flames' art style (scripts/make-flicker-designs.py) and are still
-// pictures for now. `words` is how the Flicker is told what it looks like.
+// Every shape has a white (pearl) picture (the "clean palette"); the app tints it with your color in
+// the browser, so no extra pictures are needed per color. 'art' is the picture's file name in
+// public/umbra/flames: a square 512x512 still (.png) and a resting animation (.avif and .webp).
+// Gabriel designed the six shapes and Art drew them and their idle loops (droplet bubbles, sprout
+// pollen, star sparkles, gem glints, flame embers). `words` is how the Flicker is told what it looks like.
 export const SHAPES = [
-  { id: 'flame', name: 'Flame', art: 'pearl', words: 'flame spirit' },
+  { id: 'flame', name: 'Flame', art: 'flame', words: 'flame spirit' },
   { id: 'droplet', name: 'Droplet', art: 'droplet', words: 'water droplet spirit' },
-  { id: 'leaf', name: 'Sprout', art: 'leaf', words: 'leaf sprout spirit' },
+  { id: 'sprout', name: 'Sprout', art: 'sprout', words: 'leaf sprout spirit' },
   { id: 'star', name: 'Star', art: 'star', words: 'star spirit' },
-  { id: 'stone', name: 'Crystal', art: 'stone', words: 'crystal spirit' },
-  { id: 'umbra', name: 'Umbra', art: 'umbra', words: 'shadow flame spirit' },
+  { id: 'gem', name: 'Gem', art: 'gem', words: 'crystal gem spirit' },
+  { id: 'wispy-flame', name: 'Wispy flame', art: 'wispy-flame', words: 'wispy shadow flame spirit' },
 ] as const;
+
+// Shape ids saved before the shapes got their final names. A Flicker saved as "leaf#aabbcc" is a
+// Sprout now, "stone" a Gem and "umbra" a Wispy flame. They are not offered in the picker.
+const SHAPE_ALIASES: Record<string, string> = { leaf: 'sprout', stone: 'gem', umbra: 'wispy-flame' };
 
 // The color a new Flicker starts with, and the color of an untinted (white) one.
 export const DEFAULT_FLAME_COLOR = '#a77bff';
@@ -45,12 +49,14 @@ const WHITE = '#e8e8f0';
 //   "violet"       one of the eight original flames, drawn with its own full-color pictures
 //                  (Flickers made before the shape picker keep looking exactly as they did)
 function read(flame: unknown): { shape: (typeof SHAPES)[number]; original?: (typeof FLAMES)[number]; tint?: string } | null {
-  const parts = typeof flame === 'string' ? /^([a-z]*)(#[0-9a-f]{6})?$/i.exec(flame) : null;
+  // Shape ids are lowercase words, joined by hyphens ("wispy-flame").
+  const parts = typeof flame === 'string' ? /^([a-z]+(?:-[a-z]+)*)?(#[0-9a-f]{6})?$/i.exec(flame) : null;
   if (!parts || (!parts[1] && !parts[2])) return null;
   const tint = parts[2]?.toLowerCase();
   const original = tint ? undefined : FLAMES.find((f) => f.id === parts[1]);
   if (original) return { shape: SHAPES[0], original };
-  const shape = parts[1] ? SHAPES.find((s) => s.id === parts[1]) : SHAPES[0];
+  const id = parts[1] ? (SHAPE_ALIASES[parts[1]] ?? parts[1]) : undefined;
+  const shape = id ? SHAPES.find((s) => s.id === id) : SHAPES[0];
   return shape ? { shape, tint } : null;
 }
 
@@ -89,10 +95,15 @@ export const flameAnimation = (flame: string, clip: FlameClip = 'idle') => {
   const file = `/umbra/flames/${flameArt(flame)}${clip === 'dance' ? '-dance' : ''}`;
   return { avif: `${file}.avif`, webp: `${file}.webp` };
 };
-// Width of a flicker picture for each pixel of height (they all share one picture shape).
+// Width of a flicker picture for each pixel of height. The eight original flames are tall (161x246);
+// the six shapes are square (512x512).
 export const FLAME_ASPECT = flameClips.width / flameClips.height;
-/** True when this look has a resting animation (the flame does; the other shapes don't yet). */
-export const hasAnimation = (flame: string) => FLAMES.some((f) => f.id === flameArt(flame));
+export const flameAspect = (flame: string): number => (read(flame)?.original ? FLAME_ASPECT : 1);
+/** True when this look has a resting animation (all eight original flames and all six shapes do). */
+export const hasAnimation = (flame: string) => {
+  const art = flameArt(flame);
+  return FLAMES.some((f) => f.id === art) || SHAPES.some((s) => s.art === art);
+};
 // True once a dance clip has been made for this look (the script fills in the list).
 // Until then the app makes the resting animation hop and sway instead.
 export const hasDanceClip = (flame: string) => (flameClips.dance as string[]).includes(flameArt(flame));
@@ -103,6 +114,7 @@ export const BOT_MODELS = [
   { id: 'qwen3.5:9b', name: 'Little Eyed Fish: quick, can see images' },
   { id: 'qwen2.5-coder:7b', name: 'Small Code Fish: quick code help' },
   { id: 'gpt-oss:20b', name: 'Big City Task Fish: multi-step tasks (heavy)' },
+  { id: 'devstral-small-2:24b', name: 'Harbor Code Fish: explores and edits a project, can see images (heavy)' },
   { id: 'qwen3-coder:30b', name: 'Deep Sea Code Fish: best code (heavy, slow)' },
 ] as const;
 

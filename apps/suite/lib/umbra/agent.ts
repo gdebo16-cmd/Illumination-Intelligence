@@ -208,7 +208,17 @@ export async function runAgent(options: {
       options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high', options.context.userId,
       thinks ? showThinking : undefined,
     );
-    const calls = reply.message?.tool_calls ?? [];
+    let calls = reply.message?.tool_calls ?? [];
+    let spoken = reply.message?.content ?? '';
+    // Some models write a tool request as JSON in the reply text instead of
+    // Ollama's official tool_calls slot. Turn that into a real tool request.
+    if (calls.length === 0) {
+      const fromText = parseTextToolCalls(spoken, (name) => tools.has(name));
+      if (fromText.length) {
+        calls = fromText;
+        spoken = ''; // the JSON was a tool request, not the answer to show
+      }
+    }
 
     // The thinking is over: keep it with the reply, folded away under how long it took.
     const thinking = reply.message?.thinking?.trim() ?? '';
@@ -235,7 +245,7 @@ export async function runAgent(options: {
     }));
     messages.push({
       role: 'assistant',
-      content: reply.message?.content ?? '',
+      content: spoken,
       tool_calls: parsed.map((p) => ({ function: { name: p.name, arguments: p.args } })),
       ...(thinking ? { thinking } : {}),
     });
@@ -285,6 +295,99 @@ export async function runAgent(options: {
     }
   }
   return { reply: '…', steps }; // not reached: the last round always returns
+}
+
+
+/**
+ * Some models (Devstral, for example) write a tool request as JSON in the reply
+ * text instead of Ollama's official tool_calls slot: {"name": "search_code",
+ * "arguments": {"text": "page.tsx"}}. If that JSON names a real tool, treat it
+ * as a real request so the tool actually runs.
+ */
+function parseTextToolCalls(
+  content: string,
+  isTool: (name: string) => boolean,
+): NonNullable<NonNullable<OllamaReply['message']>['tool_calls']> {
+  const text = content.trim();
+  if (!text) return [];
+
+  const asCall = (value: unknown): { function: { name: string; arguments: Record<string, unknown> } } | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const obj = value as Record<string, unknown>;
+    const fn = obj.function && typeof obj.function === 'object' && !Array.isArray(obj.function)
+      ? (obj.function as Record<string, unknown>)
+      : obj;
+    const name = typeof fn.name === 'string' ? fn.name.trim() : '';
+    if (!name || !isTool(name)) return null;
+    let args: unknown = fn.arguments ?? fn.args ?? fn.parameters ?? {};
+    if (typeof args === 'string') args = safeJson(args);
+    if (!args || typeof args !== 'object' || Array.isArray(args)) args = {};
+    return { function: { name, arguments: args as Record<string, unknown> } };
+  };
+
+  const consider = (value: unknown) => {
+    if (Array.isArray(value)) {
+      const calls = value.map(asCall).filter((c): c is NonNullable<typeof c> => c !== null);
+      return calls.length === value.length && calls.length > 0 ? calls : [];
+    }
+    if (value && typeof value === 'object' && Array.isArray((value as { tool_calls?: unknown }).tool_calls)) {
+      return consider((value as { tool_calls: unknown[] }).tool_calls);
+    }
+    const one = asCall(value);
+    return one ? [one] : [];
+  };
+
+  const unfenced = text.replace(/^```(?:json|tool|tools)?\s*/i, '').replace(/\s*```$/, '').trim();
+  for (const candidate of [text, unfenced]) {
+    try {
+      const found = consider(JSON.parse(candidate));
+      if (found.length) return found;
+    } catch {
+      // not a single JSON value
+    }
+  }
+
+  const found: NonNullable<NonNullable<OllamaReply['message']>['tool_calls']> = [];
+  for (const snippet of jsonSnippets(unfenced)) {
+    try {
+      found.push(...consider(JSON.parse(snippet)));
+    } catch {
+      // keep looking
+    }
+  }
+  return found;
+}
+
+/** Top-level JSON objects or arrays sitting inside a larger string. */
+function jsonSnippets(text: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const start = text[i];
+    if (start !== '{' && start !== '[') continue;
+    let depth = 0;
+    let inStr = false;
+    let escape = false;
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j];
+      if (inStr) {
+        if (escape) escape = false;
+        else if (ch === '\\') escape = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') inStr = true;
+      else if (ch === '{' || ch === '[') depth++;
+      else if (ch === '}' || ch === ']') {
+        depth--;
+        if (depth === 0) {
+          out.push(text.slice(i, j + 1));
+          i = j;
+          break;
+        }
+      }
+    }
+  }
+  return out;
 }
 
 function safeJson(text: string): Record<string, unknown> {

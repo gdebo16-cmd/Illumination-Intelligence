@@ -78,6 +78,7 @@ export default function TeamForm({ teamId }: { teamId?: string }) {
       router.push(`/umbra/teams/${data.id}`);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
       setSaving(false);
     }
   };

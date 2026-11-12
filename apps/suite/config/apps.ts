@@ -31,14 +31,16 @@ const app = (id: string, name: string, tagline: string, color: string, status: A
 });
 
 export const APPS: readonly SuiteApp[] = [
-  app('lumen', 'Lumen', 'Local chat', '#7aa2ff', 'live'),
-  app('umbra', 'Umbra', 'Agent Flickers', '#a3394b', 'live'),
-  app('prism', 'Prism', 'Image studio', '#b07cff', 'live'),
-  app('eclipse', 'Eclipse', 'Coming soon', '#e0484f', 'soon'),
-  app('halo', 'Halo', 'Coming soon', '#e3b84f', 'soon'),
-  app('aegis', 'Aegis', 'Coming soon', '#8fb8e8', 'soon'),
-  app('refract', 'Refract', 'Coming soon', '#5b93e6', 'soon'),
-  app('astra', 'Astra', 'Coming soon', '#5ad1c4', 'soon'),
+  app('lumen', 'Lumen', 'AI Assistant', '#7aa2ff', 'live'),
+  app('umbra', 'Umbra', 'Agentic Flickers', '#a3394b', 'live'),
+  app('prism', 'Prism', 'Imagination Station', '#b07cff', 'live'),
+  app('astra', 'Astra', 'Font Forger', '#5ad1c4', 'soon'),
+  app('refract', 'Refract', 'Virtual Playground', '#5b93e6', 'soon'),
+  app('aegis', 'Aegis', 'Digital Guardian', '#8fb8e8', 'soon'),
+  app('halo', 'Halo', 'Life Mapping', '#e3b84f', 'soon'),
+  app('eclipse', 'Eclipse', 'Data Nexus', '#e0484f', 'soon'),
+  
+
 ];
 
 export const getApp = (id: string): SuiteApp => {

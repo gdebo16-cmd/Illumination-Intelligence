@@ -79,6 +79,7 @@ export default function BotForm({ botId }: { botId?: string }) {
       router.push(`/umbra/${data.id}`);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
       setSaving(false);
     }
   };
@@ -102,7 +103,7 @@ export default function BotForm({ botId }: { botId?: string }) {
           <>
             <fieldset className="umbra-field">
               <legend className="umbra-label">Pick a shape</legend>
-              {/* Six white shapes (a clean palette). Picking one keeps the color you chose below. */}
+              {/* Art's six pearl shapes (a clean palette), each with its idle loop. Picking one keeps the color you chose below. */}
               <div className="umbra-flames" role="radiogroup">
                 {SHAPES.map((s) => (
                   <button

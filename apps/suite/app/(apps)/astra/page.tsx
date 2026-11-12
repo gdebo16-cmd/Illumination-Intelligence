@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import ComingSoon from '@/components/ComingSoon';
+import Astra from './components/astra';
 
 export const metadata: Metadata = { title: 'Astra' };
 
 export default function AstraPage() {
-  return <ComingSoon appId="astra" />;
+  return <Astra />;
 }

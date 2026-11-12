@@ -13,6 +13,12 @@ export const MessageContent = ({ content }: { content: string }) => (
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeHighlight]}
       components={{
+        // Wide tables scroll sideways on a phone instead of wrapping letter-by-letter.
+        table: ({ children }: { children?: ReactNode }) => (
+          <div className="markdown-table-scroll">
+            <table>{children}</table>
+          </div>
+        ),
         // Fenced code arrives as <pre><code class="language-x">. Inline `code` is left alone.
         pre: ({ children }: { children?: ReactNode }) => {
           const child = Children.toArray(children)[0];

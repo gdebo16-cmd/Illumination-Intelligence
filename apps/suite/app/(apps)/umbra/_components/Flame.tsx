@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FLAME_ASPECT, flameAnimation, flameColor, flameStill, flameTint, hasAnimation, hasDanceClip } from '@/config/umbra';
+import { flameAnimation, flameAspect, flameColor, flameStill, flameTint, hasAnimation, hasDanceClip } from '@/config/umbra';
 
 // A Flicker's avatar. `size` is its height in pixels. `flame` is its saved look: a shape and a
 // color, such as "star#ff8800" (see config/umbra.ts).
@@ -23,7 +23,7 @@ export default function Flame({ flame, size = 80, still = false, mood = 'idle', 
   const [broken, setBroken] = useState(false);
   const working = mood === 'working';
   const dancing = working && hasDanceClip(flame);
-  // Only the flame shape has an animation so far; the other shapes are still pictures.
+  // Every look has a resting animation now; hasAnimation guards against a look without one.
   const animated = (working || !still) && !broken && hasAnimation(flame);
   const clip = flameAnimation(flame, dancing ? 'dance' : 'idle');
   const classes = ['flame', working && 'is-working', working && !dancing && 'is-standin', className].filter(Boolean).join(' ');
@@ -38,7 +38,7 @@ export default function Flame({ flame, size = 80, still = false, mood = 'idle', 
   return (
     <picture
       className={classes}
-      style={{ height: size, width: Math.round(size * FLAME_ASPECT), '--flame-color': flameColor(flame), '--flame-size': `${size}px` } as React.CSSProperties}
+      style={{ height: size, width: Math.round(size * flameAspect(flame)), '--flame-color': flameColor(flame), '--flame-size': `${size}px` } as React.CSSProperties}
     >
       {animated && <source media="(prefers-reduced-motion: reduce)" srcSet={flameStill(flame)} />}
       {animated && <source type="image/avif" srcSet={clip.avif} />}
