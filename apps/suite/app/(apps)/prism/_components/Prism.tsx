@@ -588,11 +588,11 @@ const Prism = () => {
               ))}
             </select>
             {/* A style with a LoRA (a trained add-on) only fits the model it was trained on */}
-            {pickedStyle?.lora && (
+            {pickedStyle?.loras && (
               <p className="prism-note">
-                {pickedStyle.lora.model === model
+                {model in pickedStyle.loras
                   ? 'This style was trained on your own art.'
-                  : `This style was trained for ${findPrismModel(pickedStyle.lora.model).name}. With this model you only get its words, so the look will be weaker.`}
+                  : 'This style wasn’t trained for this model, so you only get its words and the look will be weaker.'}
               </p>
             )}
 

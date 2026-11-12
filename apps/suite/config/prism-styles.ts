@@ -16,17 +16,18 @@ export interface PrismStyle {
   /** Put in front of your prompt. A LoRA's "trigger phrase" (the words it was trained with) goes here. */
   lead?: string;
   /**
-   * A LoRA: a small add-on file that teaches a model one art style from example pictures.
-   * It only fits the model it was trained on, so with any other model just the words are used.
+   * LoRAs: small add-on files that teach a model one art style from example pictures, one per
+   * model (an id from config/prism-models.ts). A LoRA only fits the model it was trained on,
+   * so with a model that has none here, just the words are used.
    */
-  lora?: {
-    /** The file's name in ComfyUI's models\loras folder. */
-    file: string;
-    /** The model it was trained for: an id from config/prism-models.ts. */
-    model: PrismModelId;
-    /** How strongly it's applied. 1 is full strength. */
-    strength: number;
-  };
+  loras?: Partial<Record<PrismModelId, StyleLora>>;
+}
+
+export interface StyleLora {
+  /** The file's name in ComfyUI's models\loras folder. */
+  file: string;
+  /** How strongly it's applied. 1 is full strength. */
+  strength: number;
 }
 
 export const PRISM_STYLES: readonly PrismStyle[] = [
@@ -44,14 +45,18 @@ export const PRISM_STYLES: readonly PrismStyle[] = [
   { id: 'color-sketch', name: 'Colored sketch', words: 'colored pencil sketch, loose pencil linework with light color washes, hand-drawn, visible strokes and hatching, sketchbook paper texture' },
   { id: 'linework', name: 'Linework', words: 'clean ink line art, black lines on white background, precise even line weight, no shading, no color, no fill, coloring book style' },
   // The Eldrid Tales look: ink and muted watercolor on parchment, learned from the game's own
-  // race and subclass art (trained with AI Toolkit; the file is step 1,250 of eldrid_parchment_v1).
+  // race and subclass art, trained with AI Toolkit once per model (both files are step 1,250 of
+  // their runs: eldrid_parchment_v1 for Quicksketch, eldrid_parchment_flux3_v1 for Masterpiece).
   // Without "no text" the model writes the trigger phrase onto the picture as a signature.
   {
     id: 'eldrid',
     name: 'Eldrid Tales',
     lead: 'eldridtales style',
     words: 'ink and muted watercolor, plain parchment-colored background filling the whole frame, no text, no lettering, no signature, no watermark',
-    lora: { file: 'eldrid-parchment-v1.safetensors', model: 'flux2-klein', strength: 1 },
+    loras: {
+      'flux2-klein': { file: 'eldrid-parchment-v1.safetensors', strength: 1 },
+      'flux3-klein': { file: 'eldrid-parchment-flux3-v1.safetensors', strength: 1 },
+    },
   },
 ];
 
@@ -62,7 +67,6 @@ export function applyStyle(prompt: string, styleId?: string): string {
 }
 
 /** The LoRA to load for this style and model, if the style has one made for that model. */
-export function styleLora(styleId: string | undefined, model: PrismModelId) {
-  const lora = PRISM_STYLES.find((s) => s.id === styleId)?.lora;
-  return lora?.model === model ? lora : undefined;
+export function styleLora(styleId: string | undefined, model: PrismModelId): StyleLora | undefined {
+  return PRISM_STYLES.find((s) => s.id === styleId)?.loras?.[model];
 }
