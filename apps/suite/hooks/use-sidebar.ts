@@ -1,26 +1,15 @@
 'use client';
 
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useState } from 'react';
 
 // Whether an app's side panel (components/Sidebar.tsx) is open. Every app with one uses this, so
 // they all behave the same:
-//   - On a wide screen (a computer, or a tablet on its side) it starts open; on a phone, closed,
-//     because there it slides over the page.
-//   - Until you open or close it yourself, it follows the screen width as the window is resized.
-//     After that, your choice sticks.
-//   - closeOnPhone() is for picking something in the panel (a chat, a picture): on a phone the
-//     panel gets out of the way so you can see it; on a wide screen it stays.
+//   - It starts closed, on every screen. The ☰ button opens and closes it.
+//   - closeOnPhone() is for picking something in the panel (a chat, a picture): on a phone, where
+//     the panel covers the page, it gets out of the way so you can see what you picked; on a wider
+//     screen it stays open.
 
-const WIDE_SCREEN = '(min-width: 1024px)';
 const PHONE_WIDTH = 768;
-
-const watchWide = (onChange: () => void) => {
-  const query = window.matchMedia(WIDE_SCREEN);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-};
-const isWideNow = () => window.matchMedia(WIDE_SCREEN).matches;
-const isWideOnServer = () => false; // the server can't see the window; the browser corrects it
 
 export interface SidebarState {
   open: boolean;
@@ -31,13 +20,11 @@ export interface SidebarState {
 }
 
 export default function useSidebar(): SidebarState {
-  const isWide = useSyncExternalStore(watchWide, isWideNow, isWideOnServer);
-  const [choice, setChoice] = useState<boolean | null>(null);
-  const open = choice ?? isWide;
-  const toggle = useCallback(() => setChoice(!open), [open]);
-  const close = useCallback(() => setChoice(false), []);
+  const [open, setOpen] = useState(false);
+  const toggle = useCallback(() => setOpen((o) => !o), []);
+  const close = useCallback(() => setOpen(false), []);
   const closeOnPhone = useCallback(() => {
-    if (window.innerWidth < PHONE_WIDTH) setChoice(false);
+    if (window.innerWidth < PHONE_WIDTH) setOpen(false);
   }, []);
   return { open, toggle, close, closeOnPhone };
 }
