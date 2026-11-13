@@ -108,3 +108,21 @@
     --border-radius: 10px;
     --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
+
+[data-theme="aegis"] {
+    --background-color: #000000;
+    --text-color: #eef3fb;
+    --primary-color: rgba(20, 34, 56, 0.45);
+    --secondary-color: rgba(0, 0, 0, 0.6);
+    --grad-color-1: #172a45;
+    --grad-color-2: #05080f;
+    --accent-color: #0c1626;
+    --border-color: #243246;
+    --edge-color: #030406;
+    --chat-user: #c0d4e6;
+    --chat-assistant: #fcdfab;
+    --load: #3c5a7e;
+    --placeholder: #3f414567;
+    --border-radius: 10px;
+    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+}

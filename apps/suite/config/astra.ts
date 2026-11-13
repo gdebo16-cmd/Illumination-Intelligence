@@ -15,7 +15,7 @@ export const CHARACTER_GROUPS: CharacterGroup[] = [
 export const CHARACTERS = CHARACTER_GROUPS.flatMap((group) => group.characters);
 export const isCharacter = (text: string) => CHARACTERS.includes(text);
 /** The capitals A to Z. */
-export const LETTERS = CHARACTER_GROUPS[0].characters;
+const LETTERS = CHARACTER_GROUPS[0].characters;
 
 /** A lowercase letter that hasn't been made yet borrows its capital. Everything else has no stand-in. */
 export const fallbackFor = (char: string): string | null => {

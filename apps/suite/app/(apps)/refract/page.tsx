@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Refract from './_components/refract';
+import Refract from './_components/Refract';
 
 export const metadata: Metadata = { title: 'Refract' };
 

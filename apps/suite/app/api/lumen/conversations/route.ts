@@ -1,6 +1,6 @@
 import { connection, NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 
 // Lists the signed-in profile's chats, newest first.
 export async function GET() {
@@ -9,9 +9,7 @@ export async function GET() {
   await connection();
   try {
     const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
-    }
+    if (!userId) return noProfile();
 
     const conversations = db
       .prepare('SELECT id, title, updatedAt FROM Conversation WHERE user_id = ? ORDER BY updatedAt DESC')

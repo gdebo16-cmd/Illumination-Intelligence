@@ -7,14 +7,15 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
-import { USERS, type UserId } from '@/lib/users';
+import { USERS, type UserId } from '@/lib/profiles';
 import { nextRun, parseSchedule, type Schedule } from '@/config/umbra-schedule';
-import { runAgent, type AgentStep } from './agent';
+import { runAgent } from './agent';
+import type { AgentStep } from './types';
 import { getBot, listNotes, systemPrompt } from './bots';
 import { getTeam, listTeamMessages, runTeam, viewTeam } from './teams';
 import { saveDocumentArtifacts } from '@/lib/artifacts';
 
-export const TASK_LIMITS = { title: 80, instructions: 2000 };
+const TASK_LIMITS = { title: 80, instructions: 2000 };
 
 export interface Task {
   id: string;
@@ -207,7 +208,7 @@ function claim(task: Task, now: Date): boolean {
 }
 
 /** Run a task now: the bot works on it with its tools, and the report lands in the inbox. */
-export async function runTask(userId: string, task: Task): Promise<Run> {
+async function runTask(userId: string, task: Task): Promise<Run> {
   const bot = getBot(userId, task.botId);
   if (!bot) throw new Error('The Flicker for this task no longer exists.');
   const teamRow = task.teamId ? getTeam(userId, task.teamId) : null;

@@ -49,10 +49,34 @@ if (legacyOwner) {
 
 db.exec('CREATE INDEX IF NOT EXISTS idx_conversation_user ON Conversation (user_id, updatedAt)');
 
-// Memory tables (safe to run every start: every statement uses IF NOT EXISTS)
-db.exec(
-  fs.readFileSync(path.join(process.cwd(), 'lib', 'memory-schema.sql'), 'utf8'),
-);
+// Lumen's memory: facts it remembers about each profile. Conversation ids are TEXT (UUIDs) to
+// match the Conversation table.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS memories (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id                TEXT    NOT NULL,                 -- separates you and your wife
+    fact                   TEXT    NOT NULL,                 -- one short, self-contained statement
+    category               TEXT    NOT NULL DEFAULT 'other', -- profile | preference | project | people | other
+    source_conversation_id TEXT,                             -- which chat it came from
+    embedding              BLOB,                             -- Float32 bytes; NULL until embedded
+    embedding_model        TEXT,                             -- re-embed everything if this changes
+    use_count              INTEGER NOT NULL DEFAULT 0,
+    last_used_at           TEXT,
+    created_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+    deleted_at             TEXT                              -- soft delete so "forget" is reversible
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_memories_user
+    ON memories (user_id, deleted_at);
+
+  -- How far extraction has read in each conversation (by Message rowid, since ids are UUIDs).
+  CREATE TABLE IF NOT EXISTS memory_extractions (
+    conversation_id TEXT    PRIMARY KEY,
+    last_row_id     INTEGER NOT NULL,
+    processed_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+`);
 
 // Prism: one row per picture. The picture itself is saved as data/prism/images/<id>.png.
 // The prompt, style, seed and size are kept so a picture can be made again exactly.
@@ -307,6 +331,8 @@ db.exec(`
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_key ON Artifact (user_id, app, source_kind, source_id, kind, title);
   CREATE INDEX IF NOT EXISTS idx_artifact_user ON Artifact (user_id, app, updatedAt);
+  -- One-time jobs that have run, e.g. 'lumen-backfill' (see backfillOnce in lib/artifacts.ts).
+  CREATE TABLE IF NOT EXISTS ArtifactMeta (key TEXT PRIMARY KEY);
 `);
 
 export default db;

@@ -1,5 +1,5 @@
 import { connection, NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { listArtifacts, type ArtifactApp } from '@/lib/artifacts';
 
 const APPS: ArtifactApp[] = ['lumen', 'umbra'];
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   // Run on every request, so new artifacts always show up in a production build.
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
 
   const url = new URL(req.url);
   const app = url.searchParams.get('app') as ArtifactApp | null;

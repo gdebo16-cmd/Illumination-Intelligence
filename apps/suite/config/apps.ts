@@ -3,7 +3,7 @@
 // banner at public/brand/<id>.png and its icon at public/brand/icons/<id>.png.
 // If a product moves to its own server later, set href to its full URL.
 
-export type AppStatus = 'live' | 'soon';
+type AppStatus = 'live' | 'soon';
 
 export interface SuiteApp {
   id: string;
@@ -36,7 +36,7 @@ export const APPS: readonly SuiteApp[] = [
   app('prism', 'Prism', 'Imagination Station', '#b07cff', 'live'),
   app('astra', 'Astra', 'Font Forger', '#5ad1c4', 'live'),
   app('refract', 'Refract', 'Virtual Playground', '#5b93e6', 'live'),
-  app('aegis', 'Aegis', 'Digital Guardian', '#8fb8e8', 'soon'),
+  app('aegis', 'Aegis', 'Digital Guardian', '#8fb8e8', 'live'),
   app('halo', 'Halo', 'Life Mapping', '#e3b84f', 'soon'),
   app('eclipse', 'Eclipse', 'Data Nexus', '#e0484f', 'soon'),
   

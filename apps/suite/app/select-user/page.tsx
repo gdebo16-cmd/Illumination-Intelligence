@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { USERS } from '@/lib/users';
+import { USERS } from '@/lib/profiles';
 
 const users = Object.entries(USERS).map(([id, name]) => ({
   id,

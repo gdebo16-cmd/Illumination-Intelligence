@@ -1,13 +1,13 @@
 // GET /api/refract/status - how the Refract virtual machine is doing (on, off, snapshots).
 
 import { connection, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/user";
+import { getCurrentUserId, noProfile } from "@/lib/user";
 import { getVmStatus } from "@/lib/refract/vbox";
 
 export async function GET() {
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Please select a user profile first." }, { status: 401 });
+  if (!userId) return noProfile();
   try {
     const status = await getVmStatus();
     return NextResponse.json(status, { headers: { "Cache-Control": "no-store" } });

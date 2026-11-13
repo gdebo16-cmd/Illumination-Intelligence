@@ -1,13 +1,13 @@
 // GET /api/refract/workspaces — project folders copied into the Refract VM, and their snapshots.
 
 import { connection, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/user";
+import { getCurrentUserId, noProfile } from "@/lib/user";
 import { listWorkspaces } from "@/lib/refract/workspace";
 
 export async function GET() {
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Please select a user profile first." }, { status: 401 });
+  if (!userId) return noProfile();
   try {
     const workspaces = await listWorkspaces();
     return NextResponse.json({ workspaces }, { headers: { "Cache-Control": "no-store" } });

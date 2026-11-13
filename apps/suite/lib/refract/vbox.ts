@@ -82,7 +82,7 @@ function parseSnapshotList(stdout: string): VmSnapshot[] {
 }
 
 /** The VM's snapshots, in the order VirtualBox lists them (parent, then children). */
-export async function listSnapshots(): Promise<VmSnapshot[]> {
+async function listSnapshots(): Promise<VmSnapshot[]> {
   try {
     const { stdout } = await vbox(["snapshot", VM_NAME, "list", "--machinereadable"]);
     return parseSnapshotList(stdout);

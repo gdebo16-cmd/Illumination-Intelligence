@@ -13,7 +13,8 @@
 // While a run is going, another message to the same Flicker gets 409 instead of a second, colliding loop.
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId, USERS } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
+import { USERS } from '@/lib/profiles';
 import { addMessage, getBot, listMessages, listNotes, systemPrompt } from '@/lib/umbra/bots';
 import type { ChatMessage } from '@/lib/umbra/agent';
 import { activeRun, RunBusyError, startRun, workshopPrompt } from '@/lib/umbra/runs';
@@ -67,7 +68,7 @@ function readSelectedRepo(raw: unknown): { name: string; url: string } | null {
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // 1. Who is asking, and is it their bot?
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
   const bot = getBot(userId, (await params).id);
   if (!bot) return NextResponse.json({ error: 'Flicker not found.' }, { status: 404 });
 

@@ -21,7 +21,7 @@ export interface Db {
   exec(sql: string): void;
 }
 
-export type Category = 'profile' | 'preference' | 'project' | 'people' | 'other';
+type Category = 'profile' | 'preference' | 'project' | 'people' | 'other';
 export interface Memory {
   id: number;
   fact: string;
@@ -211,7 +211,7 @@ async function applyOps(
 }
 
 // ---------------------------------------------------------------- retrieval
-export async function retrieve(
+async function retrieve(
   db: Db,
   userId: string,
   query: string,

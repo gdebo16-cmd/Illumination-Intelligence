@@ -31,12 +31,12 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
-import { USERS, type UserId } from '@/lib/user';
+import { USERS, type UserId } from '@/lib/profiles';
 import type { ToolId } from '@/config/umbra';
-import { runAgent, type AgentStep, type ChatMessage } from './agent';
+import { runAgent, type ChatMessage } from './agent';
 import { addMessage, getBot, listBots, listNotes, systemPrompt, type Bot, type BotMessage } from './bots';
 import { endWork, startWork, workFailed } from './busy';
-import type { ToolDef, ToolResult } from './tools';
+import type { AgentStep, ToolDef, ToolResult } from './types';
 import { restartResumeNote } from './prod-control';
 
 /** 0 = started from the chat; 1 = a job handed over by another Flicker. Runs at MAX_DEPTH can't delegate. */

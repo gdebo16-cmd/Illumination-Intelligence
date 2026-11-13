@@ -14,9 +14,8 @@ import crypto from 'node:crypto';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
 import { canThink } from '@/config/models';
-import { toolsFor, type ToolContext, type ToolDef } from './tools';
-import type { CodeEditView } from './code';
-import type { ApprovalView } from './prod-control';
+import { toolsFor } from './tools';
+import type { AgentStep, ToolContext, ToolDef } from './types';
 
 /** 'high' for live chat; 'low' for background tasks, so they never make a chat wait. */
 type Priority = 'high' | 'low';
@@ -25,29 +24,6 @@ const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const MAX_ROUNDS = 6;
 // Working on code takes more looking around (list, search, read, read again…) before answering.
 const MAX_ROUNDS_CODE = 14;
-
-/** One tool use, as shown in the chat. */
-export interface AgentStep {
-  id: string;
-  tool: string;
-  label: string;
-  status: 'running' | 'done' | 'error';
-  summary?: string;
-  links?: { title: string; url: string }[];
-  image?: { url: string; prompt: string };
-  /** Code helper: a suggested file change. */
-  edit?: CodeEditView;
-  /** Prod control: a request waiting for (or answered by) the user. */
-  approval?: ApprovalView;
-  /** Teams: the teammate who did this step's work, */
-  bot?: { id: string; name: string; flame: string };
-  /** …the tools that teammate used, */
-  children?: AgentStep[];
-  /** …and the full answer it gave the leader. */
-  detail?: string;
-  /** A "Thinking" step (tool: 'thinking'): what the bot reasoned before acting or answering. */
-  thought?: string;
-}
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';

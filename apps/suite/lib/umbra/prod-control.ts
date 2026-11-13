@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import db from '@/lib/db';
-import type { ToolDef, ToolResult } from './tools';
+import type { ApprovalStatus, ApprovalView, ToolDef, ToolResult } from './types';
 
 const APP_DIR = process.cwd();
 const RESULT_FILE = path.join(/* turbopackIgnore: true */ APP_DIR, 'data', 'prod-restart.json');
@@ -36,21 +36,6 @@ const FOLLOW_MS = 30 * 60_000;
 /** A restart whose progress file hasn't moved in this long is treated as over. */
 const STUCK_MS = 25 * 60_000;
 const POLL_MS = 2_000;
-
-export type ApprovalStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'failed';
-
-/** A request waiting for (or answered by) the user, as the chat shows it. */
-export interface ApprovalView {
-  id: string;
-  kind: 'restart_prod';
-  title: string;
-  detail: string[];
-  status: ApprovalStatus;
-  /** After approval: how the restart is going ('running', then 'done' or 'failed'). */
-  outcome?: 'running' | 'done' | 'failed';
-  progress?: string;
-  note?: string;
-}
 
 type RestartStatus = 'queued' | 'starting' | 'pulling' | 'building' | 'restarting' | 'done' | 'failed';
 

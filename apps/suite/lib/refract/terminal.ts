@@ -18,7 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import { Client, type ClientChannel } from "ssh2";
-import { USERS } from "../users";
+import { isSignedIn, originAllowed, pathOf, reject } from "./socket-guard";
 
 export const TERMINAL_PATH = "/api/refract/terminal";
 
@@ -30,16 +30,6 @@ const SSH_USER = "refract";
 const SSH_KEY_PATH = path.join(os.homedir(), ".cursor", "refract", "refract_ed25519");
 const KNOWN_HOSTS_PATH = path.join(os.homedir(), ".ssh", "known_hosts");
 const KNOWN_HOST_NAME = `[${SSH_HOST}]:${SSH_PORT}`;
-
-// Pages that may open the socket (on top of "same host as the request").
-const ALLOWED_ORIGIN_HOSTS = new Set([
-  "localhost",
-  "127.0.0.1",
-  "192.168.1.50",
-  "192.168.1.114",
-  "100.98.151.55",
-  "illumination.shrimp-bitterling.ts.net",
-]);
 
 const MAX_SESSIONS = 6;
 const MAX_INPUT_BYTES = 64 * 1024;
@@ -59,61 +49,6 @@ const MESSAGES = {
 } as const;
 
 let activeSessions = 0;
-
-function pathOf(url: string | undefined): string {
-  if (!url) return "";
-  const q = url.indexOf("?");
-  return q < 0 ? url : url.slice(0, q);
-}
-
-function cookieValue(header: string | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(";")) {
-    const eq = part.indexOf("=");
-    if (eq < 0) continue;
-    if (part.slice(0, eq).trim() !== name) continue;
-    try {
-      return decodeURIComponent(part.slice(eq + 1).trim());
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-/** Same rule as getCurrentUserId(): the assistant-user cookie must name a known profile. */
-function isSignedIn(req: IncomingMessage): boolean {
-  const id = cookieValue(req.headers.cookie, "assistant-user");
-  return !!id && Object.hasOwn(USERS, id);
-}
-
-/** Browsers always send Origin on WebSocket upgrades; refuse other sites riding the cookie. */
-function originAllowed(req: IncomingMessage): boolean {
-  const origin = req.headers.origin;
-  if (!origin) return false;
-  let originUrl: URL;
-  try {
-    originUrl = new URL(origin);
-  } catch {
-    return false;
-  }
-  const hosts = [req.headers.host, req.headers["x-forwarded-host"]].flat().filter(Boolean) as string[];
-  if (hosts.some((h) => h.split(",")[0].trim().toLowerCase() === originUrl.host.toLowerCase())) return true;
-  return ALLOWED_ORIGIN_HOSTS.has(originUrl.hostname.toLowerCase());
-}
-
-function reject(socket: Duplex, status: number, reason: string) {
-  const body = reason;
-  socket.end(
-    `HTTP/1.1 ${status} ${reason}\r\n` +
-      "Connection: close\r\n" +
-      "Content-Type: text/plain; charset=utf-8\r\n" +
-      "Cache-Control: no-store\r\n" +
-      `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n` +
-      body,
-  );
-  socket.destroy();
-}
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);

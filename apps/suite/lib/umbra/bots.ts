@@ -11,7 +11,7 @@ import { checkCodeFolder, editStatuses } from './code';
 import { approvalStatuses } from './prod-control';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 import { canThink } from '@/config/models';
-import type { AgentStep } from './agent';
+import type { AgentStep } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 import { DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 

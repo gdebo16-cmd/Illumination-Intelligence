@@ -3,11 +3,10 @@
 // DELETE /api/umbra/bots/<id> — delete it and its chat
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { deleteBot, getBot, updateBot, validateBot } from '@/lib/umbra/bots';
 
 type Params = { params: Promise<{ id: string }> };
-const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
 const notFound = () => NextResponse.json({ error: 'Flicker not found.' }, { status: 404 });
 
 export async function GET(_req: Request, { params }: Params) {

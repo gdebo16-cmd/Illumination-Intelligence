@@ -1,0 +1,226 @@
+/* Aegis's own styles (app/(apps)/aegis). Kept out of globals.css so each rule has one home. */
+
+.aegis {
+  --aegis-accent: #8fb8e8;
+  --sev-high: #ef6b72;
+  --sev-medium: #e3b84f;
+  --sev-low: #8fb8e8;
+  /* Same frame as Astra: clear the corner banner on top and the floating app picker below. */
+  padding: var(--header-h) 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
+  color: var(--text-color);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.aegis > * {
+  max-width: 60rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.aegis code,
+.aegis pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+.aegis code {
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--aegis-accent) 14%, transparent);
+  overflow-wrap: anywhere;
+}
+
+/* The scan box */
+.aegis-intro h1 { margin: 0 0 0.35rem; }
+.aegis-intro p { margin: 0 0 1.25rem; opacity: 0.8; line-height: 1.5; }
+.aegis-form {
+  display: flex;
+  gap: 0.5rem;
+}
+.aegis-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  color: inherit;
+  background: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+.aegis-input:focus-visible { outline: none; border-color: var(--aegis-accent); }
+.aegis-button {
+  padding: 0.75rem 1.4rem;
+  font: inherit;
+  font-weight: 600;
+  color: #06101d;
+  background: var(--aegis-accent);
+  border: 0;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+.aegis-button:disabled { opacity: 0.5; cursor: default; }
+.aegis-button:not(:disabled):hover { filter: brightness(1.1); }
+.aegis-hint { margin: 0.5rem 0 0; font-size: 0.85rem; opacity: 0.6; }
+.aegis-recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.aegis-recent button {
+  max-width: 100%;
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aegis-recent button:hover { border-color: var(--aegis-accent); }
+
+.aegis-status { display: flex; align-items: center; gap: 0.5rem; margin-top: 1.25rem; }
+.aegis-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid color-mix(in srgb, var(--aegis-accent) 30%, transparent);
+  border-top-color: var(--aegis-accent);
+  border-radius: 50%;
+  animation: aegis-spin 0.8s linear infinite;
+}
+@keyframes aegis-spin { to { transform: rotate(360deg); } }
+.aegis-error {
+  margin-top: 1.25rem;
+  padding: 0.75rem 1rem;
+  white-space: pre-wrap;
+  color: var(--sev-high);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 40%, transparent);
+  border-radius: var(--border-radius);
+}
+
+/* The report */
+.aegis-report { margin-top: 2rem; }
+.aegis-section { margin-top: 2.25rem; }
+.aegis-section > h2 { margin: 0 0 0.25rem; font-size: 1.3rem; }
+.aegis-note { margin: 0 0 0.9rem; font-size: 0.85rem; opacity: 0.65; }
+
+.aegis-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+.aegis-summary h2 { margin: 0 0 0.25rem; overflow-wrap: anywhere; }
+.aegis-summary .aegis-note { margin: 0; }
+.aegis-counts { display: flex; gap: 0.5rem; }
+.aegis-count {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+.aegis-count b { font-size: 1rem; }
+
+.sev-high { --sev: var(--sev-high); }
+.sev-medium { --sev: var(--sev-medium); }
+.sev-low { --sev: var(--sev-low); }
+.aegis-count.sev-high,
+.aegis-count.sev-medium,
+.aegis-count.sev-low { color: var(--sev); }
+
+.aegis-finding {
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--sev);
+  border-radius: var(--border-radius);
+  line-height: 1.5;
+}
+.aegis-finding-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+.aegis-finding h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.aegis-finding p { margin: 0.5rem 0; }
+.aegis-num { opacity: 0.5; font-variant-numeric: tabular-nums; }
+.aegis-sev {
+  flex-shrink: 0;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0b0b0b;
+  background: var(--sev);
+  border-radius: 999px;
+}
+.aegis-evidence {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.8rem 0.6rem 1.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  background: var(--secondary-color);
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.aegis-evidence code { padding: 0; background: none; font-size: 1em; color: var(--aegis-accent); }
+.aegis-evidence li + li { margin-top: 0.25rem; }
+
+.aegis-clean { margin: 0; padding: 0; list-style: none; columns: 2 18rem; }
+.aegis-clean li { margin-bottom: 0.35rem; break-inside: avoid; }
+.aegis-clean li::before { content: '✓ '; color: #6fcf97; }
+
+.aegis-lessons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.75rem;
+}
+.aegis-lesson {
+  padding: 1rem 1.1rem;
+  background: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  line-height: 1.5;
+}
+.aegis-lesson h3 { margin: 0 0 0.4rem; font-size: 1rem; color: var(--aegis-accent); }
+.aegis-lesson p { margin: 0; font-size: 0.9rem; opacity: 0.85; }
+
+.aegis-prompt {
+  position: relative;
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+.aegis-copy {
+  position: sticky;
+  top: 0.5rem;
+  float: right;
+  margin: 0.6rem 0.6rem 0 0;
+  padding: 0.4rem 1rem;
+  z-index: 1;
+}
+.aegis-prompt pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .aegis { padding-left: 1rem; padding-right: 1rem; }
+  .aegis-form { flex-direction: column; }
+  .aegis-finding { padding: 0.9rem 1rem; }
+}

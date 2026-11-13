@@ -16,7 +16,7 @@ import {
 } from "./ssh";
 import { runGitRemote, authFailureMessage } from "./github-auth";
 
-export const WORK_ROOT = "/home/refract/work";
+const WORK_ROOT = "/home/refract/work";
 const SNAP_DIR = "/home/refract/work/.snapshots";
 
 const READ_CHAR_LIMIT = 16_000;
@@ -81,7 +81,7 @@ export function workPath(slug: string, rel: unknown = "."): string {
   return joined;
 }
 
-export function shownPath(slug: string, full: string): string {
+function shownPath(slug: string, full: string): string {
   const root = `${WORK_ROOT}/${slug}`;
   if (full === root) return ".";
   if (full.startsWith(`${root}/`)) return full.slice(root.length + 1);

@@ -150,7 +150,7 @@ const fitSize = (n: number) => Math.min(2048, Math.max(256, Math.round(n / 16) *
  * Load the chosen model's recipe and write our prompt, seed and size into the right boxes.
  * `uploadedName` is the picture's name in ComfyUI (from upload()), when editing.
  */
-export function buildWorkflow(
+function buildWorkflow(
   request: ImageRequest,
   uploadedName?: string,
 ): { workflow: Workflow; seed: number; width: number; height: number; model: PrismModelId; expanding: boolean } {

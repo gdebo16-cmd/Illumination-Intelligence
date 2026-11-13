@@ -2,7 +2,7 @@
 //   ?count=1  just the unread count (cheap; used for the badge)
 
 import { connection, NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { listBots } from '@/lib/umbra/bots';
 import { listRuns, unreadCount } from '@/lib/umbra/tasks';
 import { listTeams } from '@/lib/umbra/teams';
@@ -10,7 +10,7 @@ import { listTeams } from '@/lib/umbra/teams';
 export async function GET(req: Request) {
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
 
   const unread = unreadCount(userId);
   if (new URL(req.url).searchParams.get('count')) return NextResponse.json({ unread });

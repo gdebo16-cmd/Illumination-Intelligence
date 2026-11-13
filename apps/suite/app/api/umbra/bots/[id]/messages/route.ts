@@ -2,7 +2,7 @@
 // DELETE /api/umbra/bots/<id>/messages — clear the chat (the bot itself stays)
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { clearMessages, getBot, listMessages } from '@/lib/umbra/bots';
 import { workHeaders } from '@/lib/umbra/busy';
 import { activeRun } from '@/lib/umbra/runs';
@@ -11,7 +11,7 @@ type Params = { params: Promise<{ id: string }> };
 
 async function ownedBot(params: Params['params']) {
   const userId = await getCurrentUserId();
-  if (!userId) return { error: NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 }) };
+  if (!userId) return { error: noProfile() };
   const bot = getBot(userId, (await params).id);
   if (!bot) return { error: NextResponse.json({ error: 'Flicker not found.' }, { status: 404 }) };
   return { bot };
