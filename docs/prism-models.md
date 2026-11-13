@@ -44,12 +44,43 @@ Note: Wan 2.5 and newer are **not** free to download. In ComfyUI they only run a
 
 A model picker would only need: a list of models (name, kind, what it's good at), one ComfyUI workflow file per model, and a drop-down in Prism. Only one big model fits on the card at a time, so switching models makes the first picture after a switch a bit slower.
 
+## Video update, 13 November 2026
+
+I checked again for video only, against both machines: the **Raider** (RTX 5080 Laptop, 16 GB card, 32 GB memory) and the **Alienware** (RTX 3070 Laptop, 8 GB card, 64 GB memory). Prism still uses Wan 2.2 TI2V 5B: about 150 s for 2 seconds of video, 450 s for 5 seconds.
+
+### What changed since 9 November
+
+| Model | What it is | Fits your machines? | Verdict |
+|---|---|---|---|
+| **LTX-2.5** (Lightricks, August 2026) | Newer LTX, video with sound. | Lightricks' own minimum is a **32 GB** card. A community NVFP4 copy is about 19 GB, plus a 15 GB text model. | **Skip for now.** Too big for the Raider without heavy spill-over. |
+| **Pika H3 Flex** (30 Oct 2026) | Add-ons for the 33B MiniMax H3 model. Video with sound, up to 12 reference pictures. | Tested on an 80 GB server card. The base model alone is about 211 GB to download. | **Skip.** Too big, and reports say its licence may exclude the US. Check before trying. |
+| **Tencent Hy-Nomas** (21 Oct 2026) | An "interactive world": you steer the camera and the scene as the video goes, up to about a minute. | A community ComfyUI version says 12 GB and up (INT8, about 9 GB). | **Fun extra, personal use only.** The main model is Apache 2.0, but its video decoder is NVIDIA non-commercial. |
+| **NVIDIA Cosmos 3** (5 Nov 2026) | World simulation for robots and cars. | 96 GB card or more. | **Skip.** |
+
+### Recommendation (unchanged at the top, with two additions)
+
+1. **Main upgrade: Wan 2.2 14B image → video and text → video, with the Lightning 4-step add-ons.** It's still the best match for the Raider. Use the Q4 or Q5 GGUF copies (about 8.5 GB per half) or FP8. People run this on 16 GB cards. It's the same family as today's model, so the Prism changes are small: a new workflow file and a text → video switch. Apache 2.0. Test how fast it really is here before replacing the 5B.
+2. **Addition: smoother video with RIFE (frame interpolation).** It adds in-between frames, turning 24 frames a second into 48. The model is tiny and fast, so it's a good job for the **Alienware**, leaving the Raider free. It's a cheap win for every video Prism already makes.
+3. **Addition, later: video with sound, using LTX-2.3 distilled NVFP4** on the Raider. It's the only model with sound that has a reasonable chance of fitting. Two warnings: NVIDIA's guide pairs 16 GB cards with **64 GB** of memory (the Raider has 32 GB), and some reports say sound pushes it past 16 GB. Try it by hand in ComfyUI before building it into Prism.
+4. **Maybe: Enhance for videos with SeedVR2 3B INT8** (720p → 1080p). Prism already uses SeedVR2 7B for pictures, but on video it's very memory-hungry: people with 16 GB cards report failures without "block swap". Make 1080p in one pass; don't go straight to 4K.
+
+The Alienware's 8 GB card is too small for any of the big video models. It's best kept for pictures (Quicksketch) and small video jobs like RIFE.
+
+### Sources for this update
+
+- [LTX-2.5 VRAM requirements](https://willitrunai.com/blog/ltx-2-5-vram-requirements), [LTX-2.5 open weights (ComfyUI Wiki)](https://comfyui-wiki.com/en/news/2026-08-11-ltx-2-5-open-weights-release), [LTX models by VRAM](https://ltxworkflow.com/models), [LTX-2.3 in ComfyUI](https://www.thundercompute.com/blog/ltx-2-3-comfyui)
+- [Pika H3 Flex blog](https://pika.art/blog/pika-h3-flex), [H3 Flex hardware fit](https://www.madebyagents.com/models/pika-h3-flex), [H3 Flex licence notes](https://explainx.ai/blog/pika-h3-flex-open-weight-video-audio-model-minimax-h3-six-steps-designarena-7-comfyui-license-2026)
+- [ComfyUI-Hy-Nomas](https://github.com/PedroMarinhoDev/ComfyUI-Hy-Nomas), [Hy-Nomas licence and requirements](https://www.datastudios.org/post/tencent-hy-nomas-open-weight-interactive-world-model)
+- [AI image and video news roundup, 7 Nov 2026](https://www.kombitz.com/2026/11/07/ai-image-video-model-news-roundup-november-7-2026/)
+- [Wan2.2 Lightning](https://github.com/ModelTC/Wan2.2-Lightning), [Wan 2.2 GGUF + Lightning on budget cards](https://community.latenode.com/t/quick-video-ai-setup-for-budget-12gb-graphics-cards-wan-2-2-gguf-models-lightning-training-optimized-steps/33286), [Wan 2.2 speed tips](https://aiidelist.com/blog/how-to-make-wan-2-2-video-generation-faster.md)
+- [SeedVR2 video upscaler](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler), [SeedVR2 notes](https://weirdwonderfulai.art/resources/seedvr2-upscaler-for-video-and-images/), [Best open video models for 8–24 GB](https://blog.ossium.in/what-s-the-best-open-source-ai-video-model-you-can-actually-run-8gb-24gb-vram)
+
 ## Unsure
 
 Some numbers come from blogs and don't always agree. Check each model's page before downloading. In particular:
 
 - LTX-2.3's memory needs: blogs say 16 GB with NVFP4, 32 GB with FP8.
-- Reports of an even newer "LTX-2.5" (August 2026) that needs 32 GB I couldn't confirm.
+- LTX-2.5 (August 2026) is real; see the video update above.
 
 ## Sources
 
