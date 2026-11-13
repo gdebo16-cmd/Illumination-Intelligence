@@ -225,9 +225,7 @@ const Astra = () => {
                   Make with AI
                 </button>
                 {Object.keys(selected.glyphs).length > 0 ? (
-                  <a className="astra-action" href={`/api/astra/fonts/${selected.id}/download`} download>
-                    Download font (.ttf)
-                  </a>
+                  <DownloadFontButton fontId={selected.id} name={selected.name} updatedAt={selected.updatedAt} />
                 ) : (
                   <span className="astra-action is-disabled" title="Make at least one character first">
                     Download font (.ttf)
@@ -320,3 +318,112 @@ const Astra = () => {
 };
 
 export default Astra;
+
+// "Download font" on a phone opens the share sheet, so closing it leaves you in Astra.
+// (A plain download link in the Home Screen app opens a full-screen viewer with no way back.)
+// On a computer it downloads the .ttf file like before. The file is fetched as soon as the
+// button is shown, so the share sheet can open right on the tap. updatedAt is in the
+// dependencies so a newly drawn character is in the file you get.
+function shareableFile(blob: Blob, fileName: string): { file: File; canShare: boolean } {
+  const asFont = new File([blob], fileName, { type: blob.type || "font/ttf" });
+  const asBytes = new File([blob], fileName, { type: "application/octet-stream" });
+  if (typeof navigator.canShare === "function" && navigator.canShare({ files: [asFont] })) {
+    return { file: asFont, canShare: true };
+  }
+  if (typeof navigator.canShare === "function" && navigator.canShare({ files: [asBytes] })) {
+    return { file: asBytes, canShare: true };
+  }
+  return { file: asFont, canShare: false };
+}
+
+function DownloadFontButton({
+  fontId,
+  name,
+  updatedAt,
+}: {
+  fontId: string;
+  name: string;
+  updatedAt: string;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [canShare, setCanShare] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const url = `/api/astra/fonts/${fontId}/download`;
+  const fileName = `${name.replace(/[/\\?%*:|"<>]/g, "").trim() || "Astra font"}.ttf`;
+
+  const requestKey = `${url}|${fileName}|${updatedAt}`;
+  const [activeKey, setActiveKey] = useState(requestKey);
+  if (activeKey !== requestKey) {
+    setActiveKey(requestKey);
+    setFile(null);
+    setCanShare(false);
+  }
+
+  useEffect(() => {
+    let live = true;
+    fetch(url, { cache: "no-store" })
+      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
+      .then((blob) => {
+        if (!live) return;
+        const ready = shareableFile(blob, fileName);
+        setFile(ready.file);
+        setCanShare(ready.canShare);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [url, fileName, updatedAt]);
+
+  const download = (href: string) => {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      let ready = file;
+      let share = canShare;
+      if (!ready) {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) return;
+        const got = shareableFile(await res.blob(), fileName);
+        ready = got.file;
+        share = got.canShare;
+        setFile(got.file);
+        setCanShare(got.canShare);
+      }
+      if (ready && share) {
+        try {
+          await navigator.share({ files: [ready] });
+        } catch (err) {
+          // Closing the share sheet isn't an error.
+          if ((err as Error).name !== "AbortError") {
+            const href = URL.createObjectURL(ready);
+            download(href);
+            setTimeout(() => URL.revokeObjectURL(href), 10_000);
+          }
+        }
+        return;
+      }
+      if (ready) {
+        const href = URL.createObjectURL(ready);
+        download(href);
+        setTimeout(() => URL.revokeObjectURL(href), 10_000);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <button type="button" className="astra-action" onClick={() => void save()} disabled={saving}>
+      {canShare ? "Share font (.ttf)" : "Download font (.ttf)"}
+    </button>
+  );
+}

@@ -34,7 +34,7 @@ export const APPS: readonly SuiteApp[] = [
   app('lumen', 'Lumen', 'AI Assistant', '#7aa2ff', 'live'),
   app('umbra', 'Umbra', 'Agentic Flickers', '#a3394b', 'live'),
   app('prism', 'Prism', 'Imagination Station', '#b07cff', 'live'),
-  app('astra', 'Astra', 'Font Forger', '#5ad1c4', 'soon'),
+  app('astra', 'Astra', 'Font Forger', '#5ad1c4', 'live'),
   app('refract', 'Refract', 'Virtual Playground', '#5b93e6', 'soon'),
   app('aegis', 'Aegis', 'Digital Guardian', '#8fb8e8', 'soon'),
   app('halo', 'Halo', 'Life Mapping', '#e3b84f', 'soon'),
