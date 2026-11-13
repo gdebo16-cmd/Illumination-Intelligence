@@ -36,10 +36,9 @@ export interface ScanReport {
   /** Checks that ran and found nothing. */
   clean: string[];
   lessons: Lesson[];
-  /** Instructions for a coding agent to make the fixes. The page adds the written suggestions
-   *  between `prompt` and `promptClosing` as they arrive. */
-  prompt: string;
-  promptClosing: string;
+  /** The project's own checks (lint, build, tests) for the agent prompt, which the page builds
+   *  from the findings and suggestions you tick (lib/aegis/report.ts buildPrompt). */
+  commands: string[];
 }
 
 /**

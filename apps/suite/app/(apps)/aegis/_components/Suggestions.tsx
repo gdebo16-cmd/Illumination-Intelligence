@@ -63,10 +63,15 @@ function Written({ w, note }: { w: WrittenSuggestion; note?: string }) {
 export default function Suggestions({
   candidates,
   onWritten,
+  picked,
+  onPick,
 }: {
   candidates: SuggestionCandidate[];
-  /** Every suggestion written so far, in order, for the AI prompt. */
-  onWritten: (written: WrittenSuggestion[]) => void;
+  /** Every suggestion written so far, by id, for the AI prompt. */
+  onWritten: (written: Record<string, WrittenSuggestion>) => void;
+  /** Which suggestions are ticked to go in the AI prompt. */
+  picked: Set<string>;
+  onPick: (id: string, on: boolean) => void;
 }) {
   const [model, setModel] = useState(AEGIS_DEFAULT_MODEL);
   const [states, setStates] = useState<Record<string, State>>({});
@@ -81,8 +86,8 @@ export default function Suggestions({
     if (active.current) active.current.stopped = true;
     active.current = token;
     setStates(Object.fromEntries(list.map((c) => [c.id, { status: 'waiting' } as State])));
-    const done: WrittenSuggestion[] = [];
-    onWritten([]);
+    const done: Record<string, WrittenSuggestion> = {};
+    onWritten({});
     for (const c of list) {
       if (token.stopped) return; // a new scan or another model took over
       setStates((s) => ({ ...s, [c.id]: { status: 'writing', since: Date.now(), model: withModel } }));
@@ -106,8 +111,8 @@ export default function Suggestions({
       if (token.stopped) return;
       setStates((s) => ({ ...s, [c.id]: next }));
       if (next.status === 'done' && next.written.plan.length) {
-        done.push(next.written);
-        onWritten([...done]);
+        done[c.id] = next.written;
+        onWritten({ ...done });
       }
     }
   };
@@ -158,6 +163,14 @@ export default function Suggestions({
         return (
           <article key={c.id} className="aegis-suggestion">
             <div className="aegis-finding-head">
+              <input
+                type="checkbox"
+                className="aegis-pick"
+                checked={picked.has(c.id)}
+                onChange={(e) => onPick(c.id, e.target.checked)}
+                aria-label="Include in the AI prompt"
+                title="Include in the AI prompt"
+              />
               <span className="aegis-num">S{i + 1}</span>
               <span className="aegis-sev sev-idea">Suggestion</span>
               <h3><Ticks text={state.status === 'done' ? state.written.title : c.title} /></h3>

@@ -88,7 +88,7 @@ export function lessonsFor(findings: Finding[], hasSuggestions = false): Lesson[
 }
 
 /** The project's own lint, type-check, test and build commands, from its package.json files. */
-function verifyCommands(files: RepoFile[]): string[] {
+export function verifyCommands(files: RepoFile[]): string[] {
   const commands: string[] = [];
   const manifests = files.filter((f) => f.path.endsWith('package.json') && f.text && !f.path.includes('/node_modules/'));
   manifests.sort((a, b) => a.path.split('/').length - b.path.split('/').length);
@@ -113,24 +113,19 @@ function verifyCommands(files: RepoFile[]): string[] {
 const SEVERITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' } as const;
 
 /**
- * The prompt for a coding agent, in two parts so the page can put the written suggestions between
- * them as they arrive: `body` (how to work, and the findings) and `closing` (what to report).
+ * The prompt for a coding agent, from the findings and suggestions you ticked on the page.
+ * `commands` are the project's own checks (verifyCommands, run by the scan).
  */
-export function buildPrompt(repo: string, findings: Finding[], files: RepoFile[], hasSuggestions: boolean): { body: string; closing: string } {
-  if (!findings.length && !hasSuggestions) {
-    return {
-      body: `An automated scan of the repository "${repo}" found no over-engineering, redundant layers or organization problems. No changes are needed.`,
-      closing: '',
-    };
-  }
-  const commands = verifyCommands(files);
+export function buildPrompt(repo: string, findings: Finding[], suggestions: WrittenSuggestion[], commands: string[]): string {
+  if (!findings.length && !suggestions.length) return '';
+  const both = findings.length > 0 && suggestions.length > 0;
   const lines: string[] = [
-    `You are cleaning up the repository "${repo}". An automated scan (Aegis) found the issues below: over-engineering, redundant layers and poor organization${hasSuggestions ? ', plus code that does the same job in several places and could be unified' : ''}. Fix them without changing what the software does.`,
+    `You are cleaning up the repository "${repo}". An automated scan (Aegis) found the items below: ${[findings.length ? 'over-engineering, redundant layers and poor organization' : '', suggestions.length ? 'code that does the same job in several places and could be unified' : ''].filter(Boolean).join(', plus ')}. Fix them without changing what the software does.`,
     '',
     'How to work:',
-    `1. Work through the ${findings.length ? 'findings in order (most important first)' : 'suggestions in order'}${findings.length && hasSuggestions ? ', then the suggestions' : ''}.`,
+    `1. Work through the ${findings.length ? 'findings in order (most important first)' : 'suggestions in order'}${both ? ', then the suggestions' : ''}.`,
     '2. Before changing anything, check the item is real. The scan uses patterns, not a full understanding of the code, so search for references (including paths built from variables, tool configs and docs). If an item is wrong or the code has a good reason to be that way, skip it and say why.',
-    '3. Keep behavior the same. No new features, no reformatting of untouched code, no dependency changes. Where a suggestion says the copies behave differently today and picks one behavior to keep, follow it and say so in the commit message.',
+    `3. Keep behavior the same. No new features, no reformatting of untouched code, no dependency changes.${suggestions.length ? ' Where a suggestion says the copies behave differently today and picks one behavior to keep, follow it and say so in the commit message.' : ''}`,
     commands.length
       ? `4. After each item, run the project's checks and fix anything you broke: ${commands.map((c) => `\`${c}\``).join(', ')}.`
       : "4. After each item, run the project's build and tests (if it has any) and fix anything you broke.",
@@ -145,15 +140,13 @@ export function buildPrompt(repo: string, findings: Finding[], files: RepoFile[]
     for (const e of f.evidence) lines.push(`   - ${e}`);
     lines.push(`   Fix: ${f.fix}`);
   });
-  return {
-    body: lines.join('\n'),
-    closing: `When you are done, report: what you changed for each ${hasSuggestions ? 'finding and suggestion' : 'finding'}, which you skipped and why, and the result of the checks.`,
-  };
+  if (suggestions.length) lines.push('', suggestionsForPrompt(suggestions, findings.length + 1));
+  lines.push('', `When you are done, report: what you changed for each ${both ? 'finding and suggestion' : findings.length ? 'finding' : 'suggestion'}, which you skipped and why, and the result of the checks.`);
+  return lines.join('\n');
 }
 
 /** The written suggestions, as a section of the agent prompt (numbered after the findings). */
-export function suggestionsForPrompt(written: WrittenSuggestion[], startAt: number): string {
-  if (!written.length) return '';
+function suggestionsForPrompt(written: WrittenSuggestion[], startAt: number): string {  if (!written.length) return '';
   const lines = ['Suggestions (unify code that does the same job):'];
   written.forEach((w, i) => {
     lines.push('', `${startAt + i}. ${w.title}`, `   ${w.summary}`);

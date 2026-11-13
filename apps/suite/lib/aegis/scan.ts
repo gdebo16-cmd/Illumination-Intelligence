@@ -6,7 +6,7 @@ import { checkCss, checkDumpingGrounds, checkDuplicateFiles, checkLargeFiles, ch
 import { CODE_EXTS, listFiles, type RepoFile } from './files';
 import { buildGraph, checkCycles, checkOrphans, checkPassThrough, checkUnusedExports, type ImportGraph } from './imports';
 import { openRepo } from './repo';
-import { buildPrompt, lessonsFor } from './report';
+import { lessonsFor, verifyCommands } from './report';
 import { findSuggestions } from './suggest';
 import type { Finding, ScanReport } from './types';
 
@@ -52,7 +52,6 @@ export async function scanRepo(input: unknown): Promise<ScanReport> {
     }
     findings.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
     const suggestions = findSuggestions(files, graph);
-    const prompt = buildPrompt(repo.name, findings, files, suggestions.length > 0);
 
     const code = files.filter((f) => CODE_EXTS.has(f.ext) && f.text !== undefined);
     return {
@@ -70,8 +69,7 @@ export async function scanRepo(input: unknown): Promise<ScanReport> {
       suggestions,
       clean,
       lessons: lessonsFor(findings, suggestions.length > 0),
-      prompt: prompt.body,
-      promptClosing: prompt.closing,
+      commands: verifyCommands(files),
     };
   } finally {
     await repo.close();

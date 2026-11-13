@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import AppShell from '@/components/AppShell';
-import { suggestionsForPrompt } from '@/lib/aegis/report';
+import { buildPrompt } from '@/lib/aegis/report';
 import type { Finding, ScanReport, Severity, WrittenSuggestion } from '@/lib/aegis/types';
 import Suggestions from './Suggestions';
 
@@ -60,10 +60,18 @@ const Section = ({ title, note, children }: { title: string; note?: string; chil
   </section>
 );
 
-function FindingCard({ finding, n }: { finding: Finding; n: number }) {
+function FindingCard({ finding, n, picked, onPick }: { finding: Finding; n: number; picked: boolean; onPick: (on: boolean) => void }) {
   return (
     <article className={`aegis-finding sev-${finding.severity}`}>
       <div className="aegis-finding-head">
+        <input
+          type="checkbox"
+          className="aegis-pick"
+          checked={picked}
+          onChange={(e) => onPick(e.target.checked)}
+          aria-label="Include in the AI prompt"
+          title="Include in the AI prompt"
+        />
         <span className="aegis-num">{n}</span>
         <span className={`aegis-sev sev-${finding.severity}`}>{SEVERITY_NAME[finding.severity]}</span>
         <h3><Ticks text={finding.title} /></h3>
@@ -77,6 +85,9 @@ function FindingCard({ finding, n }: { finding: Finding; n: number }) {
   );
 }
 
+/** Every finding and suggestion in a report, ticked. */
+const allKeys = (r: ScanReport) => new Set([...r.findings.map((_, i) => `f${i}`), ...r.suggestions.map((s) => s.id)]);
+
 export default function Aegis() {
   const [repo, setRepo] = useState('');
   const [recent, setRecent] = useState<string[]>([]);
@@ -85,7 +96,16 @@ export default function Aegis() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ScanReport | null>(null);
   const [copied, setCopied] = useState(false);
-  const [written, setWritten] = useState<WrittenSuggestion[]>([]);
+  const [written, setWritten] = useState<Record<string, WrittenSuggestion>>({});
+  // What goes in the AI prompt: findings by "f<index>", suggestions by their id. All ticked after a scan.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const pick = (key: string, on: boolean) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const reportRef = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage only exists in the browser
@@ -115,6 +135,7 @@ export default function Aegis() {
       const data = await res.json().catch(() => ({ error: 'The server sent back something unexpected.' }));
       if (!res.ok || data.error) throw new Error(data.error ?? `The scan failed (${res.status}).`);
       setReport(data as ScanReport);
+      setPicked(allKeys(data as ScanReport));
       const next = [value, ...recent.filter((r) => r !== value)].slice(0, 5);
       setRecent(next);
       saveRecent(next);
@@ -126,10 +147,13 @@ export default function Aegis() {
     }
   };
 
-  // The agent prompt: the findings, then each suggestion as it's written, then what to report.
-  const prompt = report
-    ? [report.prompt, suggestionsForPrompt(written, report.findings.length + 1), report.promptClosing].filter(Boolean).join('\n\n')
-    : '';
+  // The agent prompt, from what's ticked. A ticked suggestion joins it once it's been written.
+  const pickedFindings = report ? report.findings.filter((_, i) => picked.has(`f${i}`)) : [];
+  const pickedSuggestions = report ? report.suggestions.filter((s) => picked.has(s.id)) : [];
+  const readySuggestions = pickedSuggestions.flatMap((s) => (written[s.id] ? [written[s.id]] : []));
+  const stillWriting = pickedSuggestions.length - readySuggestions.length;
+  const prompt = report ? buildPrompt(report.repo, pickedFindings, readySuggestions, report.commands) : '';
+  const total = report ? report.findings.length + report.suggestions.length : 0;
 
   const copyPrompt = async () => {
     if (report && (await copyText(prompt))) {
@@ -213,15 +237,17 @@ export default function Aegis() {
               note={report.findings.length ? 'Most important first. The scan works from patterns, so check each one before acting on it.' : undefined}
             >
               {report.findings.length
-                ? report.findings.map((f, i) => <FindingCard key={i} finding={f} n={i + 1} />)
+                ? report.findings.map((f, i) => (
+                    <FindingCard key={i} finding={f} n={i + 1} picked={picked.has(`f${i}`)} onPick={(on) => pick(`f${i}`, on)} />
+                  ))
                 : <p>Nothing stood out. Nice work.</p>}
             </Section>
 
             <Section
               title="Suggestions"
-              note="Code that does the same job in several places and could live in one. A local model reads the code and writes each one up; they're added to the AI Prompt as they finish."
+              note="Code that does the same job in several places and could live in one. A local model reads the code and writes each one up; ticked ones join the AI Prompt as they finish."
             >
-              <Suggestions candidates={report.suggestions} onWritten={setWritten} />
+              <Suggestions candidates={report.suggestions} onWritten={setWritten} picked={picked} onPick={pick} />
             </Section>
 
             {report.clean.length > 0 && (
@@ -243,13 +269,28 @@ export default function Aegis() {
               </div>
             </Section>
 
-            <Section title="AI Prompt" note="Give this to a coding agent (Claude Code, Cursor, an Umbra Flicker) in the repo to make the fixes.">
-              <div className="aegis-prompt">
-                <button type="button" className="aegis-button aegis-copy" onClick={copyPrompt}>
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-                <pre>{prompt}</pre>
-              </div>
+            <Section title="AI Prompt" note="Give this to a coding agent (Claude Code, Cursor, an Umbra Flicker) in the repo to make the fixes. It covers the findings and suggestions you've ticked.">
+              {total > 0 && (
+                <div className="aegis-picked">
+                  <span>
+                    {pickedFindings.length} of {report.findings.length} findings
+                    {report.suggestions.length > 0 && <>, {pickedSuggestions.length} of {report.suggestions.length} suggestions</>}
+                    {stillWriting > 0 && <> ({stillWriting} still being written, added when ready)</>}
+                  </span>
+                  <button type="button" onClick={() => setPicked(allKeys(report))}>Tick all</button>
+                  <button type="button" onClick={() => setPicked(new Set())}>Untick all</button>
+                </div>
+              )}
+              {prompt ? (
+                <div className="aegis-prompt">
+                  <button type="button" className="aegis-button aegis-copy" onClick={copyPrompt}>
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                  <pre>{prompt}</pre>
+                </div>
+              ) : (
+                <p className="aegis-note">{total ? 'Tick a finding or a suggestion to put it in the prompt.' : 'Nothing to fix, so there\'s no prompt.'}</p>
+              )}
             </Section>
           </div>
         )}

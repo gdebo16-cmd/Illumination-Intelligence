@@ -13,6 +13,7 @@
   overscroll-behavior: contain;
 }
 .aegis > * {
+  width: 100%;
   max-width: 60rem;
   margin-left: auto;
   margin-right: auto;
@@ -60,7 +61,7 @@
 }
 .aegis-button:disabled { opacity: 0.5; cursor: default; }
 .aegis-button:not(:disabled):hover { filter: brightness(1.1); }
-.aegis-hint { margin: 0.5rem 0 0; font-size: 0.85rem; opacity: 0.6; }
+.aegis-hint { margin-top: 0.5rem; margin-bottom: 0; font-size: 0.85rem; opacity: 0.6; }
 .aegis-recent {
   display: flex;
   flex-wrap: wrap;
@@ -219,6 +220,36 @@
   overflow-wrap: anywhere;
   line-height: 1.5;
 }
+
+/* The checkbox on each finding and suggestion: is it in the AI prompt? */
+.aegis-pick {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+  align-self: center;
+  accent-color: var(--aegis-accent);
+  cursor: pointer;
+}
+.aegis-picked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+}
+.aegis-picked span { margin-right: auto; opacity: 0.8; }
+.aegis-picked button {
+  padding: 0.3rem 0.8rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.aegis-picked button:hover { border-color: var(--aegis-accent); }
 
 /* Suggestions: like findings, with a model picker on top and longer write-ups. */
 .aegis-model {
