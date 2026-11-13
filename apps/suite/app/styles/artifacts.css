@@ -1,0 +1,53 @@
+/* Artifacts lists: Lumen's sidebar and Umbra's Artifacts page (components/documents.tsx). */
+
+/* #region artifacts — Lumen's sidebar list and Umbra's Artifacts page (components/documents.tsx) */
+.sidebar > .artifact-list {
+  height: auto;
+  max-height: 25dvh;
+  min-height: 0; }
+.sidebar .artifact-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; }
+.artifact-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem; }
+.artifact-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis; }
+.artifact-empty {
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  color: #9a9cb8;
+  white-space: normal; }
+.umbra-intro-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem; }
+.umbra-artifact-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  font-size: 1.4rem; }
+.umbra-artifact .umbra-report-title {
+  overflow-wrap: anywhere; }
+.umbra-artifact-actions {
+  margin-top: 0;
+  padding: 0 1rem 0.75rem 3.75rem; }
+/* In a chat's top bar the Artifacts button is a word on wide screens and just its icon on phones. */
+.umbra-chat-artifacts-icon { display: none; }
+.umbra-chat-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis; }
+@media (max-width: 768px) {
+  .umbra-artifact-actions { padding-left: 1rem; }
+  .umbra-chat-artifacts-icon { display: inline; }
+  .umbra-chat-artifacts-label { display: none; } }
+/* #endregion artifacts */

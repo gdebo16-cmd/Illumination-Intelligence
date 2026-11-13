@@ -1,0 +1,309 @@
+/* Astra (app/(apps)/astra). */
+
+/* #region astra */
+.astra {
+  /* Bottom: clear the floating app picker (about 64px tall from the bottom edge) with a little gap,
+     so the last row can be scrolled up above it and clicked. */
+  padding: var(--header-h) 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
+  color: var(--text-color);
+  /* The window itself never scrolls (every app's <main> is overflow: hidden), so Astra scrolls here. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* still scrolls; the bar just isn't drawn */
+}
+.astra::-webkit-scrollbar { display: none; }
+.astra h1 {
+  margin: 0 0 1rem;
+}
+.astra-empty {
+  margin: 0;
+}
+/* The font's name, which you can click and type into to rename it */
+.astra-name {
+  display: block;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 0 1rem;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+}
+.astra-name:hover { border-color: color-mix(in srgb, currentColor 30%, transparent); }
+.astra-name:focus-visible { outline: none; border-color: currentColor; }
+.astra-error {
+  margin: 0 0 1rem;
+  color: #e0484f;
+}
+.astra-glyph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4rem, 1fr));
+  gap: 0.5rem;
+}
+/* Each letter box is a button that opens the drawing pad. */
+.astra-glyph-slot {
+  position: relative;
+  border: 1px solid currentColor;
+  border-radius: 0.375rem;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.astra-glyph-slot:not(.is-drawn) { opacity: 0.55; }
+.astra-glyph-slot:hover { background: color-mix(in srgb, currentColor 10%, transparent); opacity: 1; }
+.astra-glyph-slot:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 2px; }
+.astra-glyph-art { width: 85%; height: 85%; }
+.astra-glyph-label {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.3rem;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+/* The buttons above the letter grid: upload a sheet, download the font. */
+.astra-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1rem; }
+.astra-action {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #5ad1c4;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: #5ad1c4;
+  background: transparent;
+  text-decoration: none;
+  cursor: pointer;
+}
+.astra-action:hover { background: rgba(90, 209, 196, 0.12); }
+.astra-action:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 2px; }
+.astra-action.is-disabled { opacity: 0.4; cursor: default; }
+.astra-action.is-disabled:hover { background: transparent; }
+
+/* The pen thickness slider, with a sample line that shows the thickness. */
+.astra-pen { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; font-size: 0.9rem; }
+.astra-pen input { width: 8rem; accent-color: #5ad1c4; }
+.astra-pen svg { width: 4rem; height: 1.25rem; }
+
+/* The character grid, in sections: Capitals, Lowercase, Numbers, Punctuation. */
+.astra-group { margin-bottom: 1.25rem; }
+.astra-group h2 { display: flex; align-items: baseline; gap: 0.6rem; margin: 0 0 0.5rem; font-size: 1rem; }
+.astra-group h2 span { font-size: 0.8rem; font-weight: 400; opacity: 0.65; }
+
+/* Uploading a whole alphabet sheet (uses the pad's window, made wider). */
+.astra-pad.astra-sheet { width: min(56rem, 100%); }
+.astra-sheet-tips { margin: 0 0 1rem; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.5; opacity: 0.85; }
+.astra-sheet-order { display: grid; gap: 0.35rem; margin-bottom: 1rem; font-size: 0.9rem; }
+.astra-sheet-order input {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  letter-spacing: 0.08em;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+}
+.astra-sheet-drop {
+  display: grid;
+  place-items: center;
+  min-height: 9rem;
+  padding: 1rem;
+  border: 2px dashed rgba(90, 209, 196, 0.5);
+  border-radius: 0.75rem;
+  text-align: center;
+}
+.astra-sheet-drop.is-busy { cursor: progress; opacity: 0.7; }
+.astra-sheet-drop button {
+  padding: 0;
+  border: none;
+  font: inherit;
+  color: #5ad1c4;
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.astra-sheet-help, .astra-sheet-note { margin: 0 0 0.75rem; font-size: 0.9rem; }
+.astra-sheet-note { color: #e3b84f; }
+.astra-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.5rem;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.astra-sheet-tile {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  min-width: 0;
+}
+.astra-sheet-tile svg { width: 100%; aspect-ratio: 1; }
+.astra-sheet-tile select {
+  width: 100%;
+  padding: 0.2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.35rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  background: var(--grad-color-2);
+}
+.astra-sheet-tile.is-skipped svg { opacity: 0.3; }
+.astra-sheet-tile.is-doubled { border-color: #e0484f; }
+.astra-sheet-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: -0.5rem 0 1rem; }
+.astra-sheet-presets button {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+.astra-sheet-presets button:hover { border-color: #5ad1c4; }
+
+/* Making characters with AI */
+.astra-ai-groups { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin: 0 0 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.9rem; }
+.astra-ai-groups legend { padding: 0 0.3rem; }
+.astra-ai-groups label { display: flex; align-items: center; gap: 0.35rem; }
+.astra-ai-groups input { accent-color: #5ad1c4; }
+.astra-sheet-grid.astra-ai-grid { grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); }
+.astra-ai-status { font-size: 0.8rem; text-align: center; }
+.astra-ai-error { font-size: 0.7rem; color: #e0484f; }
+.astra-ai-tile.is-drawing svg { animation: astra-pulse 1.2s ease-in-out infinite; }
+.astra-ai-tile.is-waiting svg { opacity: 0.3; }
+.astra-ai-tile-buttons { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-size: 0.8rem; }
+.astra-ai-tile-buttons label { display: flex; align-items: center; gap: 0.25rem; }
+.astra-ai-tile-buttons input { accent-color: #5ad1c4; }
+.astra-ai-tile-buttons button {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.35rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.astra-ai-tile-buttons button:disabled { opacity: 0.4; cursor: default; }
+@keyframes astra-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .astra-ai-tile.is-drawing svg { animation: none; } }
+
+/* "Try it out": type a sentence and see it in your font. */
+.astra-preview { margin-top: 2rem; }
+.astra-preview h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.astra-preview textarea {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+  resize: vertical;
+}
+.astra-preview textarea:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 1px; }
+.astra-preview-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin: 0.75rem 0; }
+.astra-preview-size { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.astra-preview-kerning { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
+.astra-preview-kerning input { accent-color: #5ad1c4; }
+.astra-preview-size input { width: 12rem; max-width: 50vw; accent-color: #5ad1c4; }
+.astra-preview-output { overflow-x: auto; padding: 0.5rem 0; }
+.astra-preview-output svg { display: block; max-width: none; }
+.astra-preview-missing { fill: currentColor; opacity: 0.18; font-family: system-ui, sans-serif; }
+.astra-preview-todo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.5rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+.astra-preview-todo button {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.astra-preview-todo button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
+/* The drawing pad, opened on top of the page. */
+.astra-pad-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.7);
+}
+.astra-pad {
+  width: min(32rem, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--grad-color-2);
+  color: var(--text-color);
+  box-shadow: var(--box-shadow);
+}
+.astra-pad h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+.astra-pad-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  touch-action: none; /* a finger draws instead of scrolling the page */
+  user-select: none;
+  cursor: crosshair;
+}
+.astra-pad-ghost { fill: currentColor; opacity: 0.08; pointer-events: none; font-family: system-ui, sans-serif; }
+.astra-pad-guide { stroke: #5ad1c4; stroke-width: 3; stroke-dasharray: 16 12; opacity: 0.5; pointer-events: none; }
+.astra-pad-guide.is-faint { opacity: 0.22; stroke-dasharray: 6 12; }
+.astra-pad h2 .astra-pad-char { color: #5ad1c4; }
+.astra-pad h2 .astra-pad-name { display: block; margin-top: 0.15rem; font-size: 0.8rem; font-weight: 400; opacity: 0.65; }
+.astra-pad-canvas.is-tracing { opacity: 0.5; cursor: progress; }
+.astra-pad-problem { margin: 0.75rem 0 0; color: #e0484f; font-size: 0.9rem; }
+.astra-pad-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.astra-pad-spacer { flex: 1; }
+.astra-pad-buttons button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+.astra-pad-buttons button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.astra-pad-buttons button:disabled { opacity: 0.4; cursor: default; }
+.astra-pad-buttons .astra-pad-save { background: #5ad1c4; border-color: #5ad1c4; color: #04201d; font-weight: 600; }
+.astra-pad-buttons .astra-pad-save:hover:not(:disabled) { background: #7fe0d5; }
+
+.astra-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.astra-sidebar-content button {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+/* #endregion astra */

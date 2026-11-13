@@ -1,0 +1,639 @@
+/* Prism (app/(apps)/prism). */
+
+/* #region prism */
+.prism {
+  --prism-accent: #b07cff;
+  color: var(--text-color);
+  min-height: 0;
+}
+.prism-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 1.25rem;
+  padding: 1.25rem;
+}
+.prism-controls {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.prism-label {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.prism-prompt,
+.prism-select {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text-color);
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.prism-prompt { 
+  resize: vertical; 
+  min-height: 6rem; 
+  line-height: 1.45; 
+}
+.prism-prompt:focus,
+.prism-select:focus { 
+  outline: none; 
+  border-color: var(--prism-accent); 
+}
+.prism-select option {
+  background: #0c1220;
+}
+.prism-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+/* Model switcher: the "Expand my prompt" tick box, for a model with a prompt expander */
+.prism-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.9rem;
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0.1rem 0 0;
+  flex-shrink: 0;
+  accent-color: var(--prism-accent);
+}
+.prism-check > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.prism-check > span > span {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+/* ...and what the expander wrote, tucked under the picture until you open it */
+.prism-expanded {
+  flex-basis: 100%;
+}
+.prism-expanded summary {
+  font-size: 0.8rem;
+  color: #8a8ca8;
+  cursor: pointer;
+}
+.prism-expanded p {
+  max-width: 62ch;
+  max-height: 7.5rem;
+  margin: 0.4rem auto 0;
+  padding: 0.6rem 0.75rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: left;
+  color: #dcdcf0;
+  background: rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;
+}
+.prism-shapes { 
+  display: grid; 
+  grid-template-columns: repeat(4, 1fr); 
+  gap: 0.4rem; 
+}
+.prism-shape {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-color);
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-shape-icon { 
+  height: 22px; 
+  max-width: 30px; 
+  border: 1.5px solid currentColor; 
+  border-radius: 3px; 
+}
+.prism-shape[aria-checked="true"] { 
+  color: var(--text-color); 
+  border-color: 
+  var(--prism-accent); 
+  background: var(--primary-color); 
+}
+/* The prompt box. It is the whole composer: the picture you start from (when there is one)
+   across the top, the words you type, "Add a picture" bottom left and the round Generate
+   button bottom right (like Lumen's message box). The box draws the border and background;
+   the typing area inside it is see-through. */
+.prism-prompt-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 9.5rem;
+  padding-bottom: 3.4rem; /* room for the two buttons along the bottom */
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+}
+.prism-prompt-box:focus-within,
+.prism-prompt-box.has-picture {
+  border-color: var(--prism-accent);
+}
+.prism-prompt-box .prism-prompt {
+  flex: 1;
+  min-height: 4.5rem;
+  padding: 0.9rem 1rem 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 1.25rem;
+  resize: none;
+}
+/* The picture you're starting from: a small preview, its name, and ✕ to take it off */
+.prism-attached {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.6rem 0.6rem 0;
+  padding: 0.35rem;
+  background: rgb(0 0 0 / 0.25);
+  border-radius: 0.9rem;
+}
+.prism-attached img {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 0.6rem;
+}
+.prism-attached-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.prism-attached-text span {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+.prism-attached-remove,
+.prism-attach {
+  font: inherit;
+  color: var(--text-color);
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  cursor: pointer;
+}
+.prism-attached-remove {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+}
+.prism-attach {
+  position: absolute;
+  left: 0.55rem;
+  bottom: 0.55rem;
+  height: 2.5rem;
+  padding: 0 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  border-radius: 999px;
+}
+.prism-attach:hover,
+.prism-attached-remove:hover {
+  background: rgb(255 255 255 / 0.12);
+  border-color: var(--prism-accent);
+}
+.prism-generate {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cff, #b07cff 55%, #e07cd8);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(124 92 255 / 0.4);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.prism-generate:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+.prism-generate:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+/* While a picture is being made: a turning ring in the button, and a line under the box
+   saying what's happening and for how long. */
+.prism-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid rgb(255 255 255 / 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: prism-spin 0.8s linear infinite;
+}
+@keyframes prism-spin {
+  to { transform: rotate(360deg); }
+}
+.prism-status {
+  margin: 0;
+  font-size: 0.85rem;
+  text-align: center;
+  opacity: 0.8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .prism-spinner { animation-duration: 2.4s; }
+}
+.prism-error {
+  margin: 0.25rem 0 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  color: #ffd2d2;
+  background: rgb(255 80 80 / 0.12);
+  border: 1px solid rgb(255 80 80 / 0.3);
+  border-radius: 10px;
+}
+.prism-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prism-result {
+  margin: 0;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+.prism-result img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100% - 4.5rem);
+  min-height: 0;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.6);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.prism-result img.is-busy { 
+  opacity: 0.45; 
+  filter: blur(2px); 
+}
+.prism-result figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.9rem;
+  max-width: 100%;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.prism-caption-text { 
+  color: #dcdcf0; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  display: -webkit-box; 
+  -webkit-line-clamp: 2; 
+  -webkit-box-orient: vertical; 
+}
+.prism-caption-meta { 
+  color: #8a8ca8; 
+}
+.prism-caption-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.prism-caption-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.prism-caption-actions button,
+.prism-caption-actions a {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #e5e7f0;
+  text-decoration: none;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  cursor: pointer;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.05);
+}
+.prism-empty {
+  padding: 3rem 1.5rem;
+  color: #71717a;
+  text-align: center;
+  border: 1px dashed rgb(255 255 255 / 0.15);
+  border-radius: 14px;
+}
+.prism-caption-actions button:hover:not(:disabled),
+.prism-caption-actions a:hover {
+  background: rgb(255 255 255 / 0.12);
+  border-color: var(--prism-accent);
+}
+/* Enlarge: the same pills as the other picture actions, on their own row. */
+.prism-enlarge {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.prism-enlarge-note {
+  flex-basis: 100%;
+  color: #8a8ca8;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+.prism-enlarge button {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #e5e7f0;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.prism-enlarge button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.12);
+  border-color: var(--prism-accent);
+}
+.prism-enlarge button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* On a wide screen the picture is the centerpiece and the composer sits under it, like the
+   message box in a chat: with the round Generate button inside the prompt box. (On a phone the
+   composer stays on top and the page scrolls; see the phone rules further down.) */
+@media (min-width: 769px) {
+  .prism-workspace {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  .prism-stage {
+    order: 1;
+    width: 100%;
+  }
+  .prism-controls {
+    order: 2;
+    /* leaves room for the round buttons in the bottom corners */
+    width: min(760px, 100% - 9rem);
+    gap: 0.6rem;
+    overflow: visible;
+  }
+  .prism-controls > * { margin-top: 0; }
+  .prism-controls > .prism-modes { order: 1; }
+  .prism-controls > #prism-length-label,
+  .prism-controls > .prism-lengths,
+  .prism-controls > .prism-note { order: 2; }
+  .prism-controls > .prism-enlarge,
+  .prism-controls > #prism-enlarge-label { order: 3; }
+  .prism-controls > .prism-prompt-box { order: 5; }
+  .prism-controls > .prism-status { order: 6; }
+  .prism-controls > .prism-error { order: 7; }
+}
+/* Your pictures, in the side panel: a grid of square thumbnails */
+.prism-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+/* The side panel is outside the studio, so it needs the accent color too. Buttons in a
+   side panel are styled as full-width text rows; these put Prism's own buttons back. */
+.prism-sidebar {
+  --prism-accent: #b07cff;
+}
+.prism-sidebar .prism-note {
+  margin: 0;
+}
+.prism-sidebar .prism-shape {
+  padding: 0.55rem 0.1rem;
+  font-size: 0.68rem;
+  text-align: center;
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.prism-sidebar .prism-shape[aria-checked="true"] {
+  border-color: var(--prism-accent);
+  background: var(--primary-color);
+}
+.prism-sidebar .prism-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  min-height: 0;
+  padding: 0;
+  background: #0c1220;
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+/* Each thumbnail sits in a little frame so the delete ✕ can sit on its top-right corner. */
+.prism-thumb-wrap {
+  position: relative;
+}
+.prism-sidebar .prism-thumb-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  background: rgb(0 0 0 / 0.65);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  opacity: 0.85;
+}
+.prism-sidebar .prism-thumb-delete:hover {
+  opacity: 1;
+  background: rgb(200 50 50 / 0.9);
+}
+.prism-sidebar .prism-thumb[aria-current="true"] {
+  border-color: var(--prism-accent);
+}
+.prism-thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  overflow: hidden;
+  background: #0c1220;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-thumb img {
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+  display: block; 
+}
+.prism-thumb[aria-current="true"] {
+  border-color: var(--prism-accent);
+}
+/* Videos: "Edit picture / Make video" switch, the length picker, progress, and thumbnails */
+.prism-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+.prism-modes button,
+.prism-length {
+  font: inherit;
+  color: var(--text-color);
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.prism-modes button {
+  min-height: 40px;
+  font-size: 0.85rem;
+}
+.prism-modes button[aria-checked="true"],
+.prism-length[aria-checked="true"] {
+  border-color: var(--prism-accent);
+  background: var(--primary-color);
+}
+.prism-lengths {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+.prism-length {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.6rem 0.25rem;
+}
+.prism-length strong { font-size: 0.95rem; }
+.prism-length span { font-size: 0.75rem; }
+.prism-length small { font-size: 0.65rem; opacity: 0.55; }
+.prism-result video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100% - 4.5rem);
+  min-height: 0;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.6);
+  background: #000;
+}
+.prism-video-wait {
+  position: relative;
+  max-width: 100%;
+  max-height: calc(100% - 4.5rem);
+  min-height: 0;
+  display: flex;
+}
+.prism-video-wait img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  opacity: 0.45;
+  filter: blur(2px);
+}
+.prism-video-status {
+  position: absolute;
+  inset: auto 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9rem;
+  text-align: center;
+  background: rgb(0 0 0 / 0.6);
+  border-radius: 10px;
+}
+.prism-video-status small { opacity: 0.7; }
+.prism-video-status.is-failed { color: #ffd2d2; }
+.prism-video-bar {
+  height: 6px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.15);
+  border-radius: 3px;
+}
+.prism-video-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #7c5cff, #b07cff 55%, #e07cd8);
+  transition: width 1s linear;
+}
+.prism-thumb-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 0.65rem;
+  color: #fff;
+  background: rgb(0 0 0 / 0.65);
+  border-radius: 10px;
+}
+.prism-thumb.is-working img { opacity: 0.5; }
+.prism-thumb.is-failed .prism-thumb-badge { background: rgb(200 60 60 / 0.85); }
+/* #endregion prism */
