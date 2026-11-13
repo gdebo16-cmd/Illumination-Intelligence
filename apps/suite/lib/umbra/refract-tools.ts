@@ -6,7 +6,7 @@
 // the sandbox; workspace snapshots undo project-level mistakes without resetting the whole VM.
 
 import "server-only";
-import type { ToolDef, ToolResult } from "./tools";
+import type { ToolDef, ToolResult } from "./types";
 import {
   listWorkspaces,
   cloneRepo,

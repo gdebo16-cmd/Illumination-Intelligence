@@ -9,9 +9,9 @@ import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
 import { BOT_TOOLS } from '@/config/umbra';
-import { runAgent, type AgentStep, type ChatMessage } from './agent';
+import { runAgent, type ChatMessage } from './agent';
 import { getBot, listNotes, systemPrompt, type Bot } from './bots';
-import type { ToolDef } from './tools';
+import type { AgentStep, ToolDef } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 
 export const TEAM_LIMITS = { name: 40, purpose: 1000, role: 60, members: 5 };

@@ -20,52 +20,13 @@ import { saveImage } from '@/lib/prism/images';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import type { ToolId } from '@/config/umbra';
 import { calculate } from './calculator';
-import { CODE_TOOLS, type CodeEditView } from './code';
+import { CODE_TOOLS } from './code';
 import { REFRACT_TOOLS } from './refract-tools';
-import type { AgentStep } from './agent';
+import type { ToolDef } from './types';
 
 const SEARXNG_URL = process.env.SEARXNG_URL ?? 'http://127.0.0.1:8888';
 const PAGE_TEXT_LIMIT = 6000; // characters of a web page handed to the model
 const PAGE_BYTE_LIMIT = 2_000_000;
-
-/** Who is running the tool: the profile and the bot. */
-export interface ToolContext {
-  userId: string;
-  botId: string;
-  /** 'low' when a background task is running, so live chats go first. */
-  priority?: 'high' | 'low';
-  /** Show progress on this tool's step while it is still running. */
-  progress?: (update: Partial<Pick<AgentStep, 'summary' | 'children' | 'bot'>>) => void;
-}
-
-/** What a tool hands back: text for the model, plus anything the chat should show. */
-export interface ToolResult {
-  /** What the model reads. */
-  output: string;
-  /** A short line for the chat, e.g. "Found 5 results". */
-  summary: string;
-  /** Links the chat can show (search results, the page that was read). */
-  links?: { title: string; url: string }[];
-  /** A picture the chat can show. */
-  image?: { url: string; prompt: string };
-  /** A file change the Code helper suggested, with Apply / Don't apply buttons in the chat. */
-  edit?: CodeEditView;
-  /** Teams: who did the work, the tools they used, and their full answer. */
-  bot?: AgentStep['bot'];
-  children?: AgentStep[];
-  detail?: string;
-}
-
-interface ToolDef {
-  /** The description the model reads (Ollama's "function" format). */
-  schema: {
-    type: 'function';
-    function: { name: string; description: string; parameters: Record<string, unknown> };
-  };
-  /** What the chat says while it runs, e.g. "Searching the web for …". */
-  label: (args: Record<string, unknown>) => string;
-  run: (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>;
-}
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 const params = (properties: Record<string, unknown>, required: string[]) => ({ type: 'object', properties, required });
@@ -359,4 +320,3 @@ export function toolsFor(ids: ToolId[]): Map<string, ToolDef> {
   return map;
 }
 
-export type { ToolDef };
