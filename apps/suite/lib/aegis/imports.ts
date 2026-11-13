@@ -272,6 +272,22 @@ export function checkOrphans(graph: ImportGraph, all: RepoFile[]): Finding[] {
   }];
 }
 
+/** Each exported declaration's name and the text of its signature (a whole body for a type). */
+function exportedSignatures(src: string): { name: string; text: string }[] {
+  const lines = src.split('\n');
+  const out: { name: string; text: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:const|let|var|function\*?|class|type|interface|enum)\s+([A-Za-z_$][\w$]*)/);
+    if (!m) continue;
+    let j = i;
+    const isType = /^export\s+(?:declare\s+)?(?:type|interface)\b/.test(lines[i]);
+    if (isType) while (j < lines.length - 1 && !/^[}\]]|;\s*$/.test(lines[j])) j++;
+    else while (j < lines.length - 1 && j - i < 8 && !lines[j].includes('{') && !/;\s*$/.test(lines[j])) j++;
+    out.push({ name: m[1], text: lines.slice(i, j + 1).join('\n') });
+  }
+  return out;
+}
+
 export function checkUnusedExports(graph: ImportGraph, all: RepoFile[]): Finding[] {
   const isEntry = entryChecker(all);
   const words = wordIndex(graph);
@@ -282,7 +298,14 @@ export function checkUnusedExports(graph: ImportGraph, all: RepoFile[]): Finding
     const used = new Set(into.flatMap((e) => [...e.names]));
     const src = f.text ?? '';
     const exported = [...src.matchAll(/^export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:const|let|var|function\*?|class|type|interface|enum|abstract\s+class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
-    const unused = exported.filter((n) => !used.has(n) && ![...(words.get(n) ?? [])].some((q) => q !== p));
+    const inSignatures = exportedSignatures(src);
+    const unused = exported.filter(
+      (n) =>
+        !used.has(n) &&
+        ![...(words.get(n) ?? [])].some((q) => q !== p) &&
+        // A type named in another export's signature is part of the module's interface: callers may need it.
+        !(new RegExp(`^export\\s+(?:declare\\s+)?(?:type|interface)\\s+${n}\\b`, 'm').test(src) && inSignatures.some((sig) => sig.name !== n && new RegExp(`(?<![\\w$])${n}(?![\\w$])`).test(sig.text))),
+    );
     if (!unused.length) continue;
     const dead = unused.filter((n) => (src.match(new RegExp(`(?<![\\w$])${n.replace(/\$/g, '\\$')}(?![\\w$])`, 'g')) ?? []).length === 1);
     rows.push({ path: p, unused, dead });

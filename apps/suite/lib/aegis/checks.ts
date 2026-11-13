@@ -150,7 +150,7 @@ export function checkUnusedAssets(files: RepoFile[]): Finding[] {
 export function checkStaleDocs(files: RepoFile[]): Finding[] {
   const paths = files.map((f) => f.path);
   // Paths that .gitignore leaves out (data/, .env …) are meant to exist only on someone's machine.
-  const ignored = files
+  const ignored: RegExp[] = files
     .filter((f) => baseOf(f.path) === '.gitignore' && f.text)
     .flatMap((f) => f.text!.split('\n').map((l) => ({ dir: dirOf(f.path), line: l.trim() })))
     .filter(({ line }) => line && !line.startsWith('#') && !line.startsWith('!'))
@@ -161,6 +161,15 @@ export function checkStaleDocs(files: RepoFile[]): Finding[] {
       const prefix = dir ? `${escapeRe(dir)}/` : '';
       return new RegExp(anchored ? `^${prefix}${body}(/|$)` : `(^|/)${body}(/|$)`);
     });
+  // `apps/*/data/` also covers `data/…` named from inside one of those apps (e.g. its README).
+  for (const f of files.filter((f) => baseOf(f.path) === '.gitignore' && f.text)) {
+    for (const line of f.text!.split('\n').map((l) => l.trim().replace(/^\/|\/$/g, ''))) {
+      const segs = line.split('/');
+      const lastWild = segs.map((s) => s.includes('*')).lastIndexOf(true);
+      if (line.startsWith('#') || lastWild < 0 || lastWild === segs.length - 1) continue;
+      ignored.push(new RegExp(`^${segs.slice(lastWild + 1).map(escapeRe).join('/')}(/|$)`));
+    }
+  }
   const docExts = new Set([...CODE_EXTS, 'json', 'md', 'mdx', 'yml', 'yaml', 'toml']);
   const stale: string[] = [];
 
@@ -212,7 +221,8 @@ export function checkCss(files: RepoFile[]): Finding[] {
   for (const f of files) {
     if (!STYLE_EXTS.has(f.ext) || !f.text || isGenerated(f.text)) continue;
     const src = f.text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '));
-    const seen = new Map<string, number[]>();
+    // Each top-level rule a selector appears in: its line and the properties it sets.
+    const seen = new Map<string, { line: number; props: string[] }[]>();
     let depth = 0;
     let start = 0;
     let inAt = 0; // depth at which an @-rule opened; selectors inside @media are counted separately
@@ -223,9 +233,11 @@ export function checkCss(files: RepoFile[]): Finding[] {
         if (depth === 0 && head.startsWith('@')) inAt = 1;
         else if (depth === 0 && head) {
           const line = lineAt(src, start + (src.slice(start, i).length - src.slice(start, i).trimStart().length));
+          const close = src.indexOf('}', i);
+          const props = src.slice(i + 1, close < 0 ? undefined : close).split(';').map((d) => d.split(':')[0].trim().toLowerCase()).filter(Boolean);
           for (const s of head.split(',')) {
             const sel = s.trim().replace(/\s+/g, ' ');
-            if (sel && !/^(from|to|\d+%)$/.test(sel)) seen.set(sel, [...(seen.get(sel) ?? []), line]);
+            if (sel && !/^(from|to|\d+%)$/.test(sel)) seen.set(sel, [...(seen.get(sel) ?? []), { line, props }]);
           }
         }
         depth++;
@@ -238,16 +250,26 @@ export function checkCss(files: RepoFile[]): Finding[] {
         start = i + 1;
       }
     }
-    const repeated = [...seen].filter(([, lines]) => lines.length > 1).sort((a, b) => b[1].length - a[1].length);
+    // A selector written twice is fine (a shared group rule plus its own rule). It's an override
+    // when a later rule sets a property an earlier one already set.
+    const repeated = [...seen]
+      .map(([sel, rules]) => {
+        const count = new Map<string, number>();
+        for (const r of rules) for (const p of new Set(r.props)) count.set(p, (count.get(p) ?? 0) + 1);
+        const twice = [...count].filter(([, n]) => n > 1).map(([p]) => p);
+        return [sel, rules.filter((r) => r.props.some((p) => twice.includes(p))).map((r) => r.line), twice] as const;
+      })
+      .filter(([, , twice]) => twice.length > 0)
+      .sort((a, b) => b[1].length - a[1].length);
     const lines = f.text.split('\n').length;
     if (repeated.length < 8 && !(lines >= 1500 && repeated.length >= 3)) continue;
     const important = (src.match(/!important/g) ?? []).length;
     findings.push({
       kind: 'css-overrides',
       severity: lines > 2500 && repeated.length >= 20 ? 'high' : 'medium',
-      title: `${f.path} redefines ${plural(repeated.length, 'selector')} further down the file`,
+      title: `${f.path} overrides ${plural(repeated.length, 'selector')} further down the file`,
       why: `At ${plural(lines, 'line')}, with the same selectors written again later on${important ? ` and ${important} !important` : ''}, what a rule really does depends on where it sits in the file. Each fix gets added as another override, so the file only grows.`,
-      evidence: listOut(repeated.map(([sel, at]) => `\`${sel}\` at lines ${at.join(', ')}`), 10),
+      evidence: listOut(repeated.map(([sel, at, props]) => `\`${sel}\` at lines ${at.join(', ')} (sets ${props.slice(0, 3).join(', ')}${props.length > 3 ? ', …' : ''} again)`), 10),
       fix: 'Merge each later override back into the original rule, then split the file by feature or page (one stylesheet per area plus a small shared one) so each rule has one obvious home.',
     });
   }
@@ -292,15 +314,18 @@ export function checkRepeatedCode(files: RepoFile[]): Finding[] {
       const t = raw.trim().replace(/\s+/g, ' ');
       if (t.length < 12) return;
       if (/^(\/\/|#|\*|\/\*|import\s|from\s\S+\simport|export \* from|['"]use (client|server|strict)['"]|require\()/.test(t)) return;
+      // Signatures a framework requires (Next.js route handlers) look alike on purpose.
+      if (/^export (async )?function (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\(/.test(t)) return;
       if (/^[\])}]*[;,]?$/.test(t)) return;
       kept.push({ text: t, line: i + 1 });
     });
     for (let i = 0; i < kept.length; i++) {
       const one = kept[i].text;
-      if (one.length >= 50 && /^(export\s+)?(const|let|function|async function|def|func|fn)\s/.test(one)) note(one, f.path, kept[i].line);
+      // One-line helpers defined again and again (not short idioms like a useRef, or bare signatures).
+      if (one.length >= 70 && !one.endsWith('{') && /^(export\s+)?(const|let|function|async function|def|func|fn)\s/.test(one)) note(one, f.path, kept[i].line);
       if (i + 1 < kept.length) {
         const two = `${one}\n${kept[i + 1].text}`;
-        if (two.length >= 60) note(two, f.path, kept[i].line);
+        if (two.length >= 100) note(two, f.path, kept[i].line);
       }
     }
   }
@@ -356,8 +381,9 @@ export function checkNaming(files: RepoFile[]): Finding[] {
     }
   }
 
-  // The same folder name with and without a leading _ (components vs _components).
-  const dirs = new Set(files.flatMap((f) => {
+  // The same folder name with and without a leading _ (components vs _components). The _ marks a
+  // private folder in a Next.js app/ folder, so only folders inside one are compared.
+  const dirs = new Set(files.filter((f) => /(^|\/)app\//.test(f.path)).flatMap((f) => {
     const parts = f.path.split('/').slice(0, -1);
     return parts.map((_, i) => parts.slice(0, i + 1).join('/'));
   }));
@@ -430,5 +456,57 @@ export function checkSchema(files: RepoFile[]): Finding[] {
     why: "With no single place that shows every table, it's easy to miss one when changing the database, and two features can end up with clashing names.",
     evidence: spots.map((s) => `${s.path}: ${plural(s.n, 'table')}`),
     fix: 'Gather the table definitions into one schema file (or a numbered migrations folder). Leave a table where it is only if it must be created at a special moment, and note why next to it.',
+  }];
+}
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Next.js: code that calls /api/... where no route file answers. Usually the other half of a
+ * feature that was never added (or was deleted), so the call quietly fails every time.
+ */
+export function checkMissingRoutes(files: RepoFile[]): Finding[] {
+  // app/api/prism/images/[id]/route.ts → ['api', 'prism', 'images', '[id]']. Route groups like
+  // (apps) don't appear in the address.
+  const routes = files
+    .map((f) => f.path.match(/(?:^|\/)app\/(.*\/)?route\.[cm]?[jt]sx?$/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => (m[1] ?? '').split('/').filter((s) => s && !/^\(.*\)$/.test(s)));
+  if (!routes.some((r) => r[0] === 'api')) return [];
+
+  const answers = (call: string[], open: boolean) =>
+    routes.some((r) => {
+      const catchAll = r.length > 0 && /^\[\[?\.\.\./.test(r[r.length - 1]);
+      if (!catchAll && !open && r.length !== call.length) return false;
+      if (open && r.length < call.length) return false;
+      if (catchAll && call.length < r.length - 1) return false;
+      return call.every((seg, i) => i >= r.length ? catchAll : seg.includes('${') || seg === '*' || /^\[.*\]$/.test(r[i]) || seg === r[i]);
+    });
+
+  const missing = new Map<string, string[]>();
+  for (const f of files) {
+    if (!['ts', 'tsx', 'js', 'jsx', 'mjs'].includes(f.ext) || !f.text || isTest(f.path) || /(^|\/)app\/(.*\/)?route\.[cm]?[jt]sx?$/.test(f.path)) continue;
+    for (const m of f.text.matchAll(/[`'"](\/api\/[^`'"\s?#]*)/g)) {
+      const raw = m[1];
+      const lineStart = f.text.lastIndexOf('\n', m.index!) + 1;
+      const before = f.text.slice(lineStart, m.index!);
+      // Skip comments, and constants that define a path this code serves itself (a WebSocket hook).
+      if (/\/\/|^\s*\*/.test(before) || /\bconst\s+[A-Z][A-Z0-9_]*\s*=\s*$/.test(before)) continue;
+      // A string that ends at a variable ('/api/x/' + id) leaves the rest of the address open.
+      const open = raw.endsWith('/') || raw.endsWith('${');
+      const segs = raw.replace(/\$\{[^}]*\}/g, '*').split('/').filter(Boolean);
+      if (answers(segs, open)) continue;
+      const at = `${f.path}:${lineAt(f.text, m.index!)}`;
+      missing.set(raw, [...(missing.get(raw) ?? []), at]);
+    }
+  }
+  if (!missing.size) return [];
+  return [{
+    kind: 'missing-routes',
+    severity: 'medium',
+    title: `${plural(missing.size, 'API address', 'API addresses')} called by the code with no route behind ${missing.size === 1 ? 'it' : 'them'}`,
+    why: 'Each call gets a 404 every time. The page usually carries on as if nothing happened, so a feature quietly never works, and the code on the other end (if it was written) sits unused.',
+    evidence: listOut([...missing].map(([addr, at]) => `\`${addr}\` from ${at.slice(0, 3).join(', ')}${at.length > 3 ? ', …' : ''}`), 12),
+    fix: 'For each one, decide: add the missing route (if the feature is wanted and its server code exists), or remove the call and anything only it needed.',
   }];
 }

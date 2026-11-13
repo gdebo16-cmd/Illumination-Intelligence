@@ -62,6 +62,10 @@ const LESSONS: Record<string, Lesson> = {
     title: 'Keep the surface small',
     body: "Everything a module exports is something other code might rely on, so it becomes harder to change. Export only what other files actually use. Smaller surfaces are easier to understand and safer to refactor.",
   },
+  'missing-routes': {
+    title: 'Finish or remove both halves',
+    body: "A feature that crosses the network has two halves: the page that asks and the route that answers. When one half is missing, nothing crashes; the request just fails and the page falls back to a default, so nobody notices. When you add or delete a feature, check both ends in the same change.",
+  },
   'pass-through': {
     title: 'Every layer has to earn its place',
     body: "A wrapper that only passes things along adds a second place to look, without adding behavior. Layers are worth it when they hide a decision (which database, which API) or enforce a rule. If a layer doesn't do either, remove it and import the real thing directly.",

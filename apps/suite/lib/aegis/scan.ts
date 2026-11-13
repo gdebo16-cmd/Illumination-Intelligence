@@ -2,7 +2,7 @@
 // check, and write the report.
 
 import 'server-only';
-import { checkCss, checkDumpingGrounds, checkDuplicateFiles, checkLargeFiles, checkNaming, checkRepeatedCode, checkSchema, checkStaleDocs, checkUnusedAssets } from './checks';
+import { checkCss, checkDumpingGrounds, checkDuplicateFiles, checkLargeFiles, checkMissingRoutes, checkNaming, checkRepeatedCode, checkSchema, checkStaleDocs, checkUnusedAssets } from './checks';
 import { CODE_EXTS, listFiles, type RepoFile } from './files';
 import { buildGraph, checkCycles, checkOrphans, checkPassThrough, checkUnusedExports, type ImportGraph } from './imports';
 import { openRepo } from './repo';
@@ -20,6 +20,7 @@ const CHECKS: { clean: string; run: (files: RepoFile[], graph: ImportGraph) => F
   { clean: 'No files that import each other in a loop', run: (_f, g) => checkCycles(g) },
   { clean: 'Every code file is imported or is an entry point', run: (f, g) => checkOrphans(g, f) },
   { clean: 'No exports that nothing uses', run: (f, g) => checkUnusedExports(g, f) },
+  { clean: 'Every API address the code calls has a route', run: checkMissingRoutes },
   { clean: 'No modules passing another module\'s names through', run: (_f, g) => checkPassThrough(g) },
   { clean: 'Names are consistent', run: checkNaming },
   { clean: 'No overgrown catch-all folders', run: checkDumpingGrounds },
