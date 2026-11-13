@@ -4,8 +4,6 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { USERS, UserId } from './users';
 
-export { USERS, type UserId };
-
 export async function getCurrentUserId(): Promise<UserId | null> {
   const cookieStore = await cookies();
   const userId = cookieStore.get('assistant-user')?.value;

@@ -32,8 +32,6 @@ import { noWorkerMessage, rankWorkers, type GpuNeeds } from './gpu/router.ts';
 
 type Engine = 'ollama' | 'comfy';
 export type Priority = 'high' | 'low';
-export type { GpuWorker } from '../config/gpu-workers.ts';
-export type { GpuNeeds } from './gpu/router.ts';
 
 /** Optional details about a job. */
 interface JobInfo {
