@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import { MessageContent } from '@/components/MessageContent';
 import Flame from './Flame';
-import type { AgentStep, CodeEdit } from './types';
+import type { AgentStep, ApprovalRequest, CodeEdit } from './types';
 
 // The steps behind a reply: what the bot did, with links and pictures.
 // A bot with "Think before answering" on also gets "Thinking" steps: while it reasons, the last
@@ -57,6 +57,7 @@ export function Steps({ steps }: { steps: AgentStep[] }) {
               </span>
             )}
             {step.edit && <EditCard edit={step.edit} />}
+            {step.approval && <ApprovalCard approval={step.approval} />}
             {step.image && (
               <a href={step.image.url} target="_blank" rel="noreferrer" className="umbra-step-image">
                 {/* eslint-disable-next-line @next/next/no-img-element -- a picture Prism made, served by our own API */}
@@ -110,6 +111,66 @@ function EditCard({ edit: initial }: { edit: CodeEdit }) {
         </span>
       ) : (
         <span className="umbra-edit-status">{status}{edit.note ? `: ${edit.note}` : ''}</span>
+      )}
+    </span>
+  );
+}
+// Something a Flicker asked to do that needs your OK first (Prod control's restart): what would
+// run, with Approve and Deny buttons. Nothing runs until you approve. While the restart goes, the
+// step's own updates show how far it got.
+function ApprovalCard({ approval: live }: { approval: ApprovalRequest }) {
+  const [answered, setAnswered] = useState<ApprovalRequest | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Your answer shows straight away; once the Flicker's step catches up, its updates take over.
+  const approval = answered && live.status === 'pending' ? answered : live;
+
+  const decide = async (approve: boolean) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/umbra/approvals/${approval.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve }),
+      });
+      const data = await res.json();
+      setAnswered(res.ok ? data : { ...approval, status: 'failed', note: data.error ?? 'Something went wrong.' });
+    } catch {
+      setAnswered({ ...approval, status: 'failed', note: 'Couldn’t reach the app.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const status = {
+    pending: '',
+    approved: 'Approved',
+    denied: 'Denied, so nothing ran',
+    expired: 'No answer in time, so nothing ran',
+    failed: 'Couldn’t start',
+  }[approval.status];
+  const tone = approval.status === 'failed' || approval.outcome === 'failed' ? 'is-failed' : approval.outcome === 'done' ? 'is-applied' : '';
+  return (
+    <span className={`umbra-edit umbra-approval is-${approval.status} ${tone}`}>
+      <span className="umbra-approval-title">{approval.title}</span>
+      <span className="umbra-approval-steps">
+        {approval.detail.map((line, i) => (
+          <span key={i} className="umbra-approval-step">
+            <span className="umbra-approval-num">{i + 1}.</span>
+            <span>{line}</span>
+          </span>
+        ))}
+      </span>
+      {approval.status === 'pending' ? (
+        <span className="umbra-edit-actions">
+          <button type="button" className="umbra-edit-apply" disabled={busy} onClick={() => decide(true)}>Approve</button>
+          <button type="button" disabled={busy} onClick={() => decide(false)}>Deny</button>
+        </span>
+      ) : (
+        <span className="umbra-edit-status">
+          {status}
+          {approval.progress ? ` · ${approval.progress}` : ''}
+          {approval.note ? `: ${approval.note}` : ''}
+        </span>
       )}
     </span>
   );

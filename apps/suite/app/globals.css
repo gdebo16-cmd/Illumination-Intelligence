@@ -1543,6 +1543,49 @@ textarea.input-field {
 .umbra-chat-action:disabled { 
   opacity: 0.4; 
   cursor: default; }
+/* Repo dropdown: GitHub repos a Flicker can copy into Refract. */
+.umbra-repo-bar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 max(1rem, env(safe-area-inset-left)) 0.45rem;
+}
+.umbra-repo-bar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+  font-size: 0.85rem;
+  color: #9a9cb8;
+}
+.umbra-repo-label {
+  flex-shrink: 0;
+}
+.umbra-repo-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 24rem;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #d5d7ea;
+  background: rgb(0 0 0 / 0.25);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.umbra-repo-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--bot-color) 50%, transparent);
+  outline-offset: 1px;
+}
+.umbra-repo-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #9a9cb8;
+}
 .umbra-messages {
   flex: 1;
   min-height: 0;
@@ -2040,6 +2083,7 @@ textarea.input-field {
   .umbra-report-body { padding-left: 1rem; }
   .umbra-chat-bar { gap: 0.4rem; }
   .umbra-chat-action { padding: 0.35rem 0.55rem; }
+  .umbra-repo-select { font-size: 16px; }
   .umbra-page { padding: 1rem 1rem 2rem; }
   .umbra-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
   .umbra-card { min-height: 190px; padding: 1rem 0.6rem; }
@@ -4099,3 +4143,13 @@ main.refract {
   .umbra-chat-artifacts-icon { display: inline; }
   .umbra-chat-artifacts-label { display: none; } }
 /* #endregion artifacts */
+/* #region umbra prod control: the Approve / Deny card for restart_prod (lib/umbra/prod-control.ts) */
+/* It reuses the code helper's card (.umbra-edit); these are the parts only it has. */
+.umbra-approval-title { font-weight: 600; font-size: 0.9rem; color: #e5e7f0; }
+.umbra-approval-steps { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; line-height: 1.4; color: #b8bad0; }
+.umbra-approval-step { display: flex; gap: 0.4rem; }
+.umbra-approval-num { flex: none; font-weight: 600; color: var(--bot-color, #c9cbe0); }
+.umbra-approval.is-approved .umbra-edit-status { color: #c9cbe0; }
+.umbra-approval.is-approved.is-applied .umbra-edit-status { color: #8be9a8; }
+.umbra-approval.is-approved.is-failed .umbra-edit-status { color: #ffb4b4; }
+/* #endregion umbra prod control */

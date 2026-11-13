@@ -3,12 +3,12 @@
 export const PAGE_MODELS = {
     chat: [
         // Fun names say what each is for; "heavy" ones nearly fill (or overflow) the 16 GB card.
-        { id: 'gemma4:12b', name: 'Big Brain Fish: smart all-rounder, can see images' },
-        { id: 'qwen3.5:9b', name: 'Little Eyed Fish: quick, can see images' },
-        { id: 'qwen2.5-coder:7b', name: 'Small Code Fish: quick code help' },
-        { id: 'gpt-oss:20b', name: 'Big City Task Fish: multi-step tasks (heavy)' },
-        { id: 'devstral-small-2:24b', name: 'Harbor Code Fish: explores and edits a project, can see images (heavy)' },
-        { id: 'qwen3-coder:30b', name: 'Deep Sea Code Fish: best code (heavy, slow)' },
+        { id: 'gemma4:12b', name: 'Big Brain Fish: Very Smart' },
+        { id: 'qwen3.5:9b', name: 'Small Town Fish: Fast as Fish boi' },
+        { id: 'qwen2.5-coder:7b', name: 'Pond Fish: quick code' },
+        { id: 'gpt-oss:20b', name: 'Big City Fish: multi-task (Heavy)' },
+        { id: 'devstral-small-2:24b', name: 'Harbor Fish: project code (Heavy)' },
+        { id: 'qwen3-coder:30b', name: 'Deep Sea Fish: tough code (Heavy, Slow)' },
     ],
     images: [
     ],

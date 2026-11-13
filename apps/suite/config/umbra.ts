@@ -110,12 +110,12 @@ export const hasDanceClip = (flame: string) => (flameClips.dance as string[]).in
 // Local models a bot can use. All of them can use tools (needed from Stage 2 on).
 // The first one is the default for new bots.
 export const BOT_MODELS = [
-  { id: 'gemma4:12b', name: 'Big Brain Fish: smart all-rounder, can see images' },
-  { id: 'qwen3.5:9b', name: 'Little Eyed Fish: quick, can see images' },
-  { id: 'qwen2.5-coder:7b', name: 'Small Code Fish: quick code help' },
-  { id: 'gpt-oss:20b', name: 'Big City Task Fish: multi-step tasks (heavy)' },
-  { id: 'devstral-small-2:24b', name: 'Harbor Code Fish: explores and edits a project, can see images (heavy)' },
-  { id: 'qwen3-coder:30b', name: 'Deep Sea Code Fish: best code (heavy, slow)' },
+  { id: 'gemma4:12b', name: 'Big Brain Fish: Very Smart' },
+  { id: 'qwen3.5:9b', name: 'Small Town Fish: Fast as Fish boi' },
+  { id: 'qwen2.5-coder:7b', name: 'Pond Fish: quick code' },
+  { id: 'gpt-oss:20b', name: 'Big City Fish: multi-task (Heavy)' },
+  { id: 'devstral-small-2:24b', name: 'Harbor Fish: project code (Heavy)' },
+  { id: 'qwen3-coder:30b', name: 'Deep Sea Fish: tough code (Heavy, Slow)' },
 ] as const;
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);
@@ -140,6 +140,7 @@ export const BOT_TOOLS = [
   { id: 'notes', name: 'Notes', description: 'Remembers things about you between chats.' },
   { id: 'code', name: 'Code helper', description: 'Reads and searches one project folder, and suggests changes for you to approve.' },
   { id: 'refract', name: 'Refract workshop', description: 'Copies repos into the virtual machine, edits and runs commands there, and can snapshot or roll back that work. The host PC stays untouched.' },
+  { id: 'host_ops', name: 'Prod control', description: 'Merges are separate; this pulls main, builds, and restarts the live app after you approve.' },
 ] as const;
 
 export type ToolId = (typeof BOT_TOOLS)[number]['id'];
@@ -147,7 +148,8 @@ export const ALL_TOOL_IDS: ToolId[] = BOT_TOOLS.map((t) => t.id);
 export const isToolId = (id: unknown): id is ToolId => BOT_TOOLS.some((t) => t.id === id);
 // New Flickers start with these. The Code helper stays off until you pick a folder for it.
 // The Refract workshop is on: it works in the virtual machine and does not need a folder.
-export const DEFAULT_TOOL_IDS: ToolId[] = ALL_TOOL_IDS.filter((id) => id !== 'code');
+// Prod control stays off: it restarts the live app on the PC (after you approve), so you turn it on per Flicker.
+export const DEFAULT_TOOL_IDS: ToolId[] = ALL_TOOL_IDS.filter((id) => id !== 'code' && id !== 'host_ops');
 
 // Limits for the bot form.
 export const BOT_LIMITS = { name: 40, personality: 2000, purpose: 1000 };

@@ -15,6 +15,19 @@ import Flame from './Flame';
 import { Steps } from './Steps';
 import type { AgentStep, Bot, BotMessage } from './types';
 
+type HubRepo = {
+  name: string;
+  fullName: string;
+  url: string;
+  htmlUrl: string;
+  private: boolean;
+  fork: boolean;
+  inRefract: boolean;
+  workspace: string | null;
+};
+
+const repoStorageKey = (id: string) => `umbra-workshop-repo:${id}`;
+
 export default function BotChat({ botId }: { botId: string }) {
   const [bot, setBot] = useState<Bot | null>(null);
   const [messages, setMessages] = useState<BotMessage[]>([]);
@@ -35,6 +48,10 @@ export default function BotChat({ botId }: { botId: string }) {
   // Photos can only be added when this bot's model can see images.
   const canSee = bot ? canSeeImages(bot.model) : false;
   const { photos, problem, add: addPhotos, remove: removePhoto, take: takePhotos, onPaste } = usePhotos(canSee);
+  const usesWorkshop = Boolean(bot?.tools.includes('refract'));
+  const [repos, setRepos] = useState<HubRepo[]>([]);
+  const [repoUrl, setRepoUrl] = useState('');
+  const [repoNote, setRepoNote] = useState<string | null>(null);
 
   // Load the bot and its chat.
   useEffect(() => {
@@ -49,6 +66,26 @@ export default function BotChat({ botId }: { botId: string }) {
       })
       .catch((err: Error) => setError(err.message));
   }, [botId]);
+
+  useEffect(() => {
+    if (!usesWorkshop) return;
+    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem(repoStorageKey(botId))) || '';
+    fetch('/api/umbra/github-repos', { cache: 'no-store' })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : "Couldn't load your GitHub repos.");
+        const list: HubRepo[] = Array.isArray(data?.repos) ? data.repos : [];
+        setRepos(list);
+        const still = list.some((r) => r.htmlUrl === saved || r.url === saved);
+        setRepoUrl(still ? saved : '');
+        if (saved && !still) localStorage.removeItem(repoStorageKey(botId));
+        setRepoNote(null);
+      })
+      .catch((err: Error) => {
+        setRepos([]);
+        setRepoNote(err.message || "Couldn't load your GitHub repos.");
+      });
+  }, [usesWorkshop, botId]);
 
   // Keep the newest message in view.
   // Coming back to the app: reload the saved chat, and keep checking while a reply is still coming.
@@ -65,6 +102,16 @@ export default function BotChat({ botId }: { botId: string }) {
     if (!res?.ok || streaming.current) return;
     setMessages(await res.json());
     readWork(res);
+    // Still working in the background: show its steps so far (lib/umbra/runs.ts).
+    if (res.headers.get('X-Umbra-Busy') === '1') void syncRun();
+    else setLiveSteps([]);
+  }
+  async function syncRun() {
+    const res = await fetch(`/api/umbra/bots/${botId}/run`, { cache: 'no-store' }).catch(() => null);
+    if (!res?.ok || streaming.current) return;
+    const data = await res.json().catch(() => null);
+    const run = data?.run as { status?: string; steps?: AgentStep[] } | null;
+    setLiveSteps(run?.status === 'working' && Array.isArray(run.steps) ? run.steps : []);
   }
   useEffect(() => {
     const onShow = () => {
@@ -118,6 +165,17 @@ export default function BotChat({ botId }: { botId: string }) {
     }
   };
 
+  const pickRepo = (value: string) => {
+    setRepoUrl(value);
+    if (value) localStorage.setItem(repoStorageKey(botId), value);
+    else localStorage.removeItem(repoStorageKey(botId));
+  };
+
+  const selectedRepo = repos.find((r) => r.htmlUrl === repoUrl || r.url === repoUrl);
+  const repoPayload = selectedRepo
+    ? { name: selectedRepo.workspace || selectedRepo.name, url: selectedRepo.url }
+    : undefined;
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
@@ -141,16 +199,24 @@ export default function BotChat({ botId }: { botId: string }) {
         // Photos go as a form, the way a browser uploads attachments.
         const form = new FormData();
         form.append('message', text);
+        if (repoPayload) form.append('repo', JSON.stringify(repoPayload));
         for (const photo of sending) form.append('image', photo.file);
         res = await fetch(`/api/umbra/bots/${botId}/chat`, { method: 'POST', body: form });
       } else {
         res = await fetch(`/api/umbra/bots/${botId}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }),
+          body: JSON.stringify({ message: text, repo: repoPayload }),
         });
       }
-      if (!res.ok || !res.body) throw new Error((await res.json().catch(() => ({}))).error ?? 'The Flicker could not reply.');
+      if (!res.ok || !res.body) {
+        const problem = (await res.json().catch(() => ({}))).error ?? 'The Flicker could not reply.';
+        // Not sent (e.g. it's still working on something else): take the draft back out, keep the text.
+        setMessages((m) => m.filter((x) => x.id !== draft.id));
+        setInput(text);
+        if (res.status === 409) dropped = true; // it's busy: keep checking until it's done
+        throw new Error(problem);
+      }
 
       // Read the stream line by line: each line is one event.
       const reader = res.body.getReader();
@@ -192,6 +258,7 @@ export default function BotChat({ botId }: { botId: string }) {
     if (!bot || !window.confirm(`Clear your whole chat with ${bot.name}? The Flicker itself stays.`)) return;
     const res = await fetch(`/api/umbra/bots/${botId}/messages`, { method: 'DELETE' });
     if (res.ok) setMessages([]);
+    else setError((await res.json().catch(() => ({}))).error ?? 'Could not clear the chat.');
   };
 
   if (!bot) {
@@ -226,6 +293,29 @@ export default function BotChat({ botId }: { botId: string }) {
         </Link>
         <button type="button" className="umbra-chat-action" onClick={clearChat} disabled={messages.length === 0}>Clear</button>
       </div>
+      {usesWorkshop && (
+        <div className="umbra-repo-bar">
+          <label>
+            <span className="umbra-repo-label">Repo</span>
+            <select
+              className="umbra-repo-select"
+              value={repoUrl}
+              onChange={(e) => pickRepo(e.target.value)}
+              aria-label="GitHub repo for this Flicker to work on in Refract"
+            >
+              <option value="">Choose a repo</option>
+              {repos.map((repo) => (
+                <option key={repo.url} value={repo.htmlUrl || repo.url}>
+                  {repo.fullName || repo.name}
+                  {repo.inRefract ? ' (in Refract)' : ''}
+                  {repo.private ? ' (private)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          {repoNote && <p className="umbra-repo-note">{repoNote}</p>}
+        </div>
+      )}
 
       {/* The conversation */}
       <div ref={listRef} className="umbra-messages">

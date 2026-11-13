@@ -16,6 +16,7 @@ import type { ToolId } from '@/config/umbra';
 import { canThink } from '@/config/models';
 import { toolsFor, type ToolContext, type ToolDef } from './tools';
 import type { CodeEditView } from './code';
+import type { ApprovalView } from './prod-control';
 
 /** 'high' for live chat; 'low' for background tasks, so they never make a chat wait. */
 type Priority = 'high' | 'low';
@@ -36,6 +37,8 @@ export interface AgentStep {
   image?: { url: string; prompt: string };
   /** Code helper: a suggested file change. */
   edit?: CodeEditView;
+  /** Prod control: a request waiting for (or answered by) the user. */
+  approval?: ApprovalView;
   /** Teams: the teammate who did this step's work, */
   bot?: { id: string; name: string; flame: string };
   /** …the tools that teammate used, */
@@ -174,16 +177,34 @@ export async function runAgent(options: {
   think?: boolean;
   /** Called whenever a step starts or finishes, so the chat can show it live. */
   onStep: (step: AgentStep) => void;
+  /** Picking a run back up after a restart (lib/umbra/runs.ts): the round to go on from… */
+  startRound?: number;
+  /** …and the steps it had already finished. */
+  initialSteps?: AgentStep[];
+  /**
+   * Called each time the conversation grows (the model asked for tools; a tool finished), with
+   * everything needed to go on from here if the server stops. `round` is the round in progress.
+   */
+  onCheckpoint?: (checkpoint: { messages: ChatMessage[]; round: number }) => void;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
   const tools = toolsFor(options.toolIds);
   for (const tool of options.extraTools ?? []) tools.set(tool.schema.function.name, tool);
   const schemas = [...tools.values()].map((t) => t.schema);
   const messages = [...options.messages];
-  const steps: AgentStep[] = [];
-  const maxRounds = options.toolIds.includes('code') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
+  const steps: AgentStep[] = [...(options.initialSteps ?? [])];
+  const maxRounds = options.toolIds.includes('code') || options.toolIds.includes('refract') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
   const thinks = Boolean(options.think) && canThink(options.model);
 
-  for (let round = 0; round <= maxRounds; round++) {
+  const checkpoint = (round: number) => {
+    try {
+      options.onCheckpoint?.({ messages, round });
+    } catch (err) {
+      console.error('[umbra-agent] checkpoint failed', (err as Error)?.message);
+    }
+  };
+  const firstRound = Math.max(0, Math.min(maxRounds, Math.floor(options.startRound ?? 0)));
+
+  for (let round = firstRound; round <= maxRounds; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
     const lastRound = round === maxRounds;
 
@@ -249,6 +270,7 @@ export async function runAgent(options: {
       tool_calls: parsed.map((p) => ({ function: { name: p.name, arguments: p.args } })),
       ...(thinking ? { thinking } : {}),
     });
+    checkpoint(round);
 
     for (const call of parsed) {
       const def = tools.get(call.name);
@@ -278,6 +300,7 @@ export async function runAgent(options: {
           links: result.links,
           image: result.image,
           edit: result.edit,
+          approval: result.approval,
           bot: result.bot,
           children: result.children,
           detail: result.detail,
@@ -292,6 +315,7 @@ export async function runAgent(options: {
       steps.push(step);
       options.onStep({ ...step });
       messages.push({ role: 'tool', tool_name: call.name, content: output });
+      checkpoint(round);
     }
   }
   return { reply: '…', steps }; // not reached: the last round always returns

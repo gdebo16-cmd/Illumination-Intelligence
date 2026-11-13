@@ -25,6 +25,18 @@ export interface CodeEdit {
   note?: string;
 }
 
+/** Something a Flicker asked to do that needs your OK first. (Mirrors lib/umbra/prod-control.ts.) */
+export interface ApprovalRequest {
+  id: string;
+  kind: 'restart_prod';
+  title: string;
+  detail: string[];
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'failed';
+  outcome?: 'running' | 'done' | 'failed';
+  progress?: string;
+  note?: string;
+}
+
 /** One tool use, as shown in the chat. */
 export interface AgentStep {
   id: string;
@@ -35,6 +47,7 @@ export interface AgentStep {
   links?: { title: string; url: string }[];
   image?: { url: string; prompt: string };
   edit?: CodeEdit;
+  approval?: ApprovalRequest;
   /** Teams: the teammate who did this step's work, the tools it used, and its full answer. */
   bot?: { id: string; name: string; flame: string };
   children?: AgentStep[];

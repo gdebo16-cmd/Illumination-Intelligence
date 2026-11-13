@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import db from '@/lib/db';
 import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, flameWords, isBotModel, isFlame, isToolId, type ToolId } from '@/config/umbra';
 import { checkCodeFolder, editStatuses } from './code';
+import { approvalStatuses } from './prod-control';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 import { canThink } from '@/config/models';
 import type { AgentStep } from './agent';
@@ -149,6 +150,14 @@ export function deleteBot(userId: string, id: string): boolean {
   db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraCodeEdit WHERE bot_id = ?').run(id);
+  // Background chat runs (lib/umbra/runs.ts); the table only exists once a run has happened.
+  try {
+    db.prepare('DELETE FROM UmbraChatRun WHERE bot_id = ?').run(id);
+  } catch {}
+  // Prod control requests (lib/umbra/prod-control.ts); that table also only exists once used.
+  try {
+    db.prepare('DELETE FROM UmbraApproval WHERE bot_id = ?').run(id);
+  } catch {}
   // Teams: drop it from teams it's on; teams it leads go too (a team can't work without its leader).
   db.prepare('DELETE FROM UmbraTeamMember WHERE bot_id = ?').run(id);
   for (const { id: teamId } of db.prepare('SELECT id FROM UmbraTeam WHERE leader_id = ?').all(id) as { id: string }[]) {
@@ -187,6 +196,13 @@ export function listMessages(botId: string, limit = 200): BotMessage[] {
   const editSteps = messages.flatMap((m) => m.steps ?? []).filter((s) => s.edit);
   const current = editStatuses(editSteps.map((s) => s.edit!.id));
   for (const step of editSteps) Object.assign(step.edit!, current.get(step.edit!.id));
+  // Prod control: show what happened to each restart request (approved, denied, how it went).
+  const approvalSteps = messages.flatMap((m) => m.steps ?? []).filter((s) => s.approval);
+  const approvals = approvalStatuses(approvalSteps.map((s) => s.approval!.id));
+  for (const step of approvalSteps) {
+    const now = approvals.get(step.approval!.id);
+    if (now) step.approval = now;
+  }
   return messages;
 }
 
@@ -258,6 +274,9 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
         'instead of guessing. You can use several tools in a row before answering. ' +
         'Never invent tool results; if a tool fails, tell the user plainly.'
       : 'You have no tools: you cannot browse the web, see files, or take actions. If asked, say so honestly instead of pretending.',
+    toolNames.length > 0 &&
+      `You keep working even if ${userName} leaves the chat or closes the app: your tools keep running on the server and your reply is saved here for when they come back. ` +
+        'So carry a job through to the end instead of stopping to check in, unless you truly need their decision.',
     bot.tools.includes('calculator') &&
       'Never do arithmetic in your head: use the calculate tool for any math, and days_until for counting days.',
     usesWeb && 'When your answer uses information from the web, mention where it came from, with links.',
@@ -270,12 +289,28 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
           : `${userName} sees each change and applies it with a button, so tell them what each change does and why.`),
     bot.tools.includes('refract') &&
       `You can work in Refract, a virtual machine isolated from ${userName}'s PC. ` +
-        'Projects live in workspaces you copy in with refract_clone (a public https git link). ' +
+        'Projects live in workspaces you copy in with refract_clone (an https git link; private GitHub repos work too). ' +
+        'To get the latest from GitHub use refract_pull, not git pull or git fetch in refract_run (those can\'t log in to private repos). ' +
         'Look around with refract_workspaces, refract_list, refract_search and refract_read; never guess what a file says. ' +
         'Edit with refract_write (changes are written in the virtual machine straight away). ' +
         'Run builds, tests and other commands with refract_run, always inside a workspace. ' +
         'Before a risky change, take a workspace snapshot with refract_snapshot so you can restore it if something goes wrong. ' +
-        'These tools cannot touch the host PC. If the virtual machine is off, say so and ask them to start it in the Refract app.',
+        'When the work is ready, commit it with refract_commit (a clear message; files that may hold secrets are left out automatically), ' +
+        'then open a pull request with refract_pull_request, which pushes to a feature branch and returns the PR link to share. ' +
+        'refract_push pushes without a PR. Never push straight onto main or master unless they clearly ask; nothing is ever force-pushed. ' +
+        `Merge a pull request with refract_merge_pr only when ${userName} asked you to merge it or approved merging. ` +
+        'It squash-merges Flicker (flicker/) pull requests into the default branch, and refuses when there are conflicts or checks failed or are still running; then say why, and wait or fix it. ' +
+        'Pushing and pull requests need a GitHub token on the server; if a tool says it is missing, pass that on plainly. ' +
+        'All of this work stays in the virtual machine until you push it. ' +
+        'These tools cannot touch the host PC. ' +
+        'If the virtual machine is off, the refract_ tools start it themselves and wait until it is ready (this can take a minute or two), ' +
+        'and refract_start turns it on on its own. So never ask the user to start Refract: just carry on with the work. ' +
+        'Only if starting it fails, pass on the reason plainly.',
+    bot.tools.includes('host_ops') &&
+      `You have Prod control: restart_prod asks ${userName} to approve pulling main, building, and restarting the live app on their PC, and prod_status checks on it. ` +
+        `Only request a restart after ${userName} asked for one, and tell them it needs their approval: they tap Approve on the card in this chat, and nothing runs until they do. ` +
+        'The restart briefly stops the server you run on. Your work is picked back up afterwards, so then check the result with prod_status and report it plainly. ' +
+        'Merging pull requests is separate (refract_merge_pr).',
     bot.tools.includes('notes') &&
       `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note.`,
     DOCUMENT_SYSTEM_PROMPT,

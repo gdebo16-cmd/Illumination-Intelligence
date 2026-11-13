@@ -149,7 +149,14 @@ export type ExecResult = {
 /** Run one command as the refract user. `cwd` is a path already checked to be inside the workshop. */
 export async function execInVm(
   command: string,
-  opts: { cwd?: string; timeoutMs?: number; maxBytes?: number } = {},
+  opts: {
+    cwd?: string;
+    timeoutMs?: number;
+    maxBytes?: number;
+    /** Text written to the command's standard input, then closed. Used to hand over a secret
+     *  (a GitHub token) without it ever appearing in a command line or a file. */
+    stdin?: string;
+  } = {},
 ): Promise<ExecResult> {
   const timeoutMs = Math.max(1_000, Math.min(300_000, opts.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS));
   const timeoutSec = Math.ceil(timeoutMs / 1000);
@@ -199,6 +206,10 @@ export async function execInVm(
           });
         });
         stream.on("error", (e: Error) => reject(friendlyError(e)));
+        if (opts.stdin !== undefined) {
+          stream.write(opts.stdin);
+          stream.end();
+        }
       });
     });
   } finally {

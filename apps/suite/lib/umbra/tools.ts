@@ -22,6 +22,7 @@ import type { ToolId } from '@/config/umbra';
 import { calculate } from './calculator';
 import { CODE_TOOLS, type CodeEditView } from './code';
 import { REFRACT_TOOLS } from './refract-tools';
+import { PROD_TOOLS, type ApprovalView } from './prod-control';
 import type { AgentStep } from './agent';
 
 const SEARXNG_URL = process.env.SEARXNG_URL ?? 'http://127.0.0.1:8888';
@@ -35,7 +36,13 @@ export interface ToolContext {
   /** 'low' when a background task is running, so live chats go first. */
   priority?: 'high' | 'low';
   /** Show progress on this tool's step while it is still running. */
-  progress?: (update: Partial<Pick<AgentStep, 'summary' | 'children' | 'bot'>>) => void;
+  progress?: (update: Partial<Pick<AgentStep, 'summary' | 'children' | 'bot' | 'approval'>>) => void;
+  /** Repo the user picked in the Flicker chat dropdown, for Refract workshop tools. */
+  workshop?: { name: string; url: string };
+  /** The chat run this tool is part of (lib/umbra/runs.ts), when there is one. */
+  runId?: string;
+  /** 0 for a run started from the chat, 1 for a job handed over by another Flicker. */
+  depth?: number;
 }
 
 /** What a tool hands back: text for the model, plus anything the chat should show. */
@@ -50,6 +57,8 @@ export interface ToolResult {
   image?: { url: string; prompt: string };
   /** A file change the Code helper suggested, with Apply / Don't apply buttons in the chat. */
   edit?: CodeEditView;
+  /** Something that needs the user's OK first (Prod control), with Approve / Deny buttons in the chat. */
+  approval?: ApprovalView;
   /** Teams: who did the work, the tools they used, and their full answer. */
   bot?: AgentStep['bot'];
   children?: AgentStep[];
@@ -350,6 +359,7 @@ const TOOLS_BY_ID: Record<ToolId, ToolDef[]> = {
   notes: [saveNote],
   code: CODE_TOOLS,
   refract: REFRACT_TOOLS,
+  host_ops: PROD_TOOLS,
 };
 
 /** The tools a bot with these settings may use, keyed by the function name the model calls. */
