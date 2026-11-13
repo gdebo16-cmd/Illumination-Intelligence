@@ -1,0 +1,8 @@
+{
+  "name": "refract-rdpjs",
+  "version": "1.0.0-refract.1",
+  "private": true,
+  "description": "Vendored, patched copy of @electerm/rdpjs 1.0.0 (node-rdpjs fork) used by Refract's virtual remote. GPL-3.0.",
+  "license": "GPL-3.0",
+  "main": "./rdp/index.js"
+}

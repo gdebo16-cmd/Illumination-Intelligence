@@ -3037,6 +3037,646 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 }
 /* #endregion astra */
 
+/* #region refract */
+.refract {
+  /* Bottom: clear the floating app picker, same as Astra, so content can scroll above it. */
+  padding: var(--header-h) 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
+  color: var(--text-color);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.refract::-webkit-scrollbar { display: none; }
+.refract h1 {
+  margin: 0 0 0.5rem;
+}
+.refract-status {
+  margin: 0;
+  opacity: 0.8;
+}
+.refract-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+.refract-sidebar-content button {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+.refract-error {
+  margin: 0.75rem 0 0;
+  color: #e0484f;
+}
+.refract-snapshot-current {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+/* Snapshot rows: name on the left (not tappable), Restore button on the right, like Astra's font rows. */
+.refract-sidebar-content .refract-snapshot-row .chat-button {
+  overflow-wrap: anywhere;
+}
+.refract-sidebar-content .refract-snapshot-row.is-current {
+  background: rgb(255 255 255 / 0.06);
+}
+.refract-sidebar-content .refract-snapshot-restore {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #aab;
+  border: none;
+  background: transparent;
+}
+.refract-sidebar-content .refract-snapshot-restore:hover:not(:disabled) {
+  color: #ffd9a8;
+  background: rgb(255 170 60 / 0.15);
+}
+.refract-sidebar-content .refract-snapshot-restore:disabled,
+.refract-sidebar-content .new-chat-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Power controls under the status line: Start, Stop, Reset. Stop and Reset ask first. */
+.refract-power {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.refract-power-button {
+  min-height: 2.75rem;
+  min-width: 5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 8px;
+  color: #e5e7f0;
+  background: transparent;
+  font-size: 0.9rem;
+  touch-action: manipulation;
+}
+.refract-power-button:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.refract-power-button.is-danger:hover:not(:disabled) {
+  color: #ffd9a8;
+  background: rgb(255 170 60 / 0.15);
+}
+.refract-power-button:disabled { opacity: 0.5; cursor: default; }
+.refract-notice {
+  margin: 0.75rem 0 0;
+  opacity: 0.8;
+}
+/* Restore confirmation: in-app (not window.confirm) so it looks right on iPhone. */
+.refract-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgb(0 0 0 / 0.6);
+}
+.refract-confirm {
+  width: 100%;
+  max-width: 24rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 12px;
+  color: #e5e7f0;
+  background: #1b1d26;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.5);
+}
+.refract-confirm-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  overflow-wrap: anywhere;
+}
+.refract-confirm-body,
+.refract-confirm-note {
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+.refract-confirm-note {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+.refract-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.refract-confirm-actions button {
+  min-height: 2.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  color: #e5e7f0;
+}
+.refract-confirm-cancel {
+  border: 1px solid rgb(255 255 255 / 0.2);
+  background: transparent;
+}
+.refract-confirm-restore {
+  border: 1px solid #e0484f;
+  background: #b3262d;
+}
+.refract-confirm-restore:hover {
+  background: #c9333a;
+}
+/* SSH terminal in the main pane. */
+.refract-terminal {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b0d12;
+}
+.refract-terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background: #1b1d26;
+  color: #e5e7f0;
+  font-size: 0.85rem;
+}
+.refract-terminal-dot {
+  flex-shrink: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #6b7080;
+}
+.refract-terminal-dot.is-connecting { background: #e0b64f; }
+.refract-terminal-dot.is-connected { background: #4fbf7a; }
+.refract-terminal-dot.is-disconnected { background: #e0484f; }
+.refract-terminal-status {
+  flex: 1;
+  min-width: 0;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+.refract-terminal-action {
+  flex-shrink: 0;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 8px;
+  color: #e5e7f0;
+  background: transparent;
+  font-size: 0.85rem;
+}
+.refract-terminal-action:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.refract-terminal-action:disabled { opacity: 0.5; cursor: default; }
+.refract-terminal-screen {
+  height: min(60vh, 34rem);
+  min-height: 12rem;
+  padding: 0.4rem 0 0 0.5rem;
+  background: #0b0d12;
+}
+@media (max-width: 640px) {
+  .refract-terminal-screen { height: 45dvh; }
+}
+.refract-terminal.is-disconnected .refract-terminal-screen { opacity: 0.6; }
+.refract-terminal-screen .xterm { height: 100%; }
+/* Keep iOS from zooming in when the terminal takes the keyboard. */
+.refract-terminal-screen .xterm .xterm-helper-textarea { font-size: 16px; }
+.refract-terminal-keys {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  overflow-x: auto;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  background: #1b1d26;
+  scrollbar-width: none;
+}
+.refract-terminal-keys::-webkit-scrollbar { display: none; }
+.refract-terminal-key {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 6px;
+  color: #e5e7f0;
+  background: #0b0d12;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  touch-action: manipulation;
+}
+.refract-terminal-key:disabled { opacity: 0.4; cursor: default; }
+/* Virtual remote: the VM's actual screen (VirtualBox remote display) under the terminal. */
+.refract-remote {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+.refract-remote-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  background: #1b1d26;
+  color: #e5e7f0;
+  font-size: 0.85rem;
+}
+.refract-remote-dot {
+  flex-shrink: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #6b7080;
+}
+.refract-remote-dot.is-connecting { background: #e0b64f; }
+.refract-remote-dot.is-connected { background: #4fbf7a; }
+.refract-remote-dot.is-disconnected { background: #e0484f; }
+.refract-remote-title {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.refract-remote-status {
+  flex: 1;
+  min-width: 8rem;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+}
+.refract-remote-action {
+  flex-shrink: 0;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 8px;
+  color: #e5e7f0;
+  background: transparent;
+  font-size: 0.85rem;
+}
+.refract-remote-action:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.refract-remote-action:disabled { opacity: 0.5; cursor: default; }
+.refract-remote-screen {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 10rem;
+  background: #000;
+}
+/* The canvas keeps the VM's own resolution; CSS scales it down to fit the pane (and the phone). */
+.refract-remote-canvas {
+  display: block;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  max-width: 100%;
+  max-height: min(75vh, 48rem);
+  cursor: default;
+  touch-action: manipulation;
+  outline: none;
+}
+@media (max-width: 640px) {
+  .refract-remote-canvas { max-height: 60dvh; }
+}
+.refract-remote:not(.is-connected) .refract-remote-canvas { opacity: 0.25; }
+.refract-remote-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: #e5e7f0;
+  font-size: 0.9rem;
+  text-align: center;
+  opacity: 0.8;
+  pointer-events: none;
+}
+/* Invisible field that takes the keyboard (including the iPhone's on-screen one). 16px keeps iOS from zooming. */
+.refract-remote-input {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  opacity: 0;
+  resize: none;
+  overflow: hidden;
+  font-size: 16px;
+  color: transparent;
+  background: transparent;
+  caret-color: transparent;
+}
+.refract-remote.is-connected .refract-remote-screen:focus-within {
+  box-shadow: inset 0 0 0 2px rgb(255 217 168 / 0.5);
+}
+.refract-remote-keys {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  overflow-x: auto;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  background: #1b1d26;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.refract-remote-keys::-webkit-scrollbar { display: none; }
+.refract-remote-key {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 6px;
+  color: #e5e7f0;
+  background: #0b0d12;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.refract-remote-key.is-latched {
+  color: #0b0d12;
+  background: #ffd9a8;
+  border-color: #ffd9a8;
+}
+.refract-remote-key.is-danger.is-armed {
+  color: #fff;
+  background: #b3262d;
+  border-color: #e0484f;
+}
+.refract-remote-key:disabled { opacity: 0.4; cursor: default; }/* xterm.js base styles (copied from @xterm/xterm 6 css/xterm.css; Copyright the xterm.js authors, MIT). */
+/**
+ *  Default styles for xterm.js
+ */
+
+.xterm {
+    cursor: text;
+    position: relative;
+    user-select: none;
+    -ms-user-select: none;
+    -webkit-user-select: none;
+}
+
+.xterm.focus,
+.xterm:focus {
+    outline: none;
+}
+
+.xterm .xterm-helpers {
+    position: absolute;
+    top: 0;
+    /**
+     * The z-index of the helpers must be higher than the canvases in order for
+     * IMEs to appear on top.
+     */
+    z-index: 5;
+}
+
+.xterm .xterm-helper-textarea {
+    padding: 0;
+    border: 0;
+    margin: 0;
+    /* Move textarea out of the screen to the far left, so that the cursor is not visible */
+    position: absolute;
+    opacity: 0;
+    left: -9999em;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: -5;
+    /** Prevent wrapping so the IME appears against the textarea at the correct position */
+    white-space: nowrap;
+    overflow: hidden;
+    resize: none;
+}
+
+.xterm .composition-view {
+    /* TODO: Composition position got messed up somewhere */
+    background: #000;
+    color: #FFF;
+    display: none;
+    position: absolute;
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.xterm .composition-view.active {
+    display: block;
+}
+
+.xterm .xterm-viewport {
+    /* On OS X this is required in order for the scroll bar to appear fully opaque */
+    background-color: #000;
+    overflow-y: scroll;
+    cursor: default;
+    position: absolute;
+    right: 0;
+    left: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.xterm .xterm-screen {
+    position: relative;
+}
+
+.xterm .xterm-screen canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.xterm-char-measure-element {
+    display: inline-block;
+    visibility: hidden;
+    position: absolute;
+    top: 0;
+    left: -9999em;
+    line-height: normal;
+}
+
+.xterm.enable-mouse-events {
+    /* When mouse events are enabled (eg. tmux), revert to the standard pointer cursor */
+    cursor: default;
+}
+
+.xterm.xterm-cursor-pointer,
+.xterm .xterm-cursor-pointer {
+    cursor: pointer;
+}
+
+.xterm.column-select.focus {
+    /* Column selection mode */
+    cursor: crosshair;
+}
+
+.xterm .xterm-accessibility:not(.debug),
+.xterm .xterm-message {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    z-index: 10;
+    color: transparent;
+    pointer-events: none;
+}
+
+.xterm .xterm-accessibility-tree:not(.debug) *::selection {
+  color: transparent;
+}
+
+.xterm .xterm-accessibility-tree {
+  font-family: monospace;
+  user-select: text;
+  white-space: pre;
+}
+
+.xterm .xterm-accessibility-tree > div {
+  transform-origin: left;
+  width: fit-content;
+}
+
+.xterm .live-region {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.xterm-dim {
+    /* Dim should not apply to background, so the opacity of the foreground color is applied
+     * explicitly in the generated class and reset to 1 here */
+    opacity: 1 !important;
+}
+
+.xterm-underline-1 { text-decoration: underline; }
+.xterm-underline-2 { text-decoration: double underline; }
+.xterm-underline-3 { text-decoration: wavy underline; }
+.xterm-underline-4 { text-decoration: dotted underline; }
+.xterm-underline-5 { text-decoration: dashed underline; }
+
+.xterm-overline {
+    text-decoration: overline;
+}
+
+.xterm-overline.xterm-underline-1 { text-decoration: overline underline; }
+.xterm-overline.xterm-underline-2 { text-decoration: overline double underline; }
+.xterm-overline.xterm-underline-3 { text-decoration: overline wavy underline; }
+.xterm-overline.xterm-underline-4 { text-decoration: overline dotted underline; }
+.xterm-overline.xterm-underline-5 { text-decoration: overline dashed underline; }
+
+.xterm-strikethrough {
+    text-decoration: line-through;
+}
+
+.xterm-screen .xterm-decoration-container .xterm-decoration {
+	z-index: 6;
+	position: absolute;
+}
+
+.xterm-screen .xterm-decoration-container .xterm-decoration.xterm-decoration-top-layer {
+	z-index: 7;
+}
+
+.xterm-decoration-overview-ruler {
+    z-index: 8;
+    position: absolute;
+    top: 0;
+    right: 0;
+    pointer-events: none;
+}
+
+.xterm-decoration-top {
+    z-index: 2;
+    position: relative;
+}
+
+
+
+/* Derived from vs/base/browser/ui/scrollbar/media/scrollbar.css */
+
+/* xterm.js customization: Override xterm's cursor style */
+.xterm .xterm-scrollable-element > .scrollbar {
+    cursor: default;
+}
+
+/* Arrows */
+.xterm .xterm-scrollable-element > .scrollbar > .scra {
+	cursor: pointer;
+	font-size: 11px !important;
+}
+
+.xterm .xterm-scrollable-element > .visible {
+	opacity: 1;
+
+	/* Background rule added for IE9 - to allow clicks on dom node */
+	background:rgba(0,0,0,0);
+
+	transition: opacity 100ms linear;
+	/* In front of peek view */
+	z-index: 11;
+}
+.xterm .xterm-scrollable-element > .invisible {
+	opacity: 0;
+	pointer-events: none;
+}
+.xterm .xterm-scrollable-element > .invisible.fade {
+	transition: opacity 800ms linear;
+}
+
+/* Scrollable Content Inset Shadow */
+.xterm .xterm-scrollable-element > .shadow {
+	position: absolute;
+	display: none;
+}
+.xterm .xterm-scrollable-element > .shadow.top {
+	display: block;
+	top: 0;
+	left: 3px;
+	height: 3px;
+	width: 100%;
+	box-shadow: var(--vscode-scrollbar-shadow, #000) 0 6px 6px -6px inset;
+}
+.xterm .xterm-scrollable-element > .shadow.left {
+	display: block;
+	top: 3px;
+	left: 0;
+	height: 100%;
+	width: 3px;
+	box-shadow: var(--vscode-scrollbar-shadow, #000) 6px 0 6px -6px inset;
+}
+.xterm .xterm-scrollable-element > .shadow.top-left-corner {
+	display: block;
+	top: 0;
+	left: 0;
+	height: 3px;
+	width: 3px;
+}
+.xterm .xterm-scrollable-element > .shadow.top.left {
+	box-shadow: var(--vscode-scrollbar-shadow, #000) 6px 0 6px -6px inset;
+}
+
+/* #endregion refract */
+
+
 /* #region landing */
 .landing {
   padding: var(--header-h) 1.25rem 2rem;

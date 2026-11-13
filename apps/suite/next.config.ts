@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   // Local pictures may carry a ?v= version so phones fetch a fresh copy after artwork changes.
   images: { localPatterns: [{ pathname: '/**' }] },
   cacheComponents: true,
+  // Refract's SSH terminal (lib/refract/terminal.ts) loads these from node_modules at run time.
+  serverExternalPackages: ['ssh2', 'ws'],
   partialPrefetching: true,
   turbopack: {
     rules: {
