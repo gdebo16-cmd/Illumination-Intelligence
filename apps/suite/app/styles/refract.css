@@ -847,3 +847,14 @@ main.refract {
 }
 
 /* #endregion refract */
+
+
+/* #region refract liquid glass: the screen stays dark inside the glass frame (glass.css) */
+.refract-remote { overflow: hidden; }
+.refract-remote-screen,
+.refract-terminal-screen { background: rgb(0 0 0 / 0.55); }
+.refract-remote-bar,
+.refract-terminal-bar,
+.refract-remote-keys,
+.refract-terminal-keys { background: transparent; }
+/* #endregion */

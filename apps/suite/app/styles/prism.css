@@ -1,5 +1,13 @@
 /* Prism (app/(apps)/prism). */
 
+/* #region prism rainbow tokens */
+:root {
+  --prism-rainbow: linear-gradient(90deg, #ff5f6d, #ffc371, #7cf2a0, #5bc0ff, #b07cff);
+  --prism-glow: 0 0 12px 1px rgb(255 95 109 / 0.25), 0 0 18px 2px rgb(124 242 160 / 0.2), 0 0 24px 3px rgb(176 124 255 / 0.25);
+}
+/* #endregion */
+
+
 /* #region prism */
 .prism {
   --prism-accent: #b07cff;
@@ -240,11 +248,11 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(135deg, #7c5cff, #b07cff 55%, #e07cd8);
+  background: var(--prism-rainbow);
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgb(124 92 255 / 0.4);
+  box-shadow: var(--prism-glow);
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 .prism-generate:hover:not(:disabled) {
@@ -618,7 +626,7 @@
 .prism-video-bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #7c5cff, #b07cff 55%, #e07cd8);
+  background: var(--prism-rainbow);
   transition: width 1s linear;
 }
 .prism-thumb-badge {
@@ -637,3 +645,64 @@
 .prism-thumb.is-working img { opacity: 0.5; }
 .prism-thumb.is-failed .prism-thumb-badge { background: rgb(200 60 60 / 0.85); }
 /* #endregion prism */
+
+
+/* #region prism liquid glass: rainbow edges over the shared glass (glass.css) */
+/* Spectral color field behind the glass. */
+[data-theme="prism"] .site-container {
+  background:
+    radial-gradient(40% 45% at 12% 85%, rgb(255 95 109 / 0.2), transparent 70%),
+    radial-gradient(35% 40% at 35% 30%, rgb(255 195 113 / 0.13), transparent 70%),
+    radial-gradient(40% 45% at 60% 95%, rgb(124 242 160 / 0.16), transparent 70%),
+    radial-gradient(40% 45% at 85% 25%, rgb(91 192 255 / 0.18), transparent 70%),
+    radial-gradient(45% 50% at 92% 90%, rgb(176 124 255 / 0.23), transparent 70%),
+    linear-gradient(to bottom, var(--app-bg), var(--grad-color-1));
+}
+[data-theme="prism"] .prism-generate,
+[data-theme="prism"] .prism-generate:hover:not(:disabled) {
+  background: var(--prism-rainbow);
+  color: var(--app-bg);
+  border: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), var(--prism-glow);
+}
+[data-theme="prism"] .prism-generate:disabled { opacity: 0.8; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), var(--prism-glow); }
+/* Rainbow edge that keeps rounded corners. Not on .prism-attach: it sits absolutely inside the
+   prompt box, and this needs position: relative. */
+[data-theme="prism"] .prism-prompt-box,
+[data-theme="prism"] .prism-caption-actions button,
+[data-theme="prism"] .prism-caption-actions a,
+[data-theme="prism"] .prism-shape[aria-checked="true"],
+[data-theme="prism"] .prism-length[aria-checked="true"],
+[data-theme="prism"] .prism-thumb[aria-current="true"] { position: relative; }
+[data-theme="prism"] .prism-prompt-box::after,
+[data-theme="prism"] .prism-caption-actions button::after,
+[data-theme="prism"] .prism-caption-actions a::after,
+[data-theme="prism"] .prism-shape[aria-checked="true"]::after,
+[data-theme="prism"] .prism-length[aria-checked="true"]::after,
+[data-theme="prism"] .prism-thumb[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: var(--prism-rainbow);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+[data-theme="prism"] .prism-prompt-box,
+[data-theme="prism"] .prism-shape[aria-checked="true"],
+[data-theme="prism"] .prism-thumb[aria-current="true"] { box-shadow: var(--glass-highlight), var(--prism-glow); }
+[data-theme="prism"] .prism-result img,
+[data-theme="prism"] .prism-result video { border-radius: 20px; box-shadow: var(--prism-glow); }
+/* Rainbow text */
+[data-theme="prism"] .prism-label,
+[data-theme="prism"] .prism-caption-text,
+[data-theme="prism"] .sidebar-title {
+  background: var(--prism-rainbow);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* #endregion */

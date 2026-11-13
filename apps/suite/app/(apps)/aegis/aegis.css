@@ -1,10 +1,10 @@
 /* Aegis's own styles (app/(apps)/aegis). Kept out of globals.css so each rule has one home. */
 
 .aegis {
-  --aegis-accent: #8fb8e8;
+  --aegis-accent: #3fd8ff;
   --sev-high: #ef6b72;
   --sev-medium: #e3b84f;
-  --sev-low: #8fb8e8;
+  --sev-low: #a0ecff;
   /* Same frame as Astra: clear the corner banner on top and the floating app picker below. */
   padding: var(--header-h) 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
   color: var(--text-color);

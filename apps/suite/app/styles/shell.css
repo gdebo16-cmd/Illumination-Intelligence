@@ -365,7 +365,7 @@
   font-size: 0.95rem;
   color: #e8eaf6;
   background: rgb(20 24 44 / 0.92);
-  border: 1px solid rgb(140 150 255 / 0.35);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
   border-radius: 12px;
   box-shadow: 0 6px 24px rgb(0 0 0 / 0.45);
   backdrop-filter: blur(8px);

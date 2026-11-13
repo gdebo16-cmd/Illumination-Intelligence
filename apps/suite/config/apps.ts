@@ -31,13 +31,13 @@ const app = (id: string, name: string, tagline: string, color: string, status: A
 });
 
 export const APPS: readonly SuiteApp[] = [
-  app('lumen', 'Lumen', 'AI Assistant', '#7aa2ff', 'live'),
-  app('umbra', 'Umbra', 'Agentic Flickers', '#a3394b', 'live'),
+  app('lumen', 'Lumen', 'AI Assistant', '#c9cedb', 'live'),
+  app('umbra', 'Umbra', 'Agentic Flickers', '#9b6bff', 'live'),
   app('prism', 'Prism', 'Imagination Station', '#b07cff', 'live'),
-  app('astra', 'Astra', 'Font Forger', '#5ad1c4', 'live'),
-  app('refract', 'Refract', 'Virtual Playground', '#5b93e6', 'live'),
-  app('aegis', 'Aegis', 'Digital Guardian', '#8fb8e8', 'live'),
-  app('halo', 'Halo', 'Life Mapping', '#e3b84f', 'soon'),
+  app('astra', 'Astra', 'Font Forger', '#4cd08a', 'live'),
+  app('refract', 'Refract', 'Virtual Playground', '#30c9a5', 'live'),
+  app('aegis', 'Aegis', 'Digital Guardian', '#3fd8ff', 'live'),
+  app('halo', 'Halo', 'Life Mapping', '#f2c14e', 'soon'),
   app('eclipse', 'Eclipse', 'Data Nexus', '#e0484f', 'soon'),
   
 

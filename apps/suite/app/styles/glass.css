@@ -1,0 +1,127 @@
+/* Liquid Glass: translucent, blurred panels and buttons tinted by the app's accent.
+   Loaded last (see globals.css) so it sits on top of each area's own look.
+   Reuse it on something new by adding its selector to one of the lists below. */
+
+/* #region glass tokens */
+:root {
+  --glass-tint: var(--app-accent);
+  --glass-fill: color-mix(in srgb, var(--glass-tint) 9%, rgb(255 255 255 / 0.06));
+  --glass-sheen: linear-gradient(135deg, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0.04) 40%, rgb(255 255 255 / 0) 60%, rgb(255 255 255 / 0.05) 100%);
+  --glass-edge: rgb(255 255 255 / 0.18);
+  --glass-highlight: inset 0 1px 0 rgb(255 255 255 / 0.32), inset 1px 0 0 rgb(255 255 255 / 0.10), inset 0 -1px 0 rgb(0 0 0 / 0.15);
+  --glass-shadow: var(--glass-highlight), 0 10px 30px rgb(0 0 0 / 0.35), 0 0 18px color-mix(in srgb, var(--glass-tint) 14%, transparent);
+  --glass-blur: blur(24px) saturate(170%);
+  --glass-radius: 24px;
+  --glass-radius-small: 14px;
+}
+/* #endregion */
+
+/* #region glass surfaces */
+/* Panels: cards, boxes, the chat input */
+.landing-card,
+.umbra-card,
+.prism-prompt-box,
+.refract-remote,
+.refract-terminal,
+.sidebar,
+.aegis .aegis-input,
+.input-form .input-field,
+.input-form .input-field:focus,
+.umbra-input textarea,
+/* Pill buttons */
+.sidebar-toggle,
+.app-launcher-button,
+.input-form .app-launcher-button,
+.send-button,
+.input-form .send-button,
+.umbra-primary,
+.umbra-inbox-link,
+.umbra-chat-action,
+.prism-caption-actions button,
+.prism-caption-actions a,
+.prism-attach,
+.prism-modes button,
+.refract-power-button,
+.refract-remote-action,
+.refract-terminal-action,
+.aegis .aegis-button,
+.astra-action,
+/* Small tiles */
+.astra-glyph-slot,
+.refract-remote-key,
+.refract-terminal-key,
+.prism-shape,
+.prism-sidebar .prism-shape,
+.prism-thumb,
+.prism-sidebar .prism-thumb,
+.aegis .aegis-recent button {
+  background: var(--glass-sheen), var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+}
+
+.landing-card,
+.umbra-card,
+.prism-prompt-box,
+.refract-remote,
+.refract-terminal,
+.sidebar,
+.aegis .aegis-input,
+.input-form .input-field,
+.umbra-input textarea { border-radius: var(--glass-radius); }
+
+.sidebar-toggle,
+.app-launcher-button,
+.input-form .app-launcher-button,
+.send-button,
+.input-form .send-button,
+.umbra-primary,
+.umbra-inbox-link,
+.umbra-chat-action,
+.prism-caption-actions button,
+.prism-caption-actions a,
+.prism-attach,
+.prism-modes button,
+.refract-power-button,
+.refract-remote-action,
+.refract-terminal-action,
+.aegis .aegis-button,
+.astra-action { border-radius: 999px; }
+
+.astra-glyph-slot,
+.refract-remote-key,
+.refract-terminal-key,
+.prism-shape,
+.prism-sidebar .prism-shape,
+.prism-thumb,
+.prism-sidebar .prism-thumb,
+.aegis .aegis-recent button { border-radius: var(--glass-radius-small); }
+
+/* Main action buttons: a stronger tint of the accent. Umbra's follows the Flicker's own color. */
+.aegis .aegis-button,
+.umbra-primary {
+  background: var(--glass-sheen), color-mix(in srgb, var(--glass-tint) 42%, transparent);
+  border-color: color-mix(in srgb, var(--glass-tint) 60%, rgb(255 255 255 / 0.3));
+  color: #fff;
+  opacity: 1;
+}
+.umbra-primary { --glass-tint: var(--bot-color, var(--app-accent)); }
+/* Waiting for input: keep the tint visible, only a little dimmer. */
+.aegis .aegis-button:disabled { opacity: 0.8; }
+/* #endregion */
+
+/* #region Lumen input bar: same silver glass as Lumen's round buttons */
+[data-theme="lumen"] .sidebar-toggle,
+[data-theme="lumen"] .app-launcher-button,
+[data-theme="lumen"] .input-form .input-field,
+[data-theme="lumen"] .input-form .send-button {
+  border-color: rgb(201 206 219 / 0.30);
+  color: #f5f7fa;
+}
+[data-theme="lumen"] .input-form .send-button { background: var(--glass-sheen), rgb(201 206 219 / 0.16); }
+[data-theme="lumen"] .input-form .input-field::placeholder { color: rgb(201 206 219 / 0.6); }
+[data-theme="lumen"] .input-form .input-button,
+[data-theme="lumen"] .input-form .photo-button { color: #c9cedb; background: transparent; }
+/* #endregion */

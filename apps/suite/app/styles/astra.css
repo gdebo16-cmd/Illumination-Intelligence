@@ -62,7 +62,7 @@
 }
 .astra-glyph-slot:not(.is-drawn) { opacity: 0.55; }
 .astra-glyph-slot:hover { background: color-mix(in srgb, currentColor 10%, transparent); opacity: 1; }
-.astra-glyph-slot:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 2px; }
+.astra-glyph-slot:focus-visible { outline: 2px solid #4cd08a; outline-offset: 2px; }
 .astra-glyph-art { width: 85%; height: 85%; }
 .astra-glyph-label {
   position: absolute;
@@ -77,23 +77,23 @@
 .astra-action {
   display: inline-block;
   padding: 0.45rem 0.9rem;
-  border: 1px solid #5ad1c4;
+  border: 1px solid #4cd08a;
   border-radius: 0.5rem;
   font: inherit;
   font-size: 0.9rem;
-  color: #5ad1c4;
+  color: #4cd08a;
   background: transparent;
   text-decoration: none;
   cursor: pointer;
 }
-.astra-action:hover { background: rgba(90, 209, 196, 0.12); }
-.astra-action:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 2px; }
+.astra-action:hover { background: rgba(76, 208, 138, 0.12); }
+.astra-action:focus-visible { outline: 2px solid #4cd08a; outline-offset: 2px; }
 .astra-action.is-disabled { opacity: 0.4; cursor: default; }
 .astra-action.is-disabled:hover { background: transparent; }
 
 /* The pen thickness slider, with a sample line that shows the thickness. */
 .astra-pen { display: inline-flex; align-items: center; gap: 0.5rem; margin-left: auto; font-size: 0.9rem; }
-.astra-pen input { width: 8rem; accent-color: #5ad1c4; }
+.astra-pen input { width: 8rem; accent-color: #4cd08a; }
 .astra-pen svg { width: 4rem; height: 1.25rem; }
 
 /* The character grid, in sections: Capitals, Lowercase, Numbers, Punctuation. */
@@ -119,7 +119,7 @@
   place-items: center;
   min-height: 9rem;
   padding: 1rem;
-  border: 2px dashed rgba(90, 209, 196, 0.5);
+  border: 2px dashed rgba(76, 208, 138, 0.5);
   border-radius: 0.75rem;
   text-align: center;
 }
@@ -128,7 +128,7 @@
   padding: 0;
   border: none;
   font: inherit;
-  color: #5ad1c4;
+  color: #4cd08a;
   background: none;
   text-decoration: underline;
   cursor: pointer;
@@ -174,13 +174,13 @@
   background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
 }
-.astra-sheet-presets button:hover { border-color: #5ad1c4; }
+.astra-sheet-presets button:hover { border-color: #4cd08a; }
 
 /* Making characters with AI */
 .astra-ai-groups { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; margin: 0 0 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.9rem; }
 .astra-ai-groups legend { padding: 0 0.3rem; }
 .astra-ai-groups label { display: flex; align-items: center; gap: 0.35rem; }
-.astra-ai-groups input { accent-color: #5ad1c4; }
+.astra-ai-groups input { accent-color: #4cd08a; }
 .astra-sheet-grid.astra-ai-grid { grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); }
 .astra-ai-status { font-size: 0.8rem; text-align: center; }
 .astra-ai-error { font-size: 0.7rem; color: #e0484f; }
@@ -188,7 +188,7 @@
 .astra-ai-tile.is-waiting svg { opacity: 0.3; }
 .astra-ai-tile-buttons { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; font-size: 0.8rem; }
 .astra-ai-tile-buttons label { display: flex; align-items: center; gap: 0.25rem; }
-.astra-ai-tile-buttons input { accent-color: #5ad1c4; }
+.astra-ai-tile-buttons input { accent-color: #4cd08a; }
 .astra-ai-tile-buttons button {
   padding: 0.1rem 0.45rem;
   border: 1px solid var(--border-color);
@@ -217,12 +217,12 @@
   background: rgba(255, 255, 255, 0.04);
   resize: vertical;
 }
-.astra-preview textarea:focus-visible { outline: 2px solid #5ad1c4; outline-offset: 1px; }
+.astra-preview textarea:focus-visible { outline: 2px solid #4cd08a; outline-offset: 1px; }
 .astra-preview-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; margin: 0.75rem 0; }
 .astra-preview-size { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
 .astra-preview-kerning { display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; }
-.astra-preview-kerning input { accent-color: #5ad1c4; }
-.astra-preview-size input { width: 12rem; max-width: 50vw; accent-color: #5ad1c4; }
+.astra-preview-kerning input { accent-color: #4cd08a; }
+.astra-preview-size input { width: 12rem; max-width: 50vw; accent-color: #4cd08a; }
 .astra-preview-output { overflow-x: auto; padding: 0.5rem 0; }
 .astra-preview-output svg { display: block; max-width: none; }
 .astra-preview-missing { fill: currentColor; opacity: 0.18; font-family: system-ui, sans-serif; }
@@ -271,9 +271,9 @@
   cursor: crosshair;
 }
 .astra-pad-ghost { fill: currentColor; opacity: 0.08; pointer-events: none; font-family: system-ui, sans-serif; }
-.astra-pad-guide { stroke: #5ad1c4; stroke-width: 3; stroke-dasharray: 16 12; opacity: 0.5; pointer-events: none; }
+.astra-pad-guide { stroke: #4cd08a; stroke-width: 3; stroke-dasharray: 16 12; opacity: 0.5; pointer-events: none; }
 .astra-pad-guide.is-faint { opacity: 0.22; stroke-dasharray: 6 12; }
-.astra-pad h2 .astra-pad-char { color: #5ad1c4; }
+.astra-pad h2 .astra-pad-char { color: #4cd08a; }
 .astra-pad h2 .astra-pad-name { display: block; margin-top: 0.15rem; font-size: 0.8rem; font-weight: 400; opacity: 0.65; }
 .astra-pad-canvas.is-tracing { opacity: 0.5; cursor: progress; }
 .astra-pad-problem { margin: 0.75rem 0 0; color: #e0484f; font-size: 0.9rem; }
@@ -290,8 +290,8 @@
 }
 .astra-pad-buttons button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
 .astra-pad-buttons button:disabled { opacity: 0.4; cursor: default; }
-.astra-pad-buttons .astra-pad-save { background: #5ad1c4; border-color: #5ad1c4; color: #04201d; font-weight: 600; }
-.astra-pad-buttons .astra-pad-save:hover:not(:disabled) { background: #7fe0d5; }
+.astra-pad-buttons .astra-pad-save { background: #4cd08a; border-color: #4cd08a; color: #04200f; font-weight: 600; }
+.astra-pad-buttons .astra-pad-save:hover:not(:disabled) { background: #7fe0aa; }
 
 .astra-sidebar-content {
   display: flex;

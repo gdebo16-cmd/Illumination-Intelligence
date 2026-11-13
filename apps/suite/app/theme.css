@@ -1,128 +1,188 @@
-:root,
+/* Each app's colors. ThemeSync puts data-theme="<app id>" on <html>; anything else uses Lumen.
+   --app-bg / --app-accent / --app-second / --app-highlight are the palette; the older variables
+   below are derived from it and used all over the styles. The glass tint follows --app-accent. */
 
+/* Lumen: silver */
+:root,
 [data-theme="lumen"] {
-  --background-color: #000000;
-  --text-color: #ffffff;
-  --primary-color: rgba(24, 26, 50, 0.244);
-  --secondary-color: rgba(0, 0, 0, 0.753);
-  --grad-color-1: #1a1e41;
-  --grad-color-2: #050913;
-  --accent-color: #0c1220;
-  --border-color: #242831;
-  --edge-color: #030406;
-  --chat-user: #c0cae6;
-  --chat-assistant: #fcdfab;
-  --load: #3c3c7e;
+  --app-bg: #10131A;
+  --app-accent: #C9CEDB;
+  --app-second: #8E9AB3;
+  --app-highlight: #F5F7FA;
+  --background-color: #10131A;
+  --text-color: #FEFEFE;
+  --primary-color: rgb(201 206 219 / 0.14);
+  --secondary-color: rgb(16 19 26 / 0.82);
+  --grad-color-1: #353841;
+  --grad-color-2: #10131A;
+  --accent-color: #22262D;
+  --border-color: #484B54;
+  --edge-color: #10131A;
+  --chat-user: #8E9AB3;
+  --chat-assistant: #F5F7FA;
+  --load: #767A84;
   --placeholder: #3f414567;
   --border-radius: 10px;
   --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
 
+/* Umbra: purple */
 [data-theme="umbra"] {
-    --background-color: #000000;
-    --text-color: #f1c7c7;
-    --primary-color: rgba(61, 13, 13, 0.342);
-    --secondary-color: rgba(0, 0, 0, 0.541);
-    --grad-color-1: #3b1616d2;
-    --grad-color-2: #000000;
-    --accent-color: #200c0c;
-    --border-color: #312424;
-    --edge-color: #060303;
-    --chat-user: #e6c0c0;
-    --chat-assistant: #fcd2ab;
-    --load: #7e643c;
-    --placeholder: #3f414567;
-    --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+  --app-bg: #0D0A14;
+  --app-accent: #9B6BFF;
+  --app-second: #D08BFF;
+  --app-highlight: #EDE6FF;
+  --background-color: #0D0A14;
+  --text-color: #FCFCFF;
+  --primary-color: rgb(155 107 255 / 0.14);
+  --secondary-color: rgb(13 10 20 / 0.82);
+  --grad-color-1: #291D43;
+  --grad-color-2: #0D0A14;
+  --accent-color: #1B142C;
+  --border-color: #38275A;
+  --edge-color: #0D0A14;
+  --chat-user: #D08BFF;
+  --chat-assistant: #EDE6FF;
+  --load: #5B3F95;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
 
-
+/* Prism: prismatic (plain fallbacks; the rainbow lives in prism.css) */
 [data-theme="prism"] {
-    --background-color: #000000;
-    --text-color: #ffffff;
-    --primary-color: rgba(151, 89, 221, 0.685);
-    --secondary-color: rgba(10, 54, 32, 0.753);
-    --grad-color-1: #162736;
-    --grad-color-2: #176864;
-    --accent-color: #1a3a35;
-    --border-color: #8f7336;
-    --edge-color: #030406;
-    --chat-user: #d7e6c0;
-    --chat-assistant: #d1abfc;
-    --load: #6f3c7e;
-    --placeholder: #3f414567;
-    --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(0, 0, 0);
+  --app-bg: #120F1C;
+  --app-accent: #B07CFF;
+  --app-second: #5BC0FF;
+  --app-highlight: #FFC371;
+  --background-color: #120F1C;
+  --text-color: #FFF7EB;
+  --primary-color: rgb(176 124 255 / 0.14);
+  --secondary-color: rgb(18 15 28 / 0.82);
+  --grad-color-1: #322549;
+  --grad-color-2: #120F1C;
+  --accent-color: #221A33;
+  --border-color: #413060;
+  --edge-color: #120F1C;
+  --chat-user: #5BC0FF;
+  --chat-assistant: #FFC371;
+  --load: #694B99;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
 
+/* Halo: gold */
 [data-theme="halo"] {
-    --background-color: #000000;
-    --text-color: #ffffff;
-    --primary-color: rgba(255, 255, 255, 0.425);
-    --secondary-color: rgba(236, 202, 151, 0.753);
-    --grad-color-1: #f1d196;
-    --grad-color-2: #0f0f0f;
-    --accent-color: #0c1220;
-    --border-color: #242831;
-    --edge-color: #030406;
-    --chat-user: #e6d6c0;
-    --chat-assistant: #f1b08a;
-    --load: #4e3e21;
-    --placeholder: #3f414567;
-    --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+  --app-bg: #15110A;
+  --app-accent: #F2C14E;
+  --app-second: #FF9F43;
+  --app-highlight: #FFF4D1;
+  --background-color: #15110A;
+  --text-color: #FFFDF9;
+  --primary-color: rgb(242 193 78 / 0.14);
+  --secondary-color: rgb(21 17 10 / 0.82);
+  --grad-color-1: #413418;
+  --grad-color-2: #15110A;
+  --accent-color: #2B2311;
+  --border-color: #57461E;
+  --edge-color: #15110A;
+  --chat-user: #FF9F43;
+  --chat-assistant: #FFF4D1;
+  --load: #8F722F;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
 
-[data-theme='eclipse'] {
-    --background-color: #000000;
-    --text-color: #ffffff;
-    --primary-color: rgba(50, 24, 24, 0.244);
-    --secondary-color: rgba(0, 0, 0, 0.753);
-    --grad-color-1: #3f0b0b;
-    --grad-color-2: #050913;
-    --accent-color: #0c1220;
-    --border-color: #312424;
-    --edge-color: #030406;
-    --chat-user: #c0cae6;
-    --chat-assistant: #fcdfab;
-    --load: #7e3c3c;
-    --placeholder: #3f414567;
-    --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+/* Eclipse: red */
+[data-theme="eclipse"] {
+  --app-bg: #0B0708;
+  --app-accent: #E0484F;
+  --app-second: #FF8A65;
+  --app-highlight: #FFE3E0;
+  --background-color: #0B0708;
+  --text-color: #FFFBFB;
+  --primary-color: rgb(224 72 79 / 0.14);
+  --secondary-color: rgb(11 7 8 / 0.82);
+  --grad-color-1: #361416;
+  --grad-color-2: #0B0708;
+  --accent-color: #200E0F;
+  --border-color: #4B1A1D;
+  --edge-color: #0B0708;
+  --chat-user: #FF8A65;
+  --chat-assistant: #FFE3E0;
+  --load: #802B2F;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
 
+/* Astra: green */
 [data-theme="astra"] {
-    --background-color: #000000;
-    --text-color: #ffffff;
-    --primary-color: rgba(14, 36, 16, 0.596);
-    --secondary-color: rgba(56, 53, 53, 0.753);
-    --grad-color-1: #1a4122;
-    --grad-color-2: #121312;
-    --accent-color: #201b0c;
-    --border-color: #243128;
-    --edge-color: #030406;
-    --chat-user: #d7e6c0;
-    --chat-assistant: #fcdfab;
-    --load: #315830;
-    --placeholder: #3f414567;
-    --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+  --app-bg: #08140E;
+  --app-accent: #4CD08A;
+  --app-second: #A6F0C6;
+  --app-highlight: #F3E9C6;
+  --background-color: #08140E;
+  --text-color: #FDFCF7;
+  --primary-color: rgb(76 208 138 / 0.14);
+  --secondary-color: rgb(8 20 14 / 0.82);
+  --grad-color-1: #163A27;
+  --grad-color-2: #08140E;
+  --accent-color: #0F271A;
+  --border-color: #1C4C33;
+  --edge-color: #08140E;
+  --chat-user: #A6F0C6;
+  --chat-assistant: #F3E9C6;
+  --load: #2D7B52;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }
 
+/* Aegis: cyan */
 [data-theme="aegis"] {
-    --background-color: #000000;
-    --text-color: #eef3fb;
-    --primary-color: rgba(20, 34, 56, 0.45);
-    --secondary-color: rgba(0, 0, 0, 0.6);
-    --grad-color-1: #172a45;
-    --grad-color-2: #05080f;
-    --accent-color: #0c1626;
-    --border-color: #243246;
-    --edge-color: #030406;
-    --chat-user: #c0d4e6;
-    --chat-assistant: #fcdfab;
-    --load: #3c5a7e;
-    --placeholder: #3f414567;
-    --border-radius: 10px;
-    --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+  --app-bg: #06131A;
+  --app-accent: #3FD8FF;
+  --app-second: #A0ECFF;
+  --app-highlight: #E6FAFF;
+  --background-color: #06131A;
+  --text-color: #FCFEFF;
+  --primary-color: rgb(63 216 255 / 0.14);
+  --secondary-color: rgb(6 19 26 / 0.82);
+  --grad-color-1: #113A48;
+  --grad-color-2: #06131A;
+  --accent-color: #0C2731;
+  --border-color: #174E5F;
+  --edge-color: #06131A;
+  --chat-user: #A0ECFF;
+  --chat-assistant: #E6FAFF;
+  --load: #257F98;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
+}
+
+/* Refract: green-teal */
+[data-theme="refract"] {
+  --app-bg: #071714;
+  --app-accent: #30C9A5;
+  --app-second: #8AF0D2;
+  --app-highlight: #DCFBF1;
+  --background-color: #071714;
+  --text-color: #FAFEFD;
+  --primary-color: rgb(48 201 165 / 0.14);
+  --secondary-color: rgb(7 23 20 / 0.82);
+  --grad-color-1: #0F3B31;
+  --grad-color-2: #071714;
+  --accent-color: #0B2922;
+  --border-color: #134C40;
+  --edge-color: #071714;
+  --chat-user: #8AF0D2;
+  --chat-assistant: #DCFBF1;
+  --load: #1E7964;
+  --placeholder: #3f414567;
+  --border-radius: 10px;
+  --box-shadow: 0 0 30px 2px rgb(7, 7, 7);
 }

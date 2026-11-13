@@ -62,7 +62,13 @@ header > :not(.header-spacer) { pointer-events: auto; }
   display: flex;
   height: var(--app-height, 100dvh);
   width: 100dvw;
-  background: linear-gradient(to bottom, #000 0%, var(--grad-color-2) 18%, var(--grad-color-1) 100%); 
+  /* Soft accent blobs over the app's fade, so the glass has color to blur (see glass.css). */
+  background:
+    radial-gradient(38% 45% at 10% 90%, color-mix(in srgb, var(--app-accent) 22%, transparent), transparent 70%),
+    radial-gradient(32% 40% at 88% 18%, color-mix(in srgb, var(--app-second) 18%, transparent), transparent 70%),
+    radial-gradient(30% 35% at 55% 55%, color-mix(in srgb, var(--app-accent) 11%, transparent), transparent 70%),
+    radial-gradient(35% 40% at 80% 95%, color-mix(in srgb, var(--app-highlight) 10%, transparent), transparent 70%),
+    linear-gradient(to bottom, var(--app-bg), var(--grad-color-1));
   color: var(--text-color);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow: hidden;}
@@ -119,8 +125,8 @@ header > .model-select-container {
   background: rgb(255 255 255 / 0.06); }
 .sidebar button[aria-current="true"],
 .chat-row.is-current { 
-  background: rgb(120 120 255 / 0.15); 
-  border-color: rgb(120 120 255 / 0.35); }
+  background: color-mix(in srgb, var(--app-accent) 15%, transparent); 
+  border-color: color-mix(in srgb, var(--app-accent) 35%, transparent); }
 .sidebar .sidebar-close { 
   width: auto; 
   padding: 0.3rem 0.6rem; }

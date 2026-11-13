@@ -92,14 +92,50 @@
   padding-bottom: 0.5rem;
 }
 
-.landing-card[data-app="lumen"] { --landing-accent: #7aa2ff; box-shadow: inset 0 0 5px .1px #7aa2ff3d, 0 0 10px 2px #7aa2ff3d;}
-.landing-card[data-app="umbra"] { --landing-accent: #a3394b; box-shadow: inset 0 0 5px .1px #a3394b3d, 0 0 10px 2px #a3394b3d;}
-.landing-card[data-app="prism"] { --landing-accent: #b07cff; box-shadow: inset 0 0 5px .1px #b07cff41, 0 0 10px 2px #b07cff41;}
-.landing-card[data-app="eclipse"] { --landing-accent: #e0484f; box-shadow: inset 0 0 5px .1px #e0484f34, 0 0 10px 2px #e0484f34;}
-.landing-card[data-app="halo"] { --landing-accent: #e3b84f; box-shadow: inset 0 0 5px .1px #e3b94f3b, 0 0 10px 2px #e3b94f3b;}
-.landing-card[data-app="aegis"] { --landing-accent: #8fb8e8; box-shadow: inset 0 0 5px .1px #8fb9e842, 0 0 10px 2px #8fb9e842;}
-.landing-card[data-app="refract"] { --landing-accent: #5b93e6; box-shadow: inset 0 0 5px .1px #5b93e638, 0 0 10px 2px #5b93e638;}
-.landing-card[data-app="astra"] { --landing-accent: #5ad1c4; box-shadow: inset 0 0 5px .1px #5ad1c477, 0 0 10px 2px #5ad1c348;}
+.landing-card[data-app="lumen"] { --landing-accent: #c9cedb; }
+.landing-card[data-app="umbra"] { --landing-accent: #9b6bff; }
+.landing-card[data-app="prism"] { --landing-accent: #b07cff; }
+.landing-card[data-app="eclipse"] { --landing-accent: #e0484f; }
+.landing-card[data-app="halo"] { --landing-accent: #f2c14e; }
+.landing-card[data-app="aegis"] { --landing-accent: #3fd8ff; }
+.landing-card[data-app="refract"] { --landing-accent: #30c9a5; }
+.landing-card[data-app="astra"] { --landing-accent: #4cd08a; }
+
+/* Each card: glass (glass.css) with its app's color on the edge, glow and name. */
+.landing-card[data-app] {
+  border-color: color-mix(in srgb, var(--landing-accent) 40%, transparent);
+  box-shadow: var(--glass-highlight), 0 10px 30px rgb(0 0 0 / 0.35), 0 0 14px 2px color-mix(in srgb, var(--landing-accent) 25%, transparent);
+}
+.landing-card[data-app] h2 { color: var(--landing-accent); }
+
+/* Prism: rainbow edge, glow, name and underline. */
+.landing-card[data-app="prism"] {
+  position: relative;
+  border-color: transparent;
+  box-shadow: var(--glass-highlight), var(--prism-glow);
+}
+.landing-card[data-app="prism"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: var(--prism-rainbow);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+/* The title stays full width so its underline spans the card; the side padding squeezes the
+   gradient's box down to about the word's width, so the whole rainbow lands on the letters. */
+.landing-card[data-app="prism"] h2 {
+  padding-inline: calc(50% - 1.6em);
+  background: var(--prism-rainbow) content-box no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  border-image: var(--prism-rainbow) 1;
+}
 
 
 /* #region landing */
