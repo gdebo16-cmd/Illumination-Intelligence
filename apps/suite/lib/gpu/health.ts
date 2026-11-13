@@ -25,12 +25,14 @@ export const LOADERS: Record<string, string> = {
   UpscaleModelLoader: 'model_name', // Prism's Fast 4×, Photo 4×, and the 8K 2× pass
   LoraLoaderModelOnly: 'lora_name', // an art style's LoRA, and the Wan 14B Lightning add-ons
   UnetLoaderGGUF: 'unet_name', // slimmed-down GGUF models (the Wan 14B video halves)
+  'RIFE VFI': 'ckpt_name', // Smooth: RIFE frame interpolation (the names it offers, downloaded or not)
 };
 
 // Load boxes that come from an add-on (custom node) rather than ComfyUI itself. A machine
 // without the add-on simply offers none of their files; it isn't counted as offline.
-// UnetLoaderGGUF is from ComfyUI-GGUF (city96), installed with ComfyUI Manager.
-const ADD_ON_LOADERS = new Set(['UnetLoaderGGUF']);
+// UnetLoaderGGUF is from ComfyUI-GGUF (city96) and RIFE VFI from ComfyUI-Frame-Interpolation
+// (Fannovel16), both installed with ComfyUI Manager.
+const ADD_ON_LOADERS = new Set(['UnetLoaderGGUF', 'RIFE VFI']);
 
 const ONLINE_FOR_MS = 3_000; // re-check a machine that answered after this long
 const OFFLINE_FOR_MS = 15_000; // and one that didn't after this long
@@ -45,7 +47,7 @@ async function getJson(url: string, timeoutMs = ASK_TIMEOUT_MS): Promise<unknown
 
 /** The files ComfyUI offers in one kind of Load box: the same list its dropdown shows. */
 export async function filesOffered(comfyUrl: string, loader: string): Promise<string[]> {
-  const info = (await getJson(`${comfyUrl}/object_info/${loader}`, 5_000)) as Record<
+  const info = (await getJson(`${comfyUrl}/object_info/${encodeURIComponent(loader)}`, 5_000)) as Record<
     string,
     { input?: { required?: Record<string, unknown[]> } }
   >;

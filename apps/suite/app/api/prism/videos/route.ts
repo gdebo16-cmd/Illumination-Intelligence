@@ -3,7 +3,8 @@
 // GET:  your videos (newest first), the length choices for each video model with how long each
 //       usually takes, and which models are downloaded (null when ComfyUI isn't running):
 //         { videos: [...], lengths: { 'wan-5b': [{ id, name, seconds, wait, runs }], ... },
-//           models: [{ id, ready: { image, text }, missing: { image: [...], text: [...] } }] | null }
+//           models: [{ id, ready: { image, text }, missing: { image: [...], text: [...] } }] | null,
+//           smooth: true | false | null (whether some machine can Smooth), smoothWait: seconds }
 // POST: make a video. Answers straight away with the video's details and status 'working';
 //       check GET until it says 'done'. Every request has prompt, length ('short' | 'medium' |
 //       'long') and model ('wan-5b' | 'wan-14b', default 'wan-5b'), plus:
@@ -16,7 +17,7 @@ import { getCurrentUserId } from '@/lib/user';
 import { readImageFile } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
 import { findLength, findVideoModel, findVideoShape, videoSize } from '@/config/prism-video-models';
-import { lengthChoices, listVideos, startVideo, videoModelStatus } from '@/lib/prism/videos';
+import { lengthChoices, listVideos, smoothWait, startVideo, videoModelStatus } from '@/lib/prism/videos';
 
 const MAX_PROMPT = 2000;
 
@@ -27,8 +28,14 @@ export async function GET() {
   await connection();
   const userId = await getCurrentUserId();
   if (!userId) return bad('Please select a user profile first.', 401);
-  const models = await videoModelStatus().catch(() => null);
-  return NextResponse.json({ videos: listVideos(userId), lengths: lengthChoices(), models });
+  const status = await videoModelStatus().catch(() => null);
+  return NextResponse.json({
+    videos: listVideos(userId),
+    lengths: lengthChoices(),
+    models: status?.models ?? null,
+    smooth: status?.smooth ?? null,
+    smoothWait: smoothWait(),
+  });
 }
 
 export async function POST(req: Request) {

@@ -14,6 +14,7 @@
 //   POST /api/prism/videos     start a video (it's made in the background)
 //   GET  /api/prism/videos     your videos, the length choices with their usual wait, and which
 //                              video models are downloaded
+//   POST /api/prism/videos/<id>/smooth   "Smooth": a copy with twice the frames (RIFE)
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
@@ -106,6 +107,10 @@ interface PrismVideo {
   length: string;
   /** How long the clip is, in seconds. */
   clipSeconds: number;
+  /** For a smoothed copy: the video it was made from. */
+  smoothOf: string | null;
+  /** Frames per second (twice the model's for a smoothed copy). */
+  fps: number;
   frames: number;
   width: number;
   height: number;
@@ -182,6 +187,9 @@ const Prism = () => {
   const [videoShape, setVideoShape] = useState<VideoShapeId>('landscape');
   // Until the server says which video models are downloaded, list them all as ready.
   const [videoModels, setVideoModels] = useState<VideoModelStatus[] | null>(null);
+  // Can some machine Smooth (has the RIFE add-on)? null until the server can tell.
+  const [smoothReady, setSmoothReady] = useState<boolean | null>(null);
+  const [smoothWait, setSmoothWait] = useState(60);
   const editing = source !== null && make === 'edit';
   const animating = make === 'video';
   /** A video from words only, with no starting picture. */
@@ -282,12 +290,22 @@ const Prism = () => {
   const loadVideos = useCallback(() => {
     fetch('/api/prism/videos')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { videos: PrismVideo[]; lengths: Record<VideoModelId, LengthChoice[]>; models: VideoModelStatus[] | null } | null) => {
-        if (!data) return;
-        setVideos(data.videos);
-        setLengths(data.lengths);
-        if (data.models) setVideoModels(data.models);
-      })
+      .then(
+        (data: {
+          videos: PrismVideo[];
+          lengths: Record<VideoModelId, LengthChoice[]>;
+          models: VideoModelStatus[] | null;
+          smooth: boolean | null;
+          smoothWait: number;
+        } | null) => {
+          if (!data) return;
+          setVideos(data.videos);
+          setLengths(data.lengths);
+          if (data.models) setVideoModels(data.models);
+          if (data.smooth !== null) setSmoothReady(data.smooth);
+          setSmoothWait(data.smoothWait);
+        },
+      )
       .catch(() => {});
   }, []);
 
@@ -526,6 +544,21 @@ const Prism = () => {
     if (match) setShape(match.id);
   };
 
+  // "Smooth" the video shown big: the server makes a copy with twice the frames, in the background.
+  const smooth = async (video: PrismVideo) => {
+    setError('');
+    try {
+      const res = await fetch(`/api/prism/videos/${video.id}/smooth`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
+      setVideos((list) => [data, ...list]);
+      setShown({ kind: 'video', id: data.id });
+      // (The clock starts ticking on its own: a video is now being made.)
+    } catch (err) {
+      setError((err as Error).message || 'Something went wrong.');
+    }
+  };
+
   // Put a video's prompt, model, length and starting picture (or shape) back into the form.
   const reuseVideo = (video: PrismVideo) => {
     if (video.mode === 'text') {
@@ -732,7 +765,7 @@ const Prism = () => {
                 type="button"
                 className={`prism-thumb ${item.kind === 'video' ? `is-video is-${item.video.status}` : ''}`}
                 aria-current={shown?.kind === item.kind && shown.id === item.id}
-                title={item.kind === 'video' ? `Video: ${item.video.prompt}` : item.image.prompt}
+                title={item.kind === 'video' ? `${item.video.smoothOf ? 'Smooth video' : 'Video'}: ${item.video.prompt}` : item.image.prompt}
                 onClick={() => show({ kind: item.kind, id: item.id })}
               >
                 {(item.kind === 'image' || item.video.poster) && (
@@ -942,7 +975,15 @@ const Prism = () => {
                     <span className="prism-video-blank" style={{ aspectRatio: `${shownVideo.width} / ${shownVideo.height}` }} />
                   )}
                   {shownVideo.status === 'working' ? (
-                    <VideoProgress video={shownVideo} lengths={lengthsByModel[shownVideo.model] ?? FIRST_GUESS[shownVideo.model]} now={now} />
+                    <VideoProgress
+                      video={shownVideo}
+                      wait={
+                        shownVideo.smoothOf
+                          ? smoothWait
+                          : ((lengthsByModel[shownVideo.model] ?? FIRST_GUESS[shownVideo.model]).find((l) => l.id === shownVideo.length)?.wait ?? 150)
+                      }
+                      now={now}
+                    />
                   ) : (
                     <p className="prism-video-status is-failed">{shownVideo.error ?? 'This video didn’t work.'}</p>
                   )}
@@ -951,11 +992,32 @@ const Prism = () => {
               <figcaption>
                 <span className="prism-caption-text">{shownVideo.prompt}</span>
                 <span className="prism-caption-meta">
-                  Video · {findVideoModel(shownVideo.model).name} · {shownVideo.clipSeconds} sec · {shownVideo.width}×{shownVideo.height}
+                  {shownVideo.smoothOf ? 'Smooth video' : 'Video'} · {findVideoModel(shownVideo.model).name} · {shownVideo.clipSeconds} sec · {shownVideo.fps} fps · {shownVideo.width}×{shownVideo.height}
                   {shownVideo.seconds ? ` · made in ${clock(shownVideo.seconds)}` : ''}
                 </span>
                 <span className="prism-caption-actions">
                   <button type="button" onClick={() => reuseVideo(shownVideo)}>Reuse settings</button>
+                  {/* Smooth: once per video. If there's already a smooth copy, go to it instead. */}
+                  {shownVideo.status === 'done' && !shownVideo.smoothOf && (() => {
+                    const copy = videos.find((v) => v.smoothOf === shownVideo.id && v.status !== 'failed');
+                    if (copy) {
+                      return (
+                        <button type="button" onClick={() => show({ kind: 'video', id: copy.id })}>
+                          {copy.status === 'working' ? 'Smoothing…' : 'See smooth version'}
+                        </button>
+                      );
+                    }
+                    if (smoothReady === false) return null; // no machine has RIFE yet (docs/prism-video.md)
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => void smooth(shownVideo)}
+                        title={`Add an in-between frame after every frame: ${shownVideo.fps} → ${shownVideo.fps * 2} frames a second`}
+                      >
+                        Smooth
+                      </button>
+                    );
+                  })()}
                   {shownVideo.status === 'done' && (
                     <SaveButton key={shownVideo.url} url={shownVideo.url} name={`prism-${shownVideo.id.slice(0, 8)}.mp4`} type="video/mp4" />
                   )}
@@ -1008,15 +1070,14 @@ const Prism = () => {
 };
 
 /** "Making your video… 1:12 of about 2½ min", with a bar that fills up as it goes. */
-function VideoProgress({ video, lengths, now }: { video: PrismVideo; lengths: LengthChoice[]; now: number }) {
-  const wait = lengths.find((l) => l.id === video.length)?.wait ?? 150;
+function VideoProgress({ video, wait, now }: { video: PrismVideo; wait: number; now: number }) {
   const elapsed = Math.max(0, (now - Date.parse(video.createdAt)) / 1000);
   // Never show it as finished before it is: the bar stops at 95% if it runs long.
   const share = Math.min(0.95, elapsed / wait);
   return (
     <div className="prism-video-status">
       <span>
-        Making your video… {clock(elapsed)} <small>of {aboutTime(wait)}</small>
+        {video.smoothOf ? 'Smoothing your video…' : 'Making your video…'} {clock(elapsed)} <small>of {aboutTime(wait)}</small>
       </span>
       <span className="prism-video-bar" aria-hidden="true">
         <span style={{ width: `${share * 100}%` }} />

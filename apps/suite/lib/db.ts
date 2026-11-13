@@ -259,6 +259,9 @@ db.exec(`
 // there was at first), and whether it started from a picture ('image') or from words ('text').
 addColumn('PrismVideo', 'model', 'TEXT');
 addColumn('PrismVideo', 'mode', "TEXT NOT NULL DEFAULT 'image'");
+// A smoothed copy ("Smooth" on a finished video: RIFE doubles its frames) names the video it
+// was made from; empty for every other video.
+addColumn('PrismVideo', 'smooth_of', 'TEXT');
 
 // Photos attached to chat messages (Lumen and Umbra). The files are data/chat-images/<id>.jpg.
 // `chat` says which chat a photo belongs to ("lumen:<conversation id>" or "umbra:<bot id>"), so

@@ -21,6 +21,7 @@ import {
   type VideoLengthId, type VideoModelId,
 } from '../../config/prism-video-models.ts';
 import { generateVideo, videoFiles, videoNeeds, type VideoMode } from './video';
+import { SMOOTH_FILE, smoothNeeds, smoothVideo } from './smooth';
 import type { PreparedSource } from './source';
 
 const VIDEO_DIR = path.join(process.cwd(), 'data', 'prism', 'videos');
@@ -42,6 +43,10 @@ export interface PrismVideo {
   length: VideoLengthId;
   /** How long the clip is, in seconds. */
   clipSeconds: number;
+  /** For a smoothed copy ("Smooth"): the video it was made from. Null for every other video. */
+  smoothOf: string | null;
+  /** Frames per second: the model's, or twice that for a smoothed copy. */
+  fps: number;
   frames: number;
   seed: number;
   width: number;
@@ -59,20 +64,21 @@ export interface PrismVideo {
   poster: string | null;
 }
 
-type Row = Omit<PrismVideo, 'url' | 'poster' | 'clipSeconds' | 'model'> & { model: string | null };
+type Row = Omit<PrismVideo, 'url' | 'poster' | 'clipSeconds' | 'model' | 'fps'> & { model: string | null };
 const withUrls = (row: Row): PrismVideo => {
   const model = findVideoModel(row.model).id;
   const hasPoster = row.mode === 'image' || fs.existsSync(path.join(VIDEO_DIR, `${row.id}.png`));
   return {
     ...row,
     model,
+    fps: findVideoModel(model).fps * (row.smoothOf ? 2 : 1),
     clipSeconds: VIDEO_LENGTHS.find((l) => l.id === row.length)?.seconds ?? Math.round(row.frames / findVideoModel(model).fps),
     url: `/api/prism/videos/${row.id}`,
     poster: hasPoster ? `/api/prism/videos/${row.id}?poster=1` : null,
   };
 };
 
-const COLUMNS = `id, image_id AS imageId, prompt, model, mode, length, frames, seed, width, height, status, error, seconds, createdAt`;
+const COLUMNS = `id, image_id AS imageId, prompt, model, mode, smooth_of AS smoothOf, length, frames, seed, width, height, status, error, seconds, createdAt`;
 
 /**
  * Order a video. Returns straight away with status 'working'; the video is made in the
@@ -133,9 +139,68 @@ export function startVideo(
     });
 
   return withUrls({
-    id, imageId: options.imageId, prompt: options.prompt, model: model.id, mode, length: length.id, frames, seed: 0,
+    id, imageId: options.imageId, prompt: options.prompt, model: model.id, mode, smoothOf: null, length: length.id, frames, seed: 0,
     width: size.width, height: size.height, status: 'working', error: null, seconds: null, createdAt,
   });
+}
+
+/**
+ * "Smooth" a finished video: a new video, made in the background, with an in-between frame
+ * after every frame (lib/prism/smooth.ts). The original is kept. Returns 'missing' when the
+ * video isn't this profile's, 'not-done' when it isn't finished, 'smoothed' when it's already
+ * a smoothed copy.
+ */
+export function startSmooth(userId: string, sourceId: string): PrismVideo | 'missing' | 'not-done' | 'smoothed' {
+  const source = db.prepare(`SELECT ${COLUMNS} FROM PrismVideo WHERE id = ? AND user_id = ?`).get(sourceId, userId) as Row | undefined;
+  if (!source) return 'missing';
+  if (source.status !== 'done') return 'not-done';
+  if (source.smoothOf) return 'smoothed';
+  const mp4 = path.join(VIDEO_DIR, `${source.id}.mp4`);
+  if (!fs.existsSync(mp4)) return 'missing';
+
+  // Read it now, so deleting the original while this waits in line doesn't matter.
+  const original = fs.readFileSync(mp4);
+  const id = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const frames = source.frames * 2 - 1; // an in-between frame in every gap
+  const fps = findVideoModel(source.model).fps;
+  const poster = path.join(VIDEO_DIR, `${source.id}.png`);
+  if (fs.existsSync(poster)) fs.copyFileSync(poster, path.join(VIDEO_DIR, `${id}.png`));
+  db.prepare(
+    `INSERT INTO PrismVideo (id, user_id, image_id, prompt, model, mode, smooth_of, length, frames, seed, width, height, status, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'working', ?)`,
+  ).run(
+    id, userId, source.imageId, source.prompt, findVideoModel(source.model).id, source.mode, source.id, source.length, frames,
+    source.seed, source.width, source.height, createdAt,
+  );
+
+  void gpuQueue
+    .add((worker) => smoothVideo(original, fps, worker), 'high', 'comfy', { userId, needs: smoothNeeds() })
+    .then((result) => {
+      fs.writeFileSync(path.join(VIDEO_DIR, `${id}.mp4`), result.video);
+      db.prepare(`UPDATE PrismVideo SET status = 'done', seconds = ? WHERE id = ?`).run(result.seconds, id);
+    })
+    .catch((err: Error) => {
+      console.error('Prism smooth error:', err);
+      const friendly = /fetch failed|ECONNREFUSED/i.test(err.message ?? '')
+        ? 'ComfyUI isn’t running. Start it with run_nvidia_gpu.bat and try again.'
+        : err.message || 'Something went wrong.';
+      db.prepare(`UPDATE PrismVideo SET status = 'failed', error = ? WHERE id = ?`).run(friendly, id);
+    });
+
+  return withUrls({
+    id, imageId: source.imageId, prompt: source.prompt, model: source.model, mode: source.mode, smoothOf: source.id,
+    length: source.length, frames, seed: source.seed, width: source.width, height: source.height,
+    status: 'working', error: null, seconds: null, createdAt,
+  });
+}
+
+/** How long smoothing usually takes, in seconds: the average so far, or a first guess. */
+export function smoothWait(): number {
+  const row = db.prepare(`SELECT AVG(seconds) AS average FROM PrismVideo WHERE status = 'done' AND smooth_of IS NOT NULL`).get() as
+    | { average: number | null }
+    | undefined;
+  return row?.average ?? 60;
 }
 
 /** A profile's videos, newest first. */
@@ -173,7 +238,7 @@ export function lengthChoices(): Record<VideoModelId, LengthChoice[]> {
   const rows = db
     .prepare(
       `SELECT COALESCE(model, '${PRISM_VIDEO_MODELS[0].id}') AS model, length, AVG(seconds) AS average, COUNT(*) AS runs
-       FROM PrismVideo WHERE status = 'done' GROUP BY 1, length`,
+       FROM PrismVideo WHERE status = 'done' AND smooth_of IS NULL GROUP BY 1, length`,
     )
     .all() as { model: string; length: string; average: number; runs: number }[];
   const choices = {} as Record<VideoModelId, LengthChoice[]>;
@@ -195,13 +260,15 @@ export interface VideoModelStatus {
 }
 
 /**
- * Whether each video model is downloaded yet, for each mode. Null when ComfyUI isn't running
- * anywhere, so there's no way to tell (the page then lets you pick anything).
+ * Whether each video model is downloaded yet, for each mode, and whether some machine can
+ * Smooth (has the RIFE add-on). Null when ComfyUI isn't running anywhere, so there's no way to
+ * tell (the page then lets you pick anything).
  */
-export async function videoModelStatus(): Promise<VideoModelStatus[] | null> {
+export async function videoModelStatus(): Promise<{ models: VideoModelStatus[]; smooth: boolean } | null> {
   const online = (await checkWorkers(GPU_WORKERS)).filter((s) => s.online);
   if (!online.length) return null;
-  return PRISM_VIDEO_MODELS.map((model) => {
+  const smooth = online.some((s) => s.files.has(SMOOTH_FILE));
+  const models = PRISM_VIDEO_MODELS.map((model) => {
     const status: VideoModelStatus = { id: model.id, ready: { image: false, text: false }, missing: { image: [], text: [] } };
     for (const mode of ['image', 'text'] as const) {
       const files = videoFiles(model.id, mode);
@@ -211,6 +278,7 @@ export async function videoModelStatus(): Promise<VideoModelStatus[] | null> {
     }
     return status;
   });
+  return { models, smooth };
 }
 
 /**

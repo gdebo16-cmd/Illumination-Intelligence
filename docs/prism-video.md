@@ -16,6 +16,14 @@ A model shows as "not downloaded yet" until a machine's ComfyUI has every file i
 
 Both models want about 14 GB of graphics memory, so videos go to the Raider (16 GB). They only go to the Alienware if its ComfyUI has the same files.
 
+## Smooth
+
+Under a finished video, **Smooth** makes a copy with an in-between frame after every frame (RIFE frame interpolation). The clip keeps its length but plays at twice the frames a second, so motion looks smoother: 24 → 48 for Fast, 16 → 32 for Better. The original is kept. If a video already has a smooth copy, the button says **See smooth version** instead.
+
+RIFE is small, so the GPU queue sends it to the machine with the smallest card that can run it: the **Alienware**, leaving the Raider free for the next video. If only the Raider has it set up, it runs there.
+
+**Setup, on the Alienware (and the Raider too if you like):** in ComfyUI Manager, install **ComfyUI-Frame-Interpolation** (by Fannovel16), then restart ComfyUI. That's all. The RIFE model file (`rife49.pth`, MIT licence) downloads itself the first time Smooth runs, so that first run takes a bit longer and needs the internet. The Smooth button stays hidden until some machine has the add-on.
+
 ## Files ComfyUI needs
 
 Model files are large and stay in ComfyUI's folders, not in git. Put each file in the folder shown, then press R in ComfyUI (or restart it). Prism notices within about a minute.
@@ -84,3 +92,5 @@ In `wan14b-video-workflow.json`:
 - **"Better" stays greyed out:** a file is missing or named differently, or ComfyUI-GGUF isn't installed. The names in the recipe are the ones Prism looks for.
 - **Out of memory, or Windows error 1450:** close other programs, use 832×480, or keep Q4 instead of Q5.
 - **ComfyUI says "UnetLoaderGGUF" doesn't exist:** ComfyUI-GGUF isn't installed, or ComfyUI wasn't restarted after installing it.
+- **No Smooth button:** no machine has ComfyUI-Frame-Interpolation yet, or ComfyUI wasn't restarted after installing it.
+- **Smooth fails the first time:** RIFE couldn't download `rife49.pth`. Check that machine's internet, or put the file in `ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/` yourself.

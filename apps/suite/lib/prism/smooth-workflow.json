@@ -1,0 +1,33 @@
+{
+  "1": {
+    "class_type": "LoadVideo",
+    "_meta": { "title": "The finished video" },
+    "inputs": { "file": "" }
+  },
+  "2": {
+    "class_type": "GetVideoComponents",
+    "inputs": { "video": ["1", 0] }
+  },
+  "3": {
+    "class_type": "RIFE VFI",
+    "_meta": { "title": "RIFE: an in-between frame after every frame (from the ComfyUI-Frame-Interpolation add-on)" },
+    "inputs": {
+      "frames": ["2", 0],
+      "ckpt_name": "rife49.pth",
+      "clear_cache_after_n_frames": 10,
+      "multiplier": 2,
+      "fast_mode": true,
+      "ensemble": true,
+      "scale_factor": 1
+    }
+  },
+  "4": {
+    "class_type": "CreateVideo",
+    "_meta": { "title": "Twice the frames a second, so the clip keeps its length" },
+    "inputs": { "images": ["3", 0], "fps": 48 }
+  },
+  "5": {
+    "class_type": "SaveVideo",
+    "inputs": { "video": ["4", 0], "filename_prefix": "Prism/prism-video-smooth", "format": "mp4", "format.codec": "h264" }
+  }
+}
