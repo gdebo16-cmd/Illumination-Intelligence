@@ -257,7 +257,7 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
       ? `You have tools: ${toolNames.join(', ')}. Use them whenever they would make your answer more accurate or useful, ` +
         'instead of guessing. You can use several tools in a row before answering. ' +
         'Never invent tool results; if a tool fails, tell the user plainly.'
-      : 'You have no tools: you cannot browse the web, see files, or take actions. If asked, say so honestly instead of pretending.',
+      : 'You have no tools: you cannot browse the web, read files, or take actions. If asked, say so honestly instead of pretending. (You can still write documents and .md files with a document block, as described below.)',
     bot.tools.includes('calculator') &&
       'Never do arithmetic in your head: use the calculate tool for any math, and days_until for counting days.',
     usesWeb && 'When your answer uses information from the web, mention where it came from, with links.',
@@ -277,7 +277,7 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
         'Before a risky change, take a workspace snapshot with refract_snapshot so you can restore it if something goes wrong. ' +
         'These tools cannot touch the host PC. If the virtual machine is off, say so and ask them to start it in the Refract app.',
     bot.tools.includes('notes') &&
-      `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note.`,
+      `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note. Notes are for short facts only: when asked to save or export a write-up as a file, use a document block instead.`,
     DOCUMENT_SYSTEM_PROMPT,
     notes.length > 0 &&
       `Things you've saved about ${userName} (your notes):\n${notes.map((n) => `- ${n.content}`).join('\n')}`,
