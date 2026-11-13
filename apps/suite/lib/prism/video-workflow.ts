@@ -1,4 +1,4 @@
-// lib/prism/video.ts — turning a picture into a short video with ComfyUI (the Wan 2.2 5B model).
+// lib/prism/video-workflow.ts — turning a picture into a short video with ComfyUI (the Wan 2.2 5B model).
 //
 // Same three steps as pictures in comfy.ts (upload, order, wait, pick up), with a different
 // recipe: wan-video-workflow.json, exported from the "Wan 2.2 5B" template you ran by hand.

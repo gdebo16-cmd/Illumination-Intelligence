@@ -7,7 +7,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
-import { USERS, type UserId } from '@/lib/users';
+import { USERS, type UserId } from '@/lib/profiles';
 import { nextRun, parseSchedule, type Schedule } from '@/config/umbra-schedule';
 import { runAgent } from './agent';
 import type { AgentStep } from './types';

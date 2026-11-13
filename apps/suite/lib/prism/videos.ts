@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import db from '@/lib/db';
 import { gpuQueue } from '@/lib/queue';
-import { VIDEO_LENGTHS, generateVideo, videoNeeds, type VideoLengthId } from './video';
+import { VIDEO_LENGTHS, generateVideo, videoNeeds, type VideoLengthId } from './video-workflow';
 import type { PreparedSource } from './source';
 
 const VIDEO_DIR = path.join(process.cwd(), 'data', 'prism', 'videos');

@@ -9,7 +9,7 @@
 // faint stand-in, and is listed below so you can click it to go make it.
 
 import { useMemo, useState } from "react";
-import { GlyphArt } from "./glyph-pad";
+import { GlyphArt } from "./GlyphPad";
 import { BASELINE, CAP_LINE, MISSING_WIDTH, SIDE_SPACE, SPACE_WIDTH, fallbackFor, isCharacter, type Glyph, type Glyphs } from "@/config/astra";
 import { inkSpan, kernBetween, profilesOf, type Profile } from "@/config/astra-geometry";
 

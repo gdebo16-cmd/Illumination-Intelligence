@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
 import SidebarToggle from "@/components/SidebarToggle";
-import GlyphPad, { GlyphArt } from "./glyph-pad";
-import FontPreview from "./font-preview";
-import SheetImport, { type SheetLetter } from "./sheet-import";
-import AiAlphabet from "./ai-alphabet";
+import GlyphPad, { GlyphArt } from "./GlyphPad";
+import FontPreview from "./FontPreview";
+import SheetImport, { type SheetLetter } from "./SheetImport";
+import AiAlphabet from "./AiAlphabet";
 import {
   CHARACTER_GROUPS,
   EMPTY_GLYPH,

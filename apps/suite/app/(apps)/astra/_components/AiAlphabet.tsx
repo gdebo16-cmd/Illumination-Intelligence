@@ -8,10 +8,10 @@
 // Needs ComfyUI running, like Prism. Each character takes a few seconds on the graphics card.
 
 import { useRef, useState } from "react";
-import { GlyphArt, GuideLines } from "./glyph-pad";
+import { GlyphArt, GuideLines } from "./GlyphPad";
 import { traceImage } from "./trace";
 import { CHARACTER_GROUPS, GLYPH_SIZE, type Glyphs, type Shape } from "@/config/astra";
-import type { SheetLetter } from "./sheet-import";
+import type { SheetLetter } from "./SheetImport";
 
 type Result = {
   char: string;

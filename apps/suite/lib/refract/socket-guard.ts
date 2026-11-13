@@ -4,7 +4,7 @@
 
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { USERS } from "../users";
+import { USERS } from "../profiles";
 
 // Pages that may open the socket (on top of "same host as the request").
 const ALLOWED_ORIGIN_HOSTS = new Set([

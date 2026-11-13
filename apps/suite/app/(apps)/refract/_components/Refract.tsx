@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
 import SidebarToggle from "@/components/SidebarToggle";
-import RefractTerminal from "./refract-terminal";
-import RefractRemote from "./refract-remote";
+import RefractTerminal from "./RefractTerminal";
+import RefractRemote from "./RefractRemote";
 import { powerActionAllowed, type PowerAction } from "@/lib/refract/power";
 
 type VmSnapshot = {

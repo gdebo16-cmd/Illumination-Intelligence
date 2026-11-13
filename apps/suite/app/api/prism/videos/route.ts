@@ -11,7 +11,7 @@ import { connection, NextResponse } from 'next/server';
 import { getCurrentUserId, noProfile } from '@/lib/user';
 import { readImageFile } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
-import { VIDEO_PIXELS, VIDEO_STEP, findLength } from '@/lib/prism/video';
+import { VIDEO_PIXELS, VIDEO_STEP, findLength } from '@/lib/prism/video-workflow';
 import { lengthChoices, listVideos, startVideo } from '@/lib/prism/videos';
 
 const MAX_PROMPT = 2000;

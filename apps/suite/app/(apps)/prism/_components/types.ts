@@ -87,7 +87,7 @@ export interface LengthChoice {
   runs: number;
 }
 
-// Until the server answers, show the first guesses (the same ones as lib/prism/video.ts).
+// Until the server answers, show the first guesses (the same ones as lib/prism/video-workflow.ts).
 export const FIRST_GUESS: LengthChoice[] = [
   { id: 'short', name: 'Short', seconds: 2, wait: 150, runs: 0 },
   { id: 'medium', name: 'Medium', seconds: 3, wait: 240, runs: 0 },

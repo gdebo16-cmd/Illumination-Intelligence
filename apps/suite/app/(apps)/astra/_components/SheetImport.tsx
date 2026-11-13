@@ -9,7 +9,7 @@
 // Characters you'd already made are replaced by the ones from the sheet (they're marked first).
 
 import { useMemo, useRef, useState, type DragEvent } from "react";
-import { GlyphArt, GuideLines } from "./glyph-pad";
+import { GlyphArt, GuideLines } from "./GlyphPad";
 import { placeSheet, traceSheet, type SheetPiece } from "./trace";
 import { CHARACTER_GROUPS, GLYPH_SIZE, isCharacter, type Glyphs, type Shape } from "@/config/astra";
 

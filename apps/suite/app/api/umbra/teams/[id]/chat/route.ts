@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { endWork, startWork, workFailed } from '@/lib/umbra/busy';
-import { USERS } from '@/lib/users';
+import { USERS } from '@/lib/profiles';
 import { addTeamMessage, listTeamMessages, runTeam } from '@/lib/umbra/teams';
 import { ownedTeam } from '../../owned';
 

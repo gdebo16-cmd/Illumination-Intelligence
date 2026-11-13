@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { endWork, startWork, workFailed } from '@/lib/umbra/busy';
 import { getCurrentUserId, noProfile } from '@/lib/user';
-import { USERS } from '@/lib/users';
+import { USERS } from '@/lib/profiles';
 import { addMessage, getBot, listMessages, listNotes, systemPrompt } from '@/lib/umbra/bots';
 import { runAgent, type ChatMessage } from '@/lib/umbra/agent';
 import { canSeeImages } from '@/config/models';

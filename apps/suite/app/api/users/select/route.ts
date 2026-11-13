@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { USERS, UserId } from '@/lib/users';
+import { USERS, UserId } from '@/lib/profiles';
 
 export async function POST(request: NextRequest) {
   try {
