@@ -288,4 +288,25 @@ db.exec(`
 // How thick a font's pen strokes are (config/astra.ts DEFAULT_PEN_WIDTH for fonts made before this).
 addColumn('AstraFont', 'pen_width', 'INTEGER NOT NULL DEFAULT 60');
 
+// Artifacts: the Markdown documents Lumen and Umbra write (a <document> block in a reply, or a
+// .md file a Flicker writes in Refract). One row per document; writing it again with the same
+// title, in the same chat, updates it. See lib/artifacts.ts.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS Artifact (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    app TEXT NOT NULL,               -- lumen | umbra
+    kind TEXT NOT NULL,              -- document (a <document> block) | file (a .md file in Refract)
+    source_kind TEXT NOT NULL,       -- chat (Lumen) | bot | team (Umbra)
+    source_id TEXT NOT NULL,
+    source_name TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_key ON Artifact (user_id, app, source_kind, source_id, kind, title);
+  CREATE INDEX IF NOT EXISTS idx_artifact_user ON Artifact (user_id, app, updatedAt);
+`);
+
 export default db;

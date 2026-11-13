@@ -12,6 +12,7 @@ import { nextRun, parseSchedule, type Schedule } from '@/config/umbra-schedule';
 import { runAgent, type AgentStep } from './agent';
 import { getBot, listNotes, systemPrompt } from './bots';
 import { getTeam, listTeamMessages, runTeam, viewTeam } from './teams';
+import { saveDocumentArtifacts } from '@/lib/artifacts';
 
 export const TASK_LIMITS = { title: 80, instructions: 2000 };
 
@@ -258,6 +259,13 @@ export async function runTask(userId: string, task: Task): Promise<Run> {
         });
     db.prepare("UPDATE UmbraRun SET status = 'done', report = ?, steps = ?, finishedAt = ? WHERE id = ?").run(
       result.reply, JSON.stringify(result.steps), new Date().toISOString(), runId,
+    );
+    // A document in the report goes to Umbra's artifacts, under the team or Flicker that wrote it.
+    saveDocumentArtifacts(
+      team
+        ? { userId, app: 'umbra', sourceKind: 'team', sourceId: team.id, sourceName: team.name }
+        : { userId, app: 'umbra', sourceKind: 'bot', sourceId: bot.id, sourceName: bot.name },
+      result.reply,
     );
   } catch (err) {
     const message = (err as Error).message || 'The task failed.';

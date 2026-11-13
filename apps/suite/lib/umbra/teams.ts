@@ -12,6 +12,7 @@ import { BOT_TOOLS } from '@/config/umbra';
 import { runAgent, type AgentStep, type ChatMessage } from './agent';
 import { getBot, listNotes, systemPrompt, type Bot } from './bots';
 import type { ToolDef } from './tools';
+import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 
 export const TEAM_LIMITS = { name: 40, purpose: 1000, role: 60, members: 5 };
 
@@ -141,6 +142,7 @@ export function updateTeam(userId: string, id: string, input: TeamInput): Team |
     input.name, input.purpose, input.leaderId, new Date().toISOString(), id,
   );
   saveMembers(id, input.members);
+  renameArtifactSource(userId, id, input.name);
   // The team's tasks run as its leader, so follow a change of leader.
   db.prepare('UPDATE UmbraTask SET bot_id = ? WHERE team_id = ?').run(input.leaderId, id);
   return getTeam(userId, id);
@@ -187,6 +189,17 @@ export function addTeamMessage(teamId: string, role: TeamMessage['role'], conten
     message.id, teamId, role, content, steps?.length ? JSON.stringify(steps) : null, message.createdAt,
   );
   db.prepare('UPDATE UmbraTeam SET updatedAt = ? WHERE id = ?').run(message.createdAt, teamId);
+  // A document the team wrote goes to Umbra's artifacts too.
+  if (role === 'assistant' && content.includes('<document')) {
+    const owner = db.prepare('SELECT user_id, name FROM UmbraTeam WHERE id = ?').get(teamId) as { user_id: string; name: string } | undefined;
+    if (owner) {
+      saveDocumentArtifacts(
+        { userId: owner.user_id, app: 'umbra', sourceKind: 'team', sourceId: teamId, sourceName: owner.name },
+        content,
+        message.createdAt,
+      );
+    }
+  }
   return message;
 }
 

@@ -11,6 +11,8 @@ import { checkCodeFolder, editStatuses } from './code';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 import { canThink } from '@/config/models';
 import type { AgentStep } from './agent';
+import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
+import { DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 
 export interface Bot {
   id: string;
@@ -135,6 +137,7 @@ export function updateBot(userId: string, id: string, input: BotInput): Bot | nu
     input.name, input.flame, input.personality, input.purpose, input.model, JSON.stringify(input.tools),
     input.codeFolder, input.codeAutoWrite ? 1 : 0, input.think ? 1 : 0, now, id,
   );
+  renameArtifactSource(userId, id, input.name);
   return getBot(userId, id);
 }
 
@@ -203,6 +206,17 @@ export function addMessage(
     images?.length ? JSON.stringify(images) : null,
   );
   db.prepare('UPDATE UmbraBot SET updatedAt = ? WHERE id = ?').run(message.createdAt, botId);
+  // A document the Flicker wrote goes to Umbra's artifacts too.
+  if (role === 'assistant' && content.includes('<document')) {
+    const owner = db.prepare('SELECT user_id, name FROM UmbraBot WHERE id = ?').get(botId) as { user_id: string; name: string } | undefined;
+    if (owner) {
+      saveDocumentArtifacts(
+        { userId: owner.user_id, app: 'umbra', sourceKind: 'bot', sourceId: botId, sourceName: owner.name },
+        content,
+        message.createdAt,
+      );
+    }
+  }
   return message;
 }
 
@@ -264,6 +278,7 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
         'These tools cannot touch the host PC. If the virtual machine is off, say so and ask them to start it in the Refract app.',
     bot.tools.includes('notes') &&
       `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note.`,
+    DOCUMENT_SYSTEM_PROMPT,
     notes.length > 0 &&
       `Things you've saved about ${userName} (your notes):\n${notes.map((n) => `- ${n.content}`).join('\n')}`,
   ]

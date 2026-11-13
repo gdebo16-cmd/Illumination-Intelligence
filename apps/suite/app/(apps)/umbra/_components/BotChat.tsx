@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
-import { MessageContent } from '@/components/MessageContent';
+import { DocumentPanel, ReplyContent, type OpenDocument } from '@/components/documents';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
@@ -22,6 +22,8 @@ export default function BotChat({ botId }: { botId: string }) {
   const [thinking, setThinking] = useState(false);
   const [liveSteps, setLiveSteps] = useState<AgentStep[]>([]);
   const [error, setError] = useState('');
+  // A document from a reply, open in the side panel.
+  const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLFormElement>(null);
@@ -218,6 +220,10 @@ export default function BotChat({ botId }: { botId: string }) {
         </div>
         <Link href={`/umbra/${bot.id}/tasks`} className="umbra-chat-action">Tasks</Link>
         <Link href={`/umbra/${bot.id}/edit`} className="umbra-chat-action">Edit</Link>
+        <Link href={`/umbra/artifacts?source=${bot.id}`} className="umbra-chat-action umbra-chat-artifacts" aria-label="Artifacts" title="Artifacts">
+          <span className="umbra-chat-artifacts-icon" aria-hidden>📄</span>
+          <span className="umbra-chat-artifacts-label">Artifacts</span>
+        </Link>
         <button type="button" className="umbra-chat-action" onClick={clearChat} disabled={messages.length === 0}>Clear</button>
       </div>
 
@@ -236,7 +242,7 @@ export default function BotChat({ botId }: { botId: string }) {
               {m.role === 'assistant' ? (
                 <>
                   {m.steps && <Steps steps={m.steps} />}
-                  <MessageContent content={m.content} />
+                  <ReplyContent content={m.content} onOpen={setOpenDoc} />
                 </>
               ) : (
                 <>
@@ -291,6 +297,7 @@ export default function BotChat({ botId }: { botId: string }) {
           </button>
         </span>
       </form>
+      {openDoc && <DocumentPanel {...openDoc} onClose={() => setOpenDoc(null)} />}
     </main>
   );
 }

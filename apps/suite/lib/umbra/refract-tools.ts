@@ -18,6 +18,9 @@ import {
   takeWorkspaceSnapshot,
   restoreWorkspaceSnapshot,
 } from "@/lib/refract/workspace";
+import db from "@/lib/db";
+import { saveArtifact } from "@/lib/artifacts";
+import { isMarkdownPath } from "@/lib/document-blocks";
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 const params = (properties: Record<string, unknown>, required: string[]) => ({ type: "object", properties, required });
@@ -194,16 +197,29 @@ const write: ToolDef = {
     },
   },
   label: (a) => `Writing ${str(a.workspace)}/${str(a.path)}`,
-  run: async (a): Promise<ToolResult> => {
+  run: async (a, ctx): Promise<ToolResult> => {
     const find = typeof a.find === "string" ? a.find.replace(/\r\n/g, "\n") : "";
     const replace = typeof a.replace === "string" ? a.replace.replace(/\r\n/g, "\n") : "";
     const result = await writeWorkFile(str(a.workspace), a.path, replace, find || undefined);
+    // A Markdown file the Flicker wrote shows up in Umbra's artifacts, as it is now.
+    if (isMarkdownPath(result.path)) keepMarkdownFile(ctx.userId, ctx.botId, `${str(a.workspace)}/${result.path}`, result.text);
     return {
       output: `${result.message} Path: ${str(a.workspace)}/${result.path}. This is only inside the virtual machine.`,
       summary: result.created ? `Created ${result.path}` : `Updated ${result.path}`,
     };
   },
 };
+
+/** Save a .md file from Refract as an artifact of the Flicker that wrote it. Never breaks the tool. */
+function keepMarkdownFile(userId: string, botId: string, path: string, text: string): void {
+  try {
+    const bot = db.prepare("SELECT name FROM UmbraBot WHERE id = ? AND user_id = ?").get(botId, userId) as { name: string } | undefined;
+    if (!bot) return;
+    saveArtifact({ userId, app: "umbra", sourceKind: "bot", sourceId: botId, sourceName: bot.name }, "file", path, text.replace(/\r\n/g, "\n"));
+  } catch (err) {
+    console.error("Saving a Markdown file as an artifact failed:", err);
+  }
+}
 
 const run: ToolDef = {
   schema: {

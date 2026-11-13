@@ -18,6 +18,9 @@ const Sidebar = () => {
     setSelectedModel,
     isSidebarOpen,
     closeSidebar,
+    artifacts,
+    openArtifact,
+    deleteArtifact,
   } = useChat();
 
   return (
@@ -40,6 +43,33 @@ const Sidebar = () => {
               title='Delete chat'
               onClick={() => {
                 if (window.confirm(`Delete "${c.title}"? This can't be undone.`)) deleteConversation(c.id);
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      {/* Documents Lumen wrote, from every chat. Deleting one leaves its chat as it is. */}
+      <span className='sidebar-separator'>Artifacts</span>
+      <div className='chat-list artifact-list'>
+        {artifacts?.length === 0 && <p className='artifact-empty'>Documents Lumen writes for you show up here.</p>}
+        {artifacts?.map((a) => (
+          <div className='chat-row' key={a.id}>
+            <button
+              className='chat-button artifact-button'
+              title={`From: ${a.sourceName}`}
+              onClick={() => { void openArtifact(a); closeSidebar(); }}
+            >
+              <span className='artifact-icon' aria-hidden>📄</span>
+              <span className='artifact-title'>{a.title}</span>
+            </button>
+            <button
+              className='chat-delete'
+              aria-label={`Delete artifact: ${a.title}`}
+              title='Delete artifact'
+              onClick={() => {
+                if (window.confirm(`Delete the artifact "${a.title}"? Its chat stays.`)) void deleteArtifact(a);
               }}
             >
               ✕

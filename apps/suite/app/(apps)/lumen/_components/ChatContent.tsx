@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat, type Message } from './ChatContext';
-import { MessageContent } from '@/components/MessageContent';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import { canSeeImages } from '@/config/models';
 import { MessagePhotos, PhotoButton, PhotoTray, releasePhotos, usePhotos } from '@/components/PhotoAttach';
-import { splitContent, DocumentCard, DocumentPanel } from './documents';
+import { ReplyContent, DocumentPanel } from '@/components/documents';
 
 const getAdaptiveLoadingText = (prompt: string): string => {
   const trimmed = prompt.trim().toLowerCase();
@@ -38,12 +37,14 @@ const Chat = () => {
     selectedModel,
     refreshConversations,
     loadingConversation,
+    refreshArtifacts,
+    openDoc,
+    setOpenDoc,
   } = useChat();
 
   const [input, setInput] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [openDoc, setOpenDoc] = useState<{ title: string; content: string } | null>(null);
   // Photos can only be added while the chosen model can see images.
   const canSee = canSeeImages(selectedModel);
   const { photos, problem, add: addPhotos, remove: removePhoto, take: takePhotos, onPaste } = usePhotos(canSee);
@@ -138,6 +139,8 @@ const Chat = () => {
       if (saved.length) releasePhotos(sending);
 
       refreshConversations();
+      // The reply wrote a document: show it in the sidebar's Artifacts list.
+      if (data.artifacts > 0) void refreshArtifacts();
     } catch (err: unknown) {
       const errorObj = err as { message?: string };
       console.error('Chat submit error:', err);
@@ -168,19 +171,9 @@ const Chat = () => {
         {messages.map((msg, idx) => (
           <div key={idx} className={`message-item ${msg.role === 'user' ? 'user' : 'assistant'}`}>
             <div className={`message-content ${msg.role === 'user' ? 'user' : 'assistant'}`}>
-              {/* This is the part that replaces {msg.content} */}
+              {/* A reply's documents show as cards that open in the side panel. */}
               {msg.role === 'assistant'
-                ? splitContent(msg.content).map((seg, i) =>
-                    seg.type === 'text' ? (
-                      <MessageContent key={i} content={seg.text} />
-                    ) : (
-                      <DocumentCard
-                        key={i}
-                        title={seg.title}
-                        onOpen={() => setOpenDoc({ title: seg.title, content: seg.content })}
-                      />
-                    ),
-                  )
+                ? <ReplyContent content={msg.content} onOpen={setOpenDoc} />
                 : (
                   <>
                     <MessagePhotos images={msg.images} withText={Boolean(msg.content.trim())} />
@@ -229,11 +222,7 @@ const Chat = () => {
 
       {/* Side panel for an opened document */}
       {openDoc && (
-        <DocumentPanel
-          title={openDoc.title}
-          content={openDoc.content}
-          onClose={() => setOpenDoc(null)}
-        />
+        <DocumentPanel {...openDoc} onClose={() => setOpenDoc(null)} />
       )}
     </>
   );

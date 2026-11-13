@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import useToggle from '@/hooks/use-toggle';
+import { useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -43,6 +44,14 @@ interface ChatContextValue {
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
   closeSidebar: () => void;
+  /** The documents Lumen has written, across every chat (the sidebar's Artifacts list). */
+  artifacts: ArtifactSummary[] | null;
+  refreshArtifacts: () => Promise<void>;
+  openArtifact: (artifact: ArtifactSummary) => Promise<void>;
+  deleteArtifact: (artifact: ArtifactSummary) => Promise<void>;
+  /** The document shown in the side panel, if any. */
+  openDoc: OpenDocument | null;
+  setOpenDoc: (doc: OpenDocument | null) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -64,6 +73,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const { isOpen: isSidebarOpen, handleToggle: toggleSidebar, handleClose: closeSidebar } = useToggle(1024);
+  const { artifacts, refresh: refreshArtifacts, open: loadArtifact, remove: deleteArtifact } = useArtifacts('lumen');
+  const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
+  const openArtifact = useCallback(async (artifact: ArtifactSummary) => {
+    const doc = await loadArtifact(artifact);
+    if (doc) setOpenDoc(doc);
+  }, [loadArtifact]);
 
   const refreshConversations = useCallback(async () => {
     const data = await fetchConversationList();
@@ -131,8 +146,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       isSidebarOpen,
       toggleSidebar,
       closeSidebar,
+      artifacts,
+      refreshArtifacts,
+      openArtifact,
+      deleteArtifact,
+      openDoc,
+      setOpenDoc,
     }),
-    [selectedModel, messages, conversationId, conversations, refreshConversations, loadConversation, deleteConversation, startNewChat, loadingConversation, isSidebarOpen, toggleSidebar, closeSidebar],
+    [selectedModel, messages, conversationId, conversations, refreshConversations, loadConversation, deleteConversation, startNewChat, loadingConversation, isSidebarOpen, toggleSidebar, closeSidebar, artifacts, refreshArtifacts, openArtifact, deleteArtifact, openDoc],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

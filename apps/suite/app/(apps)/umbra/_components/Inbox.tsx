@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { flameColor } from '@/config/umbra';
-import { MessageContent } from '@/components/MessageContent';
+import { DocumentPanel, ReplyContent, type OpenDocument } from '@/components/documents';
 import Flame from './Flame';
 import { Steps } from './Steps';
 import type { Run } from './types';
@@ -23,6 +23,7 @@ export default function Inbox() {
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
 
   // Load now, and check again every 15 seconds while the page is open (tasks finish in the background).
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function Inbox() {
                   {run.status === 'running' ? (
                     <p className="umbra-thinking">{run.botName} is still working on this…</p>
                   ) : (
-                    <MessageContent content={run.report ?? ''} />
+                    <ReplyContent content={run.report ?? ''} onOpen={setOpenDoc} />
                   )}
                   <div className="umbra-report-actions">
                     {run.teamId && run.teamName !== 'A deleted team' ? (
@@ -102,6 +103,7 @@ export default function Inbox() {
           ))}
         </ul>
       </div>
+      {openDoc && <DocumentPanel {...openDoc} onClose={() => setOpenDoc(null)} />}
     </main>
   );
 }

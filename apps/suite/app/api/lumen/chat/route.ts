@@ -6,6 +6,7 @@ import { getCurrentUserId } from '@/lib/user';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 import { canSeeImages } from '@/config/models';
+import { saveDocumentArtifacts } from '@/lib/artifacts';
 import {
   chatKey, photoIds, PhotoError, PHOTO_CONTEXT_CHARS, preparePhotos, savePhotos, uploadedPhotos, withPhotos,
 } from '@/lib/chat-images';
@@ -174,14 +175,19 @@ export async function POST(req: Request) {
     const reply = ollamaData.message?.content || 'No response generated.';
 
     // 9. Save the assistant response
-    insertMsg.run(
-      crypto.randomUUID(),
-      activeConversationId,
-      'assistant',
-      reply,
-      new Date().toISOString(),
-      null,
-    );
+    const repliedAt = new Date().toISOString();
+    insertMsg.run(crypto.randomUUID(), activeConversationId, 'assistant', reply, repliedAt, null);
+
+    // 9b. Keep any document in the reply in Lumen's artifacts (the sidebar's Artifacts list).
+    let artifacts = 0;
+    if (reply.includes('<document')) {
+      const chat = db.prepare('SELECT title FROM Conversation WHERE id = ?').get(activeConversationId) as { title: string } | undefined;
+      artifacts = saveDocumentArtifacts(
+        { userId, app: 'lumen', sourceKind: 'chat', sourceId: activeConversationId, sourceName: chat?.title ?? 'Chat' },
+        reply,
+        repliedAt,
+      );
+    }
 
     // 10. Extract new memories in the background: do not await, so the reply returns immediately.
     //     It uses the model that just answered (already on the card), with the same context size.
@@ -194,7 +200,7 @@ export async function POST(req: Request) {
       .catch((memoryError) => console.error('Memory extraction error:', memoryError));
 
     // 11. Return the response to the frontend
-    return NextResponse.json({ conversationId: activeConversationId, reply, images });
+    return NextResponse.json({ conversationId: activeConversationId, reply, images, artifacts });
   } catch (err: unknown) {
     const error = err as Error;
     console.error('API Chat Error:', error);

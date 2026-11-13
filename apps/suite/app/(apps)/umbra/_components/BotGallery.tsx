@@ -39,9 +39,12 @@ export default function BotGallery() {
             <h1>Your Flickers</h1>
             <p>Each flame is a Flicker with its own personality and purpose. Tap one to chat.</p>
           </div>
-          <Link href="/umbra/inbox" className="umbra-inbox-link">
-            Inbox{unread > 0 && <span className="umbra-badge">{unread}</span>}
-          </Link>
+          <div className="umbra-intro-links">
+            <Link href="/umbra/artifacts" className="umbra-inbox-link">Artifacts</Link>
+            <Link href="/umbra/inbox" className="umbra-inbox-link">
+              Inbox{unread > 0 && <span className="umbra-badge">{unread}</span>}
+            </Link>
+          </div>
         </div>
 
         {error && <p className="umbra-error" role="alert">{error}</p>}

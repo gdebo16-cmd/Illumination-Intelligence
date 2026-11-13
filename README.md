@@ -8,6 +8,8 @@ Working apps:
 - **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes, and can enlarge them (Fast 4×, Photo 4×, or Enhance to 4K / 8K). ComfyUI must be running (`run_nvidia_gpu.bat`). Which model files go where is in [docs/prism-upscale.md](docs/prism-upscale.md).
 - **Umbra**: agent bots. Create bots with a flame avatar, a personality, a purpose and a local model, then chat with them. (Stage 1 of 4: tools, background tasks and teams come next.)
 
+Artifacts (Lumen and Umbra): when a reply writes a Markdown document (a `<document title="…">` block), it's saved as an artifact. A `.md` file a Flicker writes in Refract is saved too. Lumen lists them in the sidebar under **Artifacts**. Umbra lists them at `/umbra/artifacts` (the **Artifacts** button on the Flickers page), and each Flicker or team chat has its own Artifacts button. Writing a document again with the same title in the same chat updates it. Artifacts stay when you clear or delete a chat; delete one from its list. Code: `lib/artifacts.ts`, `components/documents.tsx`, `app/api/artifacts/`.
+
 Photos in chat (Lumen and a Flicker's chat in Umbra): the add-photo button only shows for models listed in `VISION_MODELS` in `apps/suite/config/models.ts`. Add a model's id there when you install one that can see images.
 
 Astra, Eclipse and Halo are "coming soon" pages until they're built.
@@ -56,8 +58,9 @@ apps/suite/                    the Next.js app
       prism/ umbra/ astra/ eclipse/ halo/
     api/
       lumen/                   chat, conversations
+      artifacts/               the Markdown documents Lumen and Umbra wrote (list, open, delete)
       users/select/            set or clear the profile cookie
-  components/                  shared across apps: AppLauncher, ComingSoon, MessageContent, CodeBlock
+  components/                  shared across apps: AppLauncher, ComingSoon, MessageContent, CodeBlock, documents
   config/
     apps.ts                    the list of apps the launcher shows
     models.ts                  Ollama models per page type

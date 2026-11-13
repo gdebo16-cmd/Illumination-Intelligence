@@ -302,7 +302,7 @@ export async function writeWorkFile(
   rel: unknown,
   replace: string,
   find?: string,
-): Promise<{ path: string; created: boolean; message: string }> {
+): Promise<{ path: string; created: boolean; message: string; text: string }> {
   const file = workPath(slug, rel);
   rejectSecret(file);
   const relShown = shownPath(slug, file);
@@ -332,7 +332,7 @@ export async function writeWorkFile(
 
     if (!find) {
       await sftpWriteFile(sftp, file, replace);
-      return { path: relShown, created: !existed, message: existed ? "Wrote the file." : "Created the file." };
+      return { path: relShown, created: !existed, message: existed ? "Wrote the file." : "Created the file.", text: replace };
     }
     if (!existed) throw new Error("That file doesn't exist yet. Leave find empty to create it.");
     const normalized = before.replace(/\r\n/g, "\n");
@@ -345,7 +345,7 @@ export async function writeWorkFile(
     const next = normalized.replace(needle, replace.replace(/\r\n/g, "\n"));
     const written = crlf ? next.replace(/\n/g, "\r\n") : next;
     await sftpWriteFile(sftp, file, written);
-    return { path: relShown, created: false, message: "Updated the file." };
+    return { path: relShown, created: false, message: "Updated the file.", text: next };
   });
 }
 
