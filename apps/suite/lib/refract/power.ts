@@ -3,7 +3,7 @@
 
 export type PowerAction = "start" | "stop" | "reset";
 
-export const POWER_ACTIONS: readonly PowerAction[] = ["start", "stop", "reset"];
+const POWER_ACTIONS: readonly PowerAction[] = ["start", "stop", "reset"];
 
 /**
  * start: off, crashed (aborted), or saved (startvm resumes a saved VM where it left off).

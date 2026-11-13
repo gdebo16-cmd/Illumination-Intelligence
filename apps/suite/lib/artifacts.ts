@@ -13,7 +13,7 @@ import { findDocuments } from '@/lib/document-blocks';
 
 export type ArtifactApp = 'lumen' | 'umbra';
 export type ArtifactKind = 'document' | 'file';
-export type ArtifactSourceKind = 'chat' | 'bot' | 'team';
+type ArtifactSourceKind = 'chat' | 'bot' | 'team';
 
 export interface ArtifactSource {
   userId: string;

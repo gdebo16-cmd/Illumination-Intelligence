@@ -35,11 +35,11 @@ export interface OpenDocument {
 }
 
 /** The download name for an artifact: a Refract file keeps its own name. */
-export const artifactFileName = (a: Pick<ArtifactSummary, 'kind' | 'title'>): string | undefined =>
+const artifactFileName = (a: Pick<ArtifactSummary, 'kind' | 'title'>): string | undefined =>
   a.kind === 'file' ? a.title.split('/').pop() : undefined;
 
 // ---------------------------------------------------------------- reply with document cards
-export const DocumentCard = ({ title, onOpen }: { title: string; onOpen: () => void }) => (
+const DocumentCard = ({ title, onOpen }: { title: string; onOpen: () => void }) => (
   <button type="button" className="document-card" onClick={onOpen}>
     <span className="document-card-icon" aria-hidden>📄</span>
     <span className="document-card-title">{title}</span>

@@ -3,7 +3,7 @@
 // banner at public/brand/<id>.png and its icon at public/brand/icons/<id>.png.
 // If a product moves to its own server later, set href to its full URL.
 
-export type AppStatus = 'live' | 'soon';
+type AppStatus = 'live' | 'soon';
 
 export interface SuiteApp {
   id: string;

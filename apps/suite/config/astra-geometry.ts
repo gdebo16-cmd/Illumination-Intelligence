@@ -112,7 +112,7 @@ const KERN_SMALLEST = 15; // closer than this isn't worth it
 /** How much empty room there is on each side of a character, band by band (Infinity = no ink there). */
 export type Profile = { left: Float64Array; right: Float64Array; width: number };
 
-export function profileOf(glyph: Glyph, penWidth: number): Profile | null {
+function profileOf(glyph: Glyph, penWidth: number): Profile | null {
   const span = inkSpan(glyph, penWidth);
   if (!span) return null;
   const lo = new Float64Array(BANDS).fill(Infinity); // leftmost ink in each band

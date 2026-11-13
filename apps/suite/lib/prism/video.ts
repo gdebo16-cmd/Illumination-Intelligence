@@ -32,7 +32,6 @@ const BOX = {
 };
 
 /** The model makes 24 frames a second, and the number of frames must be 4n + 1. */
-export const FPS = 24;
 
 /**
  * The lengths you can pick. `estimate` is a first guess at how long it takes on this laptop,
@@ -73,7 +72,7 @@ export interface VideoResult {
   machine: string;
 }
 
-export function buildVideoWorkflow(request: VideoRequest, uploadedName: string): { workflow: Workflow; seed: number } {
+function buildVideoWorkflow(request: VideoRequest, uploadedName: string): { workflow: Workflow; seed: number } {
   const workflow = readRecipe();
   const seed = request.seed ?? Math.floor(Math.random() * 2 ** 32);
   workflow[BOX.prompt].inputs.text = request.prompt;

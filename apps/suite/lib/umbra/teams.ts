@@ -14,9 +14,9 @@ import { getBot, listNotes, systemPrompt, type Bot } from './bots';
 import type { AgentStep, ToolDef } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 
-export const TEAM_LIMITS = { name: 40, purpose: 1000, role: 60, members: 5 };
+const TEAM_LIMITS = { name: 40, purpose: 1000, role: 60, members: 5 };
 
-export interface TeamMember {
+interface TeamMember {
   botId: string;
   role: string;
 }
@@ -156,7 +156,7 @@ export function deleteTeam(userId: string, id: string): boolean {
 }
 
 /** Used here and when a bot that leads teams is deleted. */
-export function removeTeams(ids: string[]) {
+function removeTeams(ids: string[]) {
   for (const id of ids) {
     db.prepare('DELETE FROM UmbraTeamMessage WHERE team_id = ?').run(id);
     db.prepare('DELETE FROM UmbraTeamMember WHERE team_id = ?').run(id);

@@ -15,7 +15,7 @@ import {
   SSH_MESSAGES,
 } from "./ssh";
 
-export const WORK_ROOT = "/home/refract/work";
+const WORK_ROOT = "/home/refract/work";
 const SNAP_DIR = "/home/refract/work/.snapshots";
 
 const READ_CHAR_LIMIT = 16_000;
@@ -55,7 +55,7 @@ export type SnapshotInfo = {
 
 const slugOk = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,62}$/;
 
-export function cleanSlug(raw: unknown): string {
+function cleanSlug(raw: unknown): string {
   const name = typeof raw === "string" ? raw.trim() : "";
   if (!slugOk.test(name) || name === ".snapshots") {
     throw new Error('Give the workspace a short name of letters, numbers, dots, dashes or underscores, e.g. "my-app".');
@@ -64,7 +64,7 @@ export function cleanSlug(raw: unknown): string {
 }
 
 /** A path inside a workspace. Rejects abs paths, ".." and the reserved snapshots folder. */
-export function workPath(slug: string, rel: unknown = "."): string {
+function workPath(slug: string, rel: unknown = "."): string {
   const name = cleanSlug(slug);
   const given = typeof rel === "string" ? rel.trim() : "";
   const trimmed = given.replace(/^\/+/, "");
@@ -80,7 +80,7 @@ export function workPath(slug: string, rel: unknown = "."): string {
   return joined;
 }
 
-export function shownPath(slug: string, full: string): string {
+function shownPath(slug: string, full: string): string {
   const root = `${WORK_ROOT}/${slug}`;
   if (full === root) return ".";
   if (full.startsWith(`${root}/`)) return full.slice(root.length + 1);
@@ -136,7 +136,7 @@ function stripUserinfo(url: string): string {
 }
 
 /** Only public http(s) git URLs. Credentials in the URL are stripped from anything we report. */
-export function parseRepoUrl(raw: unknown): { url: string; defaultSlug: string; safeUrl: string } {
+function parseRepoUrl(raw: unknown): { url: string; defaultSlug: string; safeUrl: string } {
   const given = typeof raw === "string" ? raw.trim() : "";
   let url: URL;
   try {

@@ -4,7 +4,7 @@
 import flameClips from './umbra-flame-clips.json';
 
 // The eight flame spirits, cut from assets/flicker-idle.mp4 by scripts/make-flame-sprites.py.
-export const FLAMES = [
+const FLAMES = [
   { id: 'violet', name: 'Violet', color: '#a77bff' },
   { id: 'cyan', name: 'Cyan', color: '#4fe3f0' },
   { id: 'amber', name: 'Amber', color: '#ffb547' },
@@ -15,7 +15,6 @@ export const FLAMES = [
   { id: 'pearl', name: 'Pearl', color: '#e8e8f0' },
 ] as const;
 
-export type FlameId = (typeof FLAMES)[number]['id'];
 
 // ------------------------------------------------------------------ shapes and colors
 //
@@ -97,7 +96,7 @@ export const flameAnimation = (flame: string, clip: FlameClip = 'idle') => {
 };
 // Width of a flicker picture for each pixel of height. The eight original flames are tall (161x246);
 // the six shapes are square (512x512).
-export const FLAME_ASPECT = flameClips.width / flameClips.height;
+const FLAME_ASPECT = flameClips.width / flameClips.height;
 export const flameAspect = (flame: string): number => (read(flame)?.original ? FLAME_ASPECT : 1);
 /** True when this look has a resting animation (all eight original flames and all six shapes do). */
 export const hasAnimation = (flame: string) => {
@@ -143,7 +142,7 @@ export const BOT_TOOLS = [
 ] as const;
 
 export type ToolId = (typeof BOT_TOOLS)[number]['id'];
-export const ALL_TOOL_IDS: ToolId[] = BOT_TOOLS.map((t) => t.id);
+const ALL_TOOL_IDS: ToolId[] = BOT_TOOLS.map((t) => t.id);
 export const isToolId = (id: unknown): id is ToolId => BOT_TOOLS.some((t) => t.id === id);
 // New Flickers start with these. The Code helper stays off until you pick a folder for it.
 // The Refract workshop is on: it works in the virtual machine and does not need a folder.

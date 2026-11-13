@@ -7,7 +7,7 @@
 //
 // The first entry is the default. It's also the one Umbra's bots paint with.
 
-export interface PrismModel {
+interface PrismModel {
   id: string;
   name: string;
   /** One line shown under the dropdown when this model is picked. */

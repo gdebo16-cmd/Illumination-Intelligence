@@ -22,7 +22,7 @@ export interface Message {
   images?: string[];
 }
 
-export interface ConversationItem {
+interface ConversationItem {
   id: string;
   title: string;
   updatedAt: string;

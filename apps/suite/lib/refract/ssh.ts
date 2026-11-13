@@ -138,7 +138,7 @@ function connect(): Promise<Client> {
   });
 }
 
-export type ExecResult = {
+type ExecResult = {
   code: number;
   stdout: string;
   stderr: string;

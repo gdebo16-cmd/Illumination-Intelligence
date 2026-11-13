@@ -21,12 +21,12 @@ export const PAGE_MODELS = {
 // Models that can look at pictures. The "add a photo" button in Lumen and in a Flicker's chat only
 // shows while one of these is the model in use. Add a model's id here when you install one that
 // can see images (Ollama lists "vision" for it in `ollama show <model>`).
-export const VISION_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b', 'devstral-small-2:24b'];
+const VISION_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b', 'devstral-small-2:24b'];
 export const canSeeImages = (modelId: string) => VISION_MODELS.includes(modelId);
 
 // Models that can think a problem through before answering (Ollama lists "thinking" for them in
 // `ollama show <model>`). A Flicker's "Think before answering" switch only works with these.
-export const THINKING_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b', 'gpt-oss:20b'];
+const THINKING_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b', 'gpt-oss:20b'];
 export const canThink = (modelId: string) => THINKING_MODELS.includes(modelId);
 
 // Photos in chat: how many one message can carry, and where the browser loads a saved one from.
