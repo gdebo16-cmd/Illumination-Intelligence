@@ -5,12 +5,25 @@ import Sidebar from "@/components/Sidebar";
 import AppHeader from "@/components/AppHeader";
 import SidebarToggle from "@/components/SidebarToggle";
 import RefractTerminal from "./refract-terminal";
+import RefractRemote from "./refract-remote";
 import { powerActionAllowed, type PowerAction } from "@/lib/refract/power";
 
 type VmSnapshot = {
   id: string;
   name: string;
   current: boolean;
+};
+
+type WorkshopSnapshot = {
+  id: string;
+  label: string;
+  takenAt: string;
+};
+
+type Workshop = {
+  name: string;
+  git: string | null;
+  snapshots: WorkshopSnapshot[];
 };
 
 type VmStatus = {
@@ -76,9 +89,18 @@ async function fetchStatus(): Promise<VmStatus> {
   return res.json();
 }
 
+async function fetchWorkspaces(): Promise<Workshop[]> {
+  const res = await fetch("/api/refract/workspaces", { cache: "no-store" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(typeof data?.error === "string" ? data.error : "Couldn't list workspaces.");
+  return Array.isArray(data?.workspaces) ? data.workspaces : [];
+}
+
 const Refract = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [snapshots, setSnapshots] = useState<VmSnapshot[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workshop[]>([]);
+  const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
   const [status, setStatus] = useState("Checking the virtual machine\u2026");
   const [taking, setTaking] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -213,6 +235,19 @@ const Refract = () => {
         .catch(() => {
           if (live) setStatus("Couldn't reach the virtual machine.");
         });
+      fetchWorkspaces()
+        .then((list) => {
+          if (live) {
+            setWorkspaces(list);
+            setWorkspaceNote(null);
+          }
+        })
+        .catch((err: Error) => {
+          if (live) {
+            setWorkspaces([]);
+            setWorkspaceNote(err.message || "Couldn't list workspaces.");
+          }
+        });
     };
     load();
     const tick = setInterval(load, 10_000);
@@ -227,32 +262,59 @@ const Refract = () => {
       <Sidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        title="Snapshots"
+        title="Workshop"
         className="refract-sidebar"
       >
         <div className="refract-sidebar-content">
-          <button type="button" className="new-chat-button" onClick={() => void addSnapshot()} disabled={busy}>
-            {taking ? "Taking snapshot\u2026" : "+ New snapshot"}
-          </button>
-          <span className="sidebar-separator">Your snapshots</span>
-          {snapshots.map((snapshot) => (
-            <div key={snapshot.id} className={`chat-row refract-snapshot-row ${snapshot.current ? "is-current" : ""}`}>
-              <div className="chat-button" aria-current={snapshot.current ? "true" : undefined}>
-                {snapshot.name}
-                {snapshot.current && <span className="refract-snapshot-current">Current</span>}
+          <div className="refract-sidebar-workspaces">
+            <span className="sidebar-separator">Copied-in work</span>
+            {workspaces.length === 0 ? (
+              <p className="refract-workspace-empty">
+                {workspaceNote ?? "No projects yet. A Flicker with the Refract workshop tool can copy a repo in."}
+              </p>
+            ) : (
+              workspaces.map((workspace) => (
+                <div key={workspace.name} className="chat-row refract-workspace-row">
+                  <div className="chat-button">
+                    {workspace.name}
+                    {workspace.git ? <span className="refract-workspace-git">{workspace.git}</span> : null}
+                    {workspace.snapshots.length > 0 ? (
+                      <span className="refract-workspace-snaps">
+                        {workspace.snapshots.length === 1
+                          ? "1 snapshot"
+                          : `${workspace.snapshots.length} snapshots`}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="refract-sidebar-snapshots">
+            <button type="button" className="new-chat-button" onClick={() => void addSnapshot()} disabled={busy}>
+              {taking ? "Taking snapshot\u2026" : "+ New snapshot"}
+            </button>
+            <span className="sidebar-separator">VM snapshots</span>
+            {snapshots.map((snapshot) => (
+              <div key={snapshot.id} className={`chat-row refract-snapshot-row ${snapshot.current ? "is-current" : ""}`}>
+                <div className="chat-button" aria-current={snapshot.current ? "true" : undefined}>
+                  {snapshot.name}
+                  {snapshot.current && <span className="refract-snapshot-current">Current</span>}
+                </div>
+                <button
+                  type="button"
+                  className="refract-snapshot-restore"
+                  aria-label={`Restore snapshot: ${snapshot.name}`}
+                  title="Restore this snapshot"
+                  disabled={busy}
+                  onClick={() => setConfirmTarget(snapshot)}
+                >
+                  {restoringId === snapshot.id ? "Restoring\u2026" : "Restore"}
+                </button>
               </div>
-              <button
-                type="button"
-                className="refract-snapshot-restore"
-                aria-label={`Restore snapshot: ${snapshot.name}`}
-                title="Restore this snapshot"
-                disabled={busy}
-                onClick={() => setConfirmTarget(snapshot)}
-              >
-                {restoringId === snapshot.id ? "Restoring\u2026" : "Restore"}
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
+          <RefractTerminal vmState={vmState} />
         </div>
       </Sidebar>
       <div className="content-area">
@@ -262,7 +324,7 @@ const Refract = () => {
             <SidebarToggle
               open={sidebarOpen}
               onToggle={() => setSidebarOpen(!sidebarOpen)}
-              label="snapshot list"
+              label="workshop and terminal"
             />
           }
         />
@@ -299,7 +361,7 @@ const Refract = () => {
           </div>
           {error && <p className="refract-error" role="alert">{error}</p>}
           {notice && !error && <p className="refract-notice">{notice}</p>}
-          <RefractTerminal vmState={vmState} />
+          <RefractRemote vmState={vmState} />
         </main>
       </div>
       {confirmTarget && (

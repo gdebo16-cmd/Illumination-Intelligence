@@ -111,6 +111,7 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
   const [latched, setLatched] = useState({ ctrl: false, alt: false });
   const [cadArmed, setCadArmed] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [softKeyboard, setSoftKeyboard] = useState(false);
 
   const setPhase = useCallback((next: Phase) => {
     phaseRef.current = next;
@@ -187,6 +188,11 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
     let serverMessage: string | null = null;
     let serverSaysOff = false;
     let opened = false;
+    const giveUp = window.setTimeout(() => {
+      if (wsRef.current !== ws || phaseRef.current !== "connecting") return;
+      serverMessage = "The remote view took too long to connect.";
+      ws.close();
+    }, 20_000);
 
     ws.onopen = () => {
       opened = true;
@@ -201,13 +207,20 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
         const msg = JSON.parse(String(event.data));
         if (msg.t !== "s") return;
         if (msg.s === "connected") {
+          window.clearTimeout(giveUp);
           const canvas = canvasRef.current;
           const w = Number(msg.w);
           const h = Number(msg.h);
           // Size the drawing surface to the VM's screen; CSS scales it to fit the pane.
-          if (canvas && w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
-            canvas.width = w;
-            canvas.height = h;
+          if (canvas && w > 0 && h > 0) {
+            if (canvas.width !== w || canvas.height !== h) {
+              canvas.width = w;
+              canvas.height = h;
+            }
+            const screen = canvas.closest(".refract-remote-screen") as HTMLElement | null;
+            const host = screen ?? canvas;
+            host.style.setProperty("--refract-fb-w", String(w));
+            host.style.setProperty("--refract-fb-h", String(h));
           }
           setPhase("connected");
         } else if (msg.s === "off") {
@@ -219,6 +232,7 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
       } catch {}
     };
     ws.onclose = () => {
+      window.clearTimeout(giveUp);
       if (wsRef.current !== ws) return;
       wsRef.current = null;
       pressed.current.clear();
@@ -246,6 +260,35 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
       if (moveFrame.current !== null) cancelAnimationFrame(moveFrame.current);
     };
   }, []);
+
+  // Pin the remote to the visual viewport (the area above the iPhone keyboard) and
+  // notice when that keyboard is open, so CSS can hide the extra keys and keep the picture on screen.
+  useEffect(() => {
+    if (phase !== "connected") {
+      setSoftKeyboard(false);
+      return;
+    }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const apply = () => {
+      const shrunk = window.innerHeight - vv.height > 80;
+      setSoftKeyboard(shrunk);
+      root.style.setProperty("--refract-vv-top", `${Math.round(vv.offsetTop)}px`);
+      root.style.setProperty("--refract-vv-height", `${Math.round(vv.height)}px`);
+      if (shrunk) window.scrollTo(0, 0);
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+      root.style.removeProperty("--refract-vv-top");
+      root.style.removeProperty("--refract-vv-height");
+      setSoftKeyboard(false);
+    };
+  }, [phase]);
 
   const disconnect = () => {
     releaseAll();
@@ -385,7 +428,10 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
   else statusText = "Not connected. Connect to see the virtual machine\u2019s screen.";
 
   return (
-    <section className={`refract-remote is-${phase}`} aria-label="Virtual remote">
+    <section
+        className={`refract-remote is-${phase}${softKeyboard ? " is-soft-keyboard" : ""}`}
+        aria-label="Virtual remote"
+      >
       <div className="refract-remote-bar">
         <span className={`refract-remote-dot is-${phase}`} aria-hidden="true" />
         <span className="refract-remote-title">Virtual remote</span>
@@ -408,17 +454,19 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
         )}
       </div>
       <div className="refract-remote-screen">
-        <canvas
-          ref={canvasRef}
-          className="refract-remote-canvas"
-          width={1024}
-          height={768}
-          aria-label="The virtual machine's screen"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onContextMenu={(event) => event.preventDefault()}
-        />
+        <div className="refract-remote-scroll">
+          <canvas
+            ref={canvasRef}
+            className="refract-remote-canvas"
+            width={1024}
+            height={768}
+            aria-label="The virtual machine's screen"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onContextMenu={(event) => event.preventDefault()}
+          />
+        </div>
         {!connected && <div className="refract-remote-placeholder">{statusText}</div>}
         <textarea
           ref={inputRef}
@@ -428,12 +476,16 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
           autoCorrect="off"
           autoComplete="off"
           spellCheck={false}
+          enterKeyHint="done"
           rows={1}
           tabIndex={connected ? 0 : -1}
           onKeyDown={onKeyDown}
           onKeyUp={onKeyUp}
           onInput={onInput}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setFocused(true);
+            window.scrollTo(0, 0);
+          }}
           onBlur={() => {
             setFocused(false);
             if (phaseRef.current === "connected") releaseAll();
@@ -477,7 +529,7 @@ export default function RefractRemote({ vmState }: { vmState: string | null }) {
           <button
             key={key.code}
             type="button"
-            className="refract-remote-key"
+            className={`refract-remote-key${/^F\d+$/.test(key.code) ? " is-fn" : ""}`}
             title={key.title}
             aria-label={key.title}
             disabled={!connected}

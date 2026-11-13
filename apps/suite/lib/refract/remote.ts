@@ -17,7 +17,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import { USERS } from "../users";
-import { ensureVrde, readVmState, readVrdePassword, VRDE_HOST, VRDE_PORT, VRDE_USER } from "./vrde";
+import { ensureVrde, isVrdeListening, readVmState, readVrdePassword, VRDE_HOST, VRDE_PORT, VRDE_USER } from "./vrde";
 
 export const REMOTE_PATH = "/api/refract/remote";
 
@@ -35,7 +35,7 @@ const MAX_SESSIONS = 4;
 const MAX_INPUT_BYTES = 1024;
 const MAX_INPUTS_PER_SECOND = 400;
 const PING_MS = 25_000;
-const CONNECT_TIMEOUT_MS = 25_000;
+const CONNECT_TIMEOUT_MS = 8_000;
 // Screen updates are batched and sent at most this often.
 const FLUSH_MS = 40;
 // Stop sending while this much is still waiting to reach the browser; changed areas are remembered and
@@ -334,13 +334,11 @@ function startSession(ws: WebSocket) {
     }
   };
 
-  // When the remote display drops (VM stopped, reset, restored), say whether the VM is still running.
+  // When the remote display drops, close immediately. Waiting on VirtualBox for the
+  // VM's state can sit long enough that the browser gives up first.
   const finishAfterDrop = () => {
     if (closed) return;
-    void readVmState().then((state) => {
-      if (state !== "running") finish("off", MESSAGES.off);
-      else finish("closed", everConnected ? MESSAGES.ended : MESSAGES.unreachable);
-    });
+    finish("closed", everConnected ? MESSAGES.ended : MESSAGES.unreachable);
   };
 
   const flush = () => {
@@ -431,91 +429,151 @@ function startSession(ws: WebSocket) {
   sendStatus(ws, "connecting");
 
   void (async () => {
-    // Don't pretend: if the VM is off, say so instead of trying to connect.
-    const state = await readVmState();
-    if (closed) return;
-    if (state !== "running") return finish("off", MESSAGES.off);
-
-    const vrde = await ensureVrde();
-    if (closed) return;
-    if (vrde === "off") return finish("off", MESSAGES.off);
-    if (vrde !== "ready") return finish("closed", MESSAGES.vrde);
+    const t0 = Date.now();
+    const log = (s: string) => console.error(`[refract-remote] ${s} +${Date.now() - t0}ms`);
 
     let password: string;
     let lib: RdpLib;
     try {
       password = readVrdePassword();
       lib = loadRdp();
+      log("client ready");
     } catch {
       console.error("[refract-remote] remote display client unavailable");
       return finish("closed", MESSAGES.failed);
     }
 
-    try {
-      client = lib.createClient({
-        userName: VRDE_USER,
-        password,
-        domain: "",
-        autoLogin: true,
-        decompress: true,
-        screen: { width: REQUEST_WIDTH, height: REQUEST_HEIGHT },
-        locale: "en",
-        logLevel: "NONE",
+    const attempt = (timeoutMs: number): Promise<boolean> =>
+      new Promise((resolve) => {
+        if (closed) return resolve(false);
+        let next: RdpClient;
+        try {
+          next = lib.createClient({
+            userName: VRDE_USER,
+            password,
+            domain: "",
+            autoLogin: true,
+            decompress: true,
+            screen: { width: REQUEST_WIDTH, height: REQUEST_HEIGHT },
+            locale: "en",
+            logLevel: "NONE",
+          });
+        } catch {
+          return resolve(false);
+        }
+        client = next;
+        const rdp = next;
+        let live = false;
+        let settled = false;
+        const done = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (!ok) {
+            destroyClient(rdp);
+            if (client === rdp) client = null;
+          }
+          resolve(ok);
+        };
+        const timer = setTimeout(() => {
+          log("rdp attempt timed out");
+          done(false);
+        }, timeoutMs);
+        // TLS only (VirtualBox's VRDE is set to TLS); never NLA, never unencrypted standard RDP security.
+        rdp.x224.requestedProtocol = 0x00000001;
+        // The library rethrows some protocol errors from inside socket callbacks; turn them into events so
+        // a bad packet can only end this session, never the suite server.
+        rdp.global.removeAllListeners("error");
+        rdp.global.on("error", (err) => {
+          rdp.emit("error", err);
+        });
+        rdp.on("error", () => {
+          if (closed) return;
+          if (live) finishAfterDrop();
+          else {
+            log("rdp error");
+            done(false);
+          }
+        });
+        rdp.on("close", () => {
+          if (closed) return;
+          if (live) finishAfterDrop();
+          else done(false);
+        });
+        rdp.on("connect", () => {
+          if (closed) {
+            done(false);
+            return;
+          }
+          try {
+            const cap = rdp.global.serverCapabilities[2]?.obj; // CAPSTYPE_BITMAP
+            const w = intIn(cap?.desktopWidth?.value, 1, MAX_DIMENSION) ?? REQUEST_WIDTH;
+            const h = intIn(cap?.desktopHeight?.value, 1, MAX_DIMENSION) ?? REQUEST_HEIGHT;
+            if (!fb || fb.width !== w || fb.height !== h) fb = new Framebuffer(w, h);
+            else fb.markAll();
+            everConnected = true;
+            live = true;
+            if (connectTimer) {
+              clearTimeout(connectTimer);
+              connectTimer = null;
+            }
+            sendStatus(ws, "connected", { w, h });
+            scheduleFlush();
+            done(true);
+          } catch {
+            finish("closed", MESSAGES.failed);
+            done(false);
+          }
+        });
+        rdp.on("bitmap", (bitmap: RdpBitmap) => {
+          if (closed || !fb) return;
+          try {
+            fb.blit(bitmap);
+            scheduleFlush();
+          } catch {
+            // Skip a rectangle we can't read rather than dropping the session.
+          }
+        });
+        try {
+          log("rdp connect");
+          rdp.connect(VRDE_HOST, VRDE_PORT);
+        } catch {
+          done(false);
+        }
       });
-    } catch {
-      return finish("closed", MESSAGES.failed);
+
+    // Open the screen immediately. The display is usually already on, and a direct
+    // RDP connection takes well under a second. VirtualBox setup only runs if that
+    // first attempt fails, and is itself capped so it cannot outlast the browser.
+    log("attempt 1");
+    if (await attempt(6_000)) {
+      log("connected");
+      password = "";
+      return;
+    }
+    if (closed) return;
+    log("attempt 1 missed, checking display");
+    const state = await Promise.race([
+      readVmState(),
+      new Promise<string>((r) => setTimeout(() => r("unknown"), 3_000)),
+    ]);
+    log("state=" + state);
+    if (closed) return;
+    if (state !== "running" && state !== "unknown") return finish("off", MESSAGES.off);
+
+    const vrde = await ensureVrde();
+    log("ensure=" + vrde);
+    if (closed) return;
+    if (vrde === "off") return finish("off", MESSAGES.off);
+
+    log("attempt 2");
+    if (await attempt(6_000)) {
+      log("connected");
+      password = "";
+      return;
     }
     password = "";
-    const rdp = client;
-    // TLS only (VirtualBox's VRDE is set to TLS); never NLA, never unencrypted standard RDP security.
-    rdp.x224.requestedProtocol = 0x00000001;
-    // The library rethrows some protocol errors from inside socket callbacks; turn them into events so
-    // a bad packet can only end this session, never the suite server.
-    rdp.global.removeAllListeners("error");
-    rdp.global.on("error", (err) => {
-      rdp.emit("error", err);
-    });
-    rdp.on("error", () => {
-      if (!closed) finishAfterDrop();
-    });
-    rdp.on("close", () => {
-      if (!closed) finishAfterDrop();
-    });
-    rdp.on("connect", () => {
-      if (closed) return;
-      try {
-        const cap = rdp.global.serverCapabilities[2]?.obj; // CAPSTYPE_BITMAP
-        const w = intIn(cap?.desktopWidth?.value, 1, MAX_DIMENSION) ?? REQUEST_WIDTH;
-        const h = intIn(cap?.desktopHeight?.value, 1, MAX_DIMENSION) ?? REQUEST_HEIGHT;
-        if (!fb || fb.width !== w || fb.height !== h) fb = new Framebuffer(w, h);
-        else fb.markAll();
-        everConnected = true;
-        if (connectTimer) {
-          clearTimeout(connectTimer);
-          connectTimer = null;
-        }
-        sendStatus(ws, "connected", { w, h });
-        scheduleFlush();
-      } catch {
-        finish("closed", MESSAGES.failed);
-      }
-    });
-    rdp.on("bitmap", (bitmap: RdpBitmap) => {
-      if (closed || !fb) return;
-      try {
-        fb.blit(bitmap);
-        scheduleFlush();
-      } catch {
-        // Skip a rectangle we can't read rather than dropping the session.
-      }
-    });
-
-    connectTimer = setTimeout(() => finish("closed", MESSAGES.unreachable), CONNECT_TIMEOUT_MS);
-    try {
-      rdp.connect(VRDE_HOST, VRDE_PORT);
-    } catch {
-      finish("closed", MESSAGES.unreachable);
-    }
+    if (!closed) finish("closed", vrde === "ready" ? MESSAGES.unreachable : MESSAGES.vrde);
   })().catch(() => finish("closed", MESSAGES.failed));
 }
 
@@ -566,4 +624,54 @@ export function installRefractRemote() {
     }
     return Reflect.apply(originalEmit, this, [event, ...args]) as boolean;
   } as typeof originalEmit;
+  // Confirm from this process that the screen is reachable, so a failed Connect
+  // can be compared against a known-good (or known-blocked) RDP path. Never logs secrets.
+  setTimeout(() => {
+    void selfCheckVrde();
+  }, 500);
+}
+
+async function selfCheckVrde() {
+  const t0 = Date.now();
+  try {
+    if (!(await isVrdeListening())) {
+      console.error("[refract-remote] self-check: display not listening");
+      return;
+    }
+    const password = readVrdePassword();
+    const lib = loadRdp();
+    const client = lib.createClient({
+      userName: VRDE_USER,
+      password,
+      domain: "",
+      autoLogin: true,
+      decompress: true,
+      screen: { width: REQUEST_WIDTH, height: REQUEST_HEIGHT },
+      locale: "en",
+      logLevel: "NONE",
+    });
+    client.x224.requestedProtocol = 0x00000001;
+    client.global.removeAllListeners("error");
+    client.global.on("error", (err) => {
+      client.emit("error", err);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("timeout")), 8_000);
+      client.on("connect", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      client.on("error", () => {
+        clearTimeout(timer);
+        reject(new Error("error"));
+      });
+      client.connect(VRDE_HOST, VRDE_PORT);
+    });
+    destroyClient(client);
+    console.error(`[refract-remote] self-check: ok in ${Date.now() - t0}ms`);
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : "failed";
+    const safe = raw.replace(/[A-Za-z0-9+/=_-]{12,}/g, "[redacted]").slice(0, 80);
+    console.error(`[refract-remote] self-check: ${safe} +${Date.now() - t0}ms`);
+  }
 }

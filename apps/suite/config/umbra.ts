@@ -139,12 +139,14 @@ export const BOT_TOOLS = [
   { id: 'make_image', name: 'Make image', description: 'Paints a picture with Prism.' },
   { id: 'notes', name: 'Notes', description: 'Remembers things about you between chats.' },
   { id: 'code', name: 'Code helper', description: 'Reads and searches one project folder, and suggests changes for you to approve.' },
+  { id: 'refract', name: 'Refract workshop', description: 'Copies repos into the virtual machine, edits and runs commands there, and can snapshot or roll back that work. The host PC stays untouched.' },
 ] as const;
 
 export type ToolId = (typeof BOT_TOOLS)[number]['id'];
 export const ALL_TOOL_IDS: ToolId[] = BOT_TOOLS.map((t) => t.id);
 export const isToolId = (id: unknown): id is ToolId => BOT_TOOLS.some((t) => t.id === id);
 // New Flickers start with these. The Code helper stays off until you pick a folder for it.
+// The Refract workshop is on: it works in the virtual machine and does not need a folder.
 export const DEFAULT_TOOL_IDS: ToolId[] = ALL_TOOL_IDS.filter((id) => id !== 'code');
 
 // Limits for the bot form.

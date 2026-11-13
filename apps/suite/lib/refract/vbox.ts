@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { powerActionAllowed, type PowerAction } from "./power";
-import { ensureVrde } from "./vrde";
+import { applyVrdeWhilePoweredOff, ensureVrde } from "./vrde";
 
 const execFileAsync = promisify(execFile);
 
@@ -228,11 +228,18 @@ export async function restoreSnapshot(id: string): Promise<RestoreResult> {
       }
     }
 
+    // Re-apply remote-display settings while the VM is still off (modifyvm is refused while it's running).
+    try {
+      await applyVrdeWhilePoweredOff();
+    } catch {
+      console.error("[refract] couldn't apply remote-display settings after restore");
+    }
+
     if (!wasRunning) return { restarted: false, restartFailed: false };
     try {
       await vbox(["startvm", VM_NAME, "--type", "headless"], 120_000);
       await waitForState(["running"], 180_000);
-      // A restored snapshot (e.g. clean-install) may have the remote display off; switch it back on (localhost only).
+      // Turn the remote display on now that the VM is running.
       void ensureVrde();
       return { restarted: true, restartFailed: false };
     } catch {
@@ -269,9 +276,16 @@ export async function powerVm(action: PowerAction): Promise<PowerResult> {
     if (!powerActionAllowed(action, state)) throw new PowerStateError("Not in this state.");
 
     if (action === "start") {
+      if (state === "poweroff" || state === "aborted") {
+        try {
+          await applyVrdeWhilePoweredOff();
+        } catch {
+          console.error("[refract] couldn't apply remote-display settings before Start");
+        }
+      }
       await vbox(["startvm", VM_NAME, "--type", "headless"], 120_000);
       await waitForState(["running"], 180_000);
-      // Make sure the virtual remote can connect (VRDE on, 127.0.0.1 only, password). Doesn't hold up Start.
+      // Make sure the virtual remote can connect (VRDE on, 127.0.0.1 only). Doesn't hold up Start.
       void ensureVrde();
       return { forced: false };
     }

@@ -254,6 +254,14 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
         (bot.codeAutoWrite
           ? 'Your changes are written straight away, so be careful and make one small change at a time.'
           : `${userName} sees each change and applies it with a button, so tell them what each change does and why.`),
+    bot.tools.includes('refract') &&
+      `You can work in Refract, a virtual machine isolated from ${userName}'s PC. ` +
+        'Projects live in workspaces you copy in with refract_clone (a public https git link). ' +
+        'Look around with refract_workspaces, refract_list, refract_search and refract_read; never guess what a file says. ' +
+        'Edit with refract_write (changes are written in the virtual machine straight away). ' +
+        'Run builds, tests and other commands with refract_run, always inside a workspace. ' +
+        'Before a risky change, take a workspace snapshot with refract_snapshot so you can restore it if something goes wrong. ' +
+        'These tools cannot touch the host PC. If the virtual machine is off, say so and ask them to start it in the Refract app.',
     bot.tools.includes('notes') &&
       `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note.`,
     notes.length > 0 &&

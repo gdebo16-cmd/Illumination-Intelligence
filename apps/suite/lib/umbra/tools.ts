@@ -21,6 +21,7 @@ import { PRISM_STYLES } from '@/config/prism-styles';
 import type { ToolId } from '@/config/umbra';
 import { calculate } from './calculator';
 import { CODE_TOOLS, type CodeEditView } from './code';
+import { REFRACT_TOOLS } from './refract-tools';
 import type { AgentStep } from './agent';
 
 const SEARXNG_URL = process.env.SEARXNG_URL ?? 'http://127.0.0.1:8888';
@@ -348,6 +349,7 @@ const TOOLS_BY_ID: Record<ToolId, ToolDef[]> = {
   make_image: [makeImage],
   notes: [saveNote],
   code: CODE_TOOLS,
+  refract: REFRACT_TOOLS,
 };
 
 /** The tools a bot with these settings may use, keyed by the function name the model calls. */
