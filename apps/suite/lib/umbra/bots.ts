@@ -13,6 +13,7 @@ import { canThink } from '@/config/models';
 import type { AgentStep } from './agent';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 import { DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
+import { mayHoldDocument } from '@/lib/document-blocks';
 
 export interface Bot {
   id: string;
@@ -207,7 +208,7 @@ export function addMessage(
   );
   db.prepare('UPDATE UmbraBot SET updatedAt = ? WHERE id = ?').run(message.createdAt, botId);
   // A document the Flicker wrote goes to Umbra's artifacts too.
-  if (role === 'assistant' && content.includes('<document')) {
+  if (role === 'assistant' && mayHoldDocument(content)) {
     const owner = db.prepare('SELECT user_id, name FROM UmbraBot WHERE id = ?').get(botId) as { user_id: string; name: string } | undefined;
     if (owner) {
       saveDocumentArtifacts(
