@@ -3,7 +3,7 @@
 Research notes, November 2026. Upscale is built (see [prism-upscale.md](prism-upscale.md)). The other models here are not.
 
 **Your PC:** RTX 5080 Laptop (16 GB of graphics memory), 32 GB of normal memory, ComfyUI.
-**Prism today:** FLUX.2 Klein 4B for pictures and picture edits, Wan 2.2 TI2V 5B for picture → video.
+**Prism today:** FLUX.2 Klein 4B for pictures and picture edits, Wan 2.2 TI2V 5B for picture → video. (Since 13 November: Wan 2.2 14B with Lightning is built in as the "Better" video model, and videos can be made from words too. Setup: [prism-video.md](prism-video.md).)
 
 How to read the tables:
 

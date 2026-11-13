@@ -23,8 +23,14 @@ export const LOADERS: Record<string, string> = {
   CLIPLoader: 'clip_name',
   VAELoader: 'vae_name',
   UpscaleModelLoader: 'model_name', // Prism's Fast 4×, Photo 4×, and the 8K 2× pass
-  LoraLoaderModelOnly: 'lora_name', // an art style's LoRA (config/prism-styles.ts)
+  LoraLoaderModelOnly: 'lora_name', // an art style's LoRA, and the Wan 14B Lightning add-ons
+  UnetLoaderGGUF: 'unet_name', // slimmed-down GGUF models (the Wan 14B video halves)
 };
+
+// Load boxes that come from an add-on (custom node) rather than ComfyUI itself. A machine
+// without the add-on simply offers none of their files; it isn't counted as offline.
+// UnetLoaderGGUF is from ComfyUI-GGUF (city96), installed with ComfyUI Manager.
+const ADD_ON_LOADERS = new Set(['UnetLoaderGGUF']);
 
 const ONLINE_FOR_MS = 3_000; // re-check a machine that answered after this long
 const OFFLINE_FOR_MS = 15_000; // and one that didn't after this long
@@ -79,7 +85,12 @@ export async function checkWorker(worker: GpuWorker): Promise<WorkerState> {
   let list = fileLists.get(worker.id);
   if (!list || Date.now() - list.at > FILES_FOR_MS) {
     try {
-      const names = await Promise.all(Object.keys(LOADERS).map((loader) => filesOffered(worker.url, loader)));
+      const names = await Promise.all(
+        Object.keys(LOADERS).map((loader) => {
+          const asking = filesOffered(worker.url, loader);
+          return ADD_ON_LOADERS.has(loader) ? asking.catch(() => [] as string[]) : asking;
+        }),
+      );
       list = { at: Date.now(), files: new Set(names.flat()) };
       fileLists.set(worker.id, list);
     } catch {

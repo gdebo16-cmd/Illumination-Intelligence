@@ -1,18 +1,22 @@
 // /api/prism/videos — Prism's videos.
 //
-// GET:  your videos (newest first) and the length choices, each with how long it usually takes:
-//         { videos: [...], lengths: [{ id, name, seconds, wait, runs }] }
-// POST: make a video from a picture. Answers straight away with the video's details and
-//       status 'working'; check GET until it says 'done'.
-//   From one of your Prism pictures (JSON):  { prompt, length: 'short' | 'medium' | 'long', imageId }
-//   From a picture on your device (form):    fields prompt, length, and the file in "image"
+// GET:  your videos (newest first), the length choices for each video model with how long each
+//       usually takes, and which models are downloaded (null when ComfyUI isn't running):
+//         { videos: [...], lengths: { 'wan-5b': [{ id, name, seconds, wait, runs }], ... },
+//           models: [{ id, ready: { image, text }, missing: { image: [...], text: [...] } }] | null }
+// POST: make a video. Answers straight away with the video's details and status 'working';
+//       check GET until it says 'done'. Every request has prompt, length ('short' | 'medium' |
+//       'long') and model ('wan-5b' | 'wan-14b', default 'wan-5b'), plus:
+//   From one of your Prism pictures (JSON):  imageId
+//   From a picture on your device (form):    the file in "image"
+//   From words only (JSON):                  shape: 'landscape' | 'portrait' | 'square'
 
 import { connection, NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/user';
 import { readImageFile } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
-import { VIDEO_PIXELS, VIDEO_STEP, findLength } from '@/lib/prism/video';
-import { lengthChoices, listVideos, startVideo } from '@/lib/prism/videos';
+import { findLength, findVideoModel, findVideoShape, videoSize } from '@/config/prism-video-models';
+import { lengthChoices, listVideos, startVideo, videoModelStatus } from '@/lib/prism/videos';
 
 const MAX_PROMPT = 2000;
 
@@ -23,7 +27,8 @@ export async function GET() {
   await connection();
   const userId = await getCurrentUserId();
   if (!userId) return bad('Please select a user profile first.', 401);
-  return NextResponse.json({ videos: listVideos(userId), lengths: lengthChoices() });
+  const models = await videoModelStatus().catch(() => null);
+  return NextResponse.json({ videos: listVideos(userId), lengths: lengthChoices(), models });
 }
 
 export async function POST(req: Request) {
@@ -54,8 +59,19 @@ export async function POST(req: Request) {
   const length = findLength(fields.length);
   if (!length) return bad('Pick a video length.');
 
-  // The starting picture, resized to the video size (about 1280×704, sides in steps of 32).
+  if (fields.model !== undefined && findVideoModel(fields.model).id !== fields.model) return bad('Pick a video model.');
+  const model = findVideoModel(fields.model);
   const imageId = typeof fields.imageId === 'string' && fields.imageId ? fields.imageId : null;
+
+  // From words only: no picture, just a shape.
+  if (!upload && !imageId) {
+    const shape = findVideoShape(fields.shape);
+    if (!shape) return bad('Pick a picture to bring to life, or a shape for a video from words.');
+    const video = startVideo(userId, { prompt, model: model.id, length: length.id, size: videoSize(model, shape.ratio), imageId: null });
+    return NextResponse.json(video, { status: 202 });
+  }
+
+  // The starting picture, resized to the model's video size (sides in its steps of 16 or 32).
   let picture: PreparedSource;
   try {
     let file: Buffer;
@@ -69,11 +85,11 @@ export async function POST(req: Request) {
     } else {
       return bad('Pick a picture to bring to life.');
     }
-    picture = await prepareSource(file, { pixels: VIDEO_PIXELS, step: VIDEO_STEP });
+    picture = await prepareSource(file, { pixels: model.pixels, step: model.step });
   } catch (err) {
     return bad((err as Error).message || 'Couldn’t read that picture.');
   }
 
-  const video = startVideo(userId, { prompt, length: length.id, picture, imageId: upload ? null : imageId });
+  const video = startVideo(userId, { prompt, model: model.id, length: length.id, picture, imageId: upload ? null : imageId });
   return NextResponse.json(video, { status: 202 });
 }

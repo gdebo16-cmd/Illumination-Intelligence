@@ -3,7 +3,8 @@
 // Prism's page: describe a picture and press Generate. The side panel (☰) holds the model,
 // art style and shape pickers, and the pictures and videos you've made.
 // Or start from a picture (upload one, or "Edit this" on one of yours) and either say what to
-// change, or bring it to life as a short video ("Make video").
+// change, or bring it to life as a short video ("Make video"). Switching to "Video" without a
+// picture makes a video from words only. Videos have their own model picker (Fast or Better).
 // It talks to these API routes:
 //   POST /api/prism/generate   start a picture, or an edit (it's made in the background)
 //   POST /api/prism/upscale    enlarge a picture (Fast 4×, Photo 4×, or Enhance to 4K / 8K)
@@ -11,11 +12,16 @@
 //   GET  /api/prism/images     your recent pictures
 //   GET  /api/prism/models     the picture models, and whether each one is downloaded yet
 //   POST /api/prism/videos     start a video (it's made in the background)
-//   GET  /api/prism/videos     your videos, and the length choices with their usual wait
+//   GET  /api/prism/videos     your videos, the length choices with their usual wait, and which
+//                              video models are downloaded
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import { DEFAULT_PRISM_MODEL, PRISM_MODELS, findPrismModel } from '@/config/prism-models';
+import {
+  DEFAULT_VIDEO_MODEL, PRISM_VIDEO_MODELS, VIDEO_LENGTHS, VIDEO_SHAPES, findVideoModel,
+  type VideoModelId, type VideoShapeId,
+} from '@/config/prism-video-models';
 import { choicesFor, type EnlargeChoice } from '@/lib/prism/upscale-plan';
 import AppHeader from '@/components/AppHeader';
 import QueueNotice from '@/components/QueueNotice';
@@ -94,7 +100,12 @@ interface PrismVideo {
   id: string;
   imageId: string | null;
   prompt: string;
+  model: VideoModelId;
+  /** Made from a picture ('image') or from words only ('text'). */
+  mode: 'image' | 'text';
   length: string;
+  /** How long the clip is, in seconds. */
+  clipSeconds: number;
   frames: number;
   width: number;
   height: number;
@@ -103,7 +114,8 @@ interface PrismVideo {
   seconds: number | null;
   createdAt: string;
   url: string;
-  poster: string;
+  /** The starting picture (or a video from words' first frame); null until a video from words is done. */
+  poster: string | null;
 }
 
 // A video length you can pick, with how long it usually takes to make (`wait`, in seconds).
@@ -116,19 +128,23 @@ interface LengthChoice {
   runs: number;
 }
 
-// Until the server answers, show the first guesses (the same ones as lib/prism/video.ts).
-const FIRST_GUESS: LengthChoice[] = [
-  { id: 'short', name: 'Short', seconds: 2, wait: 150, runs: 0 },
-  { id: 'medium', name: 'Medium', seconds: 3, wait: 240, runs: 0 },
-  { id: 'long', name: 'Long', seconds: 5, wait: 450, runs: 0 },
-];
+// Until the server answers, show each video model's first guesses (config/prism-video-models.ts).
+const FIRST_GUESS = Object.fromEntries(
+  PRISM_VIDEO_MODELS.map((m) => [m.id, VIDEO_LENGTHS.map((l) => ({ ...l, wait: m.estimates[l.id], runs: 0 }))]),
+) as Record<VideoModelId, LengthChoice[]>;
+
+// Whether a video model's files are in ComfyUI, for a video from a picture and from words.
+interface VideoModelStatus {
+  id: VideoModelId;
+  ready: { image: boolean; text: boolean };
+}
 
 // The picture to start from: a file from your device, or one of your Prism pictures.
 type Source =
   | { kind: 'upload'; file: File; preview: string }
   | { kind: 'image'; image: PrismImage };
 
-// What to do with that picture.
+// What to make: a picture ('edit': a new picture, or a change to the starting picture), or a video.
 type Make = 'edit' | 'video';
 
 // What's shown big on the stage.
@@ -162,8 +178,16 @@ const Prism = () => {
   const [source, setSource] = useState<Source | null>(null);
   const [make, setMake] = useState<Make>('edit');
   const [length, setLength] = useState('short');
+  const [videoModel, setVideoModel] = useState<VideoModelId>(DEFAULT_VIDEO_MODEL);
+  const [videoShape, setVideoShape] = useState<VideoShapeId>('landscape');
+  // Until the server says which video models are downloaded, list them all as ready.
+  const [videoModels, setVideoModels] = useState<VideoModelStatus[] | null>(null);
   const editing = source !== null && make === 'edit';
-  const animating = source !== null && make === 'video';
+  const animating = make === 'video';
+  /** A video from words only, with no starting picture. */
+  const fromWords = animating && source === null;
+  const videoMode = fromWords ? 'text' : 'image';
+  const videoReady = (id: VideoModelId) => videoModels?.find((m) => m.id === id)?.ready[videoMode] ?? true;
   const uploadSize = usePictureSize(source?.kind === 'upload' ? source.preview : null);
   const fileInput = useRef<HTMLInputElement>(null);
   const promptBox = useRef<HTMLTextAreaElement>(null);
@@ -198,7 +222,8 @@ const Prism = () => {
   // Pictures and videos, and which one is shown big
   const [images, setImages] = useState<PrismImage[]>([]);
   const [videos, setVideos] = useState<PrismVideo[]>([]);
-  const [lengths, setLengths] = useState<LengthChoice[]>(FIRST_GUESS);
+  const [lengthsByModel, setLengths] = useState<Record<VideoModelId, LengthChoice[]>>(FIRST_GUESS);
+  const lengths = lengthsByModel[videoModel] ?? FIRST_GUESS[videoModel];
   const [shown, setShown] = useState<Shown | null>(null);
   const shownImage = shown?.kind === 'image' ? images.find((i) => i.id === shown.id) : undefined;
   const shownVideo = shown?.kind === 'video' ? videos.find((v) => v.id === shown.id) : undefined;
@@ -257,10 +282,11 @@ const Prism = () => {
   const loadVideos = useCallback(() => {
     fetch('/api/prism/videos')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { videos: PrismVideo[]; lengths: LengthChoice[] } | null) => {
+      .then((data: { videos: PrismVideo[]; lengths: Record<VideoModelId, LengthChoice[]>; models: VideoModelStatus[] | null } | null) => {
         if (!data) return;
         setVideos(data.videos);
         setLengths(data.lengths);
+        if (data.models) setVideoModels(data.models);
       })
       .catch(() => {});
   }, []);
@@ -411,7 +437,8 @@ const Prism = () => {
         const res = await send('/api/prism/videos', {
           prompt,
           length,
-          ...(source?.kind === 'image' ? { imageId: source.image.id } : {}),
+          model: videoModel,
+          ...(source?.kind === 'image' ? { imageId: source.image.id } : source ? {} : { shape: videoShape }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
@@ -499,15 +526,24 @@ const Prism = () => {
     if (match) setShape(match.id);
   };
 
-  // Put a video's motion prompt, length and starting picture back into the form.
+  // Put a video's prompt, model, length and starting picture (or shape) back into the form.
   const reuseVideo = (video: PrismVideo) => {
-    const from = video.imageId ? images.find((i) => i.id === video.imageId) : undefined;
-    if (!from) {
-      setError('The picture this video started from isn’t in your list any more.');
-      return;
+    if (video.mode === 'text') {
+      setSource(null);
+      // The shape whose proportions are closest to the video's.
+      const ratio = video.width / video.height;
+      const closest = [...VIDEO_SHAPES].sort((a, b) => Math.abs(a.ratio - ratio) - Math.abs(b.ratio - ratio))[0];
+      setVideoShape(closest.id);
+    } else {
+      const from = video.imageId ? images.find((i) => i.id === video.imageId) : undefined;
+      if (!from) {
+        setError('The picture this video started from isn’t in your list any more.');
+        return;
+      }
+      setSource({ kind: 'image', image: from });
     }
-    setSource({ kind: 'image', image: from });
     setMake('video');
+    setVideoModel(video.model);
     setPrompt(video.prompt);
     setLength(video.length);
   };
@@ -559,7 +595,48 @@ const Prism = () => {
       {/* ------------------------------------------------------------ the side panel */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} title="Studio" className="prism-sidebar">
         {animating ? (
-          <p className="prism-note">Videos use their own model, so there is nothing to pick here while you make one.</p>
+          <>
+            <label className="sidebar-separator" htmlFor="prism-video-model">Video model</label>
+            <select
+              id="prism-video-model"
+              className="prism-select"
+              value={videoModel}
+              onChange={(e) => setVideoModel(e.target.value as VideoModelId)}
+            >
+              {PRISM_VIDEO_MODELS.map((m) => (
+                <option key={m.id} value={m.id} disabled={!videoReady(m.id)}>
+                  {videoReady(m.id) ? m.name : `${m.name} (not downloaded yet)`}
+                </option>
+              ))}
+            </select>
+            <p className="prism-note">{findVideoModel(videoModel).note}</p>
+            {!videoReady(videoModel) && (
+              <p className="prism-note">
+                {fromWords ? 'Videos from words' : 'Videos from a picture'} need more files for this model. See docs/prism-video.md.
+              </p>
+            )}
+
+            <span className="sidebar-separator" id="prism-video-shape-label">Shape</span>
+            {fromWords ? (
+              <div className="prism-shapes" role="radiogroup" aria-labelledby="prism-video-shape-label">
+                {VIDEO_SHAPES.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={videoShape === s.id}
+                    className="prism-shape"
+                    onClick={() => setVideoShape(s.id)}
+                  >
+                    <span className="prism-shape-icon" style={{ aspectRatio: `${s.ratio}` }} />
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="prism-note">The video keeps your picture’s shape.</p>
+            )}
+          </>
         ) : (
           <>
             <label className="sidebar-separator" htmlFor="prism-model">Model</label>
@@ -658,8 +735,10 @@ const Prism = () => {
                 title={item.kind === 'video' ? `Video: ${item.video.prompt}` : item.image.prompt}
                 onClick={() => show({ kind: item.kind, id: item.id })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- small thumbnails of our own pictures */}
-                <img src={item.kind === 'video' ? item.video.poster : item.image.url} alt={item.kind === 'video' ? item.video.prompt : item.image.prompt} loading="lazy" />
+                {(item.kind === 'image' || item.video.poster) && (
+                  // eslint-disable-next-line @next/next/no-img-element -- small thumbnails of our own pictures
+                  <img src={item.kind === 'video' ? item.video.poster! : item.image.url} alt={item.kind === 'video' ? item.video.prompt : item.image.prompt} loading="lazy" />
+                )}
                 {item.kind === 'video' && (
                   <span className="prism-thumb-badge" aria-hidden="true">
                     {item.video.status === 'working' ? '…' : item.video.status === 'failed' ? '!' : '▶'}
@@ -700,17 +779,15 @@ const Prism = () => {
             void generate();
           }}
         >
-          {/* With a picture: change it, or make a video from it */}
-          {source && (
-            <div className="prism-modes" role="radiogroup" aria-label="What to make">
-              <button type="button" role="radio" aria-checked={make === 'edit'} onClick={() => setMake('edit')}>
-                Edit picture
-              </button>
-              <button type="button" role="radio" aria-checked={make === 'video'} onClick={() => setMake('video')}>
-                Make video
-              </button>
-            </div>
-          )}
+          {/* A picture or a video. With a starting picture: change it, or make a video from it. */}
+          <div className="prism-modes" role="radiogroup" aria-label="What to make">
+            <button type="button" role="radio" aria-checked={make === 'edit'} onClick={() => setMake('edit')}>
+              {source ? 'Edit picture' : 'Picture'}
+            </button>
+            <button type="button" role="radio" aria-checked={make === 'video'} onClick={() => setMake('video')}>
+              {source ? 'Make video' : 'Video'}
+            </button>
+          </div>
 
           {source?.kind === 'upload' && !animating && (
             <>
@@ -777,7 +854,7 @@ const Prism = () => {
               ref={promptBox}
               id="prism-prompt"
               className="prism-prompt"
-              aria-label={animating ? 'What should move?' : editing ? 'What should change?' : 'Describe your picture'}
+              aria-label={fromWords ? 'Describe your video' : animating ? 'What should move?' : editing ? 'What should change?' : 'Describe your picture'}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
@@ -788,7 +865,9 @@ const Prism = () => {
                 }
               }}
               placeholder={
-                animating
+                fromWords
+                  ? 'Describe your video, e.g. a lighthouse on a sea cliff at night, waves crashing, the beam sweeping across the sea'
+                  : animating
                   ? 'What should move? e.g. the waves roll in, the lighthouse beam sweeps across the sea'
                   : editing
                     ? 'What should change? e.g. make it nighttime, with a full moon'
@@ -844,7 +923,7 @@ const Prism = () => {
                 <video
                   key={shownVideo.id}
                   src={shownVideo.url}
-                  poster={shownVideo.poster}
+                  poster={shownVideo.poster ?? undefined}
                   width={shownVideo.width}
                   height={shownVideo.height}
                   controls
@@ -855,10 +934,15 @@ const Prism = () => {
                 />
               ) : (
                 <div className="prism-video-wait">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- the starting picture, from our own API */}
-                  <img src={shownVideo.poster} alt="" width={shownVideo.width} height={shownVideo.height} className="is-busy" />
+                  {shownVideo.poster ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- the starting picture, from our own API
+                    <img src={shownVideo.poster} alt="" width={shownVideo.width} height={shownVideo.height} className="is-busy" />
+                  ) : (
+                    // A video from words has no picture until it's done: an empty frame of the right shape.
+                    <span className="prism-video-blank" style={{ aspectRatio: `${shownVideo.width} / ${shownVideo.height}` }} />
+                  )}
                   {shownVideo.status === 'working' ? (
-                    <VideoProgress video={shownVideo} lengths={lengths} now={now} />
+                    <VideoProgress video={shownVideo} lengths={lengthsByModel[shownVideo.model] ?? FIRST_GUESS[shownVideo.model]} now={now} />
                   ) : (
                     <p className="prism-video-status is-failed">{shownVideo.error ?? 'This video didn’t work.'}</p>
                   )}
@@ -867,7 +951,7 @@ const Prism = () => {
               <figcaption>
                 <span className="prism-caption-text">{shownVideo.prompt}</span>
                 <span className="prism-caption-meta">
-                  Video · {Math.round(shownVideo.frames / 24)} sec · {shownVideo.width}×{shownVideo.height}
+                  Video · {findVideoModel(shownVideo.model).name} · {shownVideo.clipSeconds} sec · {shownVideo.width}×{shownVideo.height}
                   {shownVideo.seconds ? ` · made in ${clock(shownVideo.seconds)}` : ''}
                 </span>
                 <span className="prism-caption-actions">

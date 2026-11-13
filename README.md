@@ -5,7 +5,7 @@ Gabriel DeBoer's suite of local AI apps: Lumen, Prism, Umbra, Astra, Eclipse, an
 Working apps:
 
 - **Lumen**: local chat through Ollama. With a model that can see images, an add-photo button appears in the message box.
-- **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes, and can enlarge them (Fast 4×, Photo 4×, or Enhance to 4K / 8K). ComfyUI must be running (`run_nvidia_gpu.bat`). Which model files go where is in [docs/prism-upscale.md](docs/prism-upscale.md).
+- **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes, and can enlarge them (Fast 4×, Photo 4×, or Enhance to 4K / 8K). ComfyUI must be running (`run_nvidia_gpu.bat`). Which model files go where is in [docs/prism-upscale.md](docs/prism-upscale.md). It also makes short videos, from a picture or from words, with Wan 2.2 (Fast 5B or Better 14B); setup is in [docs/prism-video.md](docs/prism-video.md).
 - **Umbra**: agent bots. Create bots with a flame avatar, a personality, a purpose and a local model, then chat with them. (Stage 1 of 4: tools, background tasks and teams come next.)
 
 Artifacts (Lumen and Umbra): when a reply writes a Markdown document (a `<document title="…">` block), it's saved as an artifact. A `.md` file a Flicker writes in Refract is saved too. Lumen lists them in the sidebar under **Artifacts**. Umbra lists them at `/umbra/artifacts` (the **Artifacts** button on the Flickers page), and each Flicker or team chat has its own Artifacts button. Writing a document again with the same title in the same chat updates it. Artifacts stay when you clear or delete a chat; delete one from its list. Code: `lib/artifacts.ts`, `components/documents.tsx`, `app/api/artifacts/`.

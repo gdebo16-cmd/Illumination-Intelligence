@@ -1184,6 +1184,14 @@ textarea.input-field {
   opacity: 0.45;
   filter: blur(2px);
 }
+/* A video from words has no starting picture: an empty frame of the video's shape instead. */
+.prism-video-blank {
+  display: block;
+  height: min(24rem, 40vh);
+  max-width: 100%;
+  border-radius: 12px;
+  background: #0c1220;
+}
 .prism-video-status {
   position: absolute;
   inset: auto 1rem 1rem;
