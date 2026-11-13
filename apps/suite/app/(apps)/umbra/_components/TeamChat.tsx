@@ -11,6 +11,7 @@ import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import Flame from './Flame';
+import { useUmbraSidebar } from './UmbraShell';
 import { Steps } from './Steps';
 import type { AgentStep, BotMessage, Team } from './types';
 
@@ -171,6 +172,17 @@ export default function TeamChat({ teamId }: { teamId: string }) {
     if (res.ok) setMessages([]);
   };
 
+  // Tasks, Edit, Artifacts and Clear live in the side panel.
+  useUmbraSidebar(team && {
+    title: team.name,
+    items: [
+      { label: 'Tasks', href: `/umbra/teams/${team.id}/tasks` },
+      { label: 'Edit', href: `/umbra/teams/${team.id}/edit` },
+      { label: 'Artifacts', href: `/umbra/artifacts?source=${team.id}` },
+      { label: 'Clear', onClick: clearChat, disabled: messages.length === 0 },
+    ],
+  });
+
   if (!team) {
     return (
       <main className="umbra">
@@ -216,13 +228,6 @@ export default function TeamChat({ teamId }: { teamId: string }) {
             Led by {leader.name} · with {team.crew.map((c) => (c.role ? `${c.bot.name} (${c.role})` : c.bot.name)).join(', ')}
           </span>
         </div>
-        <Link href={`/umbra/teams/${team.id}/tasks`} className="umbra-chat-action">Tasks</Link>
-        <Link href={`/umbra/teams/${team.id}/edit`} className="umbra-chat-action">Edit</Link>
-        <Link href={`/umbra/artifacts?source=${team.id}`} className="umbra-chat-action umbra-chat-artifacts" aria-label="Artifacts" title="Artifacts">
-          <span className="umbra-chat-artifacts-icon" aria-hidden>📄</span>
-          <span className="umbra-chat-artifacts-label">Artifacts</span>
-        </Link>
-        <button type="button" className="umbra-chat-action" onClick={clearChat} disabled={messages.length === 0}>Clear</button>
       </div>
 
       <div ref={listRef} className="umbra-messages">

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { flameColor } from '@/config/umbra';
 import Flame from './Flame';
+import { useUmbraSidebar } from './UmbraShell';
 import type { Bot, Team } from './types';
 
 export default function BotGallery() {
@@ -31,19 +32,22 @@ export default function BotGallery() {
       .catch(() => {});
   }, []);
 
+  // Inbox and Artifacts live in the side panel.
+  useUmbraSidebar({
+    title: 'Umbra',
+    items: [
+      { label: 'Inbox', href: '/umbra/inbox', badge: unread },
+      { label: 'Artifacts', href: '/umbra/artifacts' },
+    ],
+  });
+
   return (
     <main className="umbra">
       <div className="umbra-page">
-        <div className="umbra-intro umbra-intro-row">
+        <div className="umbra-intro">
           <div>
             <h1>Your Flickers</h1>
             <p>Each flame is a Flicker with its own personality and purpose. Tap one to chat.</p>
-          </div>
-          <div className="umbra-intro-links">
-            <Link href="/umbra/artifacts" className="umbra-inbox-link">Artifacts</Link>
-            <Link href="/umbra/inbox" className="umbra-inbox-link">
-              Inbox{unread > 0 && <span className="umbra-badge">{unread}</span>}
-            </Link>
           </div>
         </div>
 

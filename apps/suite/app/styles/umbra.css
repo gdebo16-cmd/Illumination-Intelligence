@@ -299,21 +299,6 @@
   overflow: hidden; 
   text-overflow: ellipsis; 
 }
-.umbra-chat-action {
-  padding: 0.35rem 0.75rem;
-  font: inherit;
-  font-size: 0.85rem;
-  color: #d5d7ea;
-  text-decoration: none;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 0.18);
-  border-radius: 8px;
-  cursor: pointer;
-  
-}
-.umbra-chat-action:disabled { 
-  opacity: 0.4; 
-  cursor: default; }
 /* Repo dropdown: GitHub repos a Flicker can copy into Refract. */
 .umbra-repo-bar {
   flex-shrink: 0;
@@ -575,24 +560,6 @@
   max-height: 360px; 
   margin-top: 0.3rem; 
   border-radius: 10px; }
-.umbra-intro-row { 
-  display: flex; 
-  align-items: flex-start; 
-  justify-content: space-between; 
-  gap: 1rem; }
-.umbra-inbox-link {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.35rem;
-  padding: 0.55rem 1rem;
-  color: #e5e7f0;
-  text-decoration: none;
-  background: rgb(255 255 255 / 0.05);
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 12px;
-}
 .umbra-badge {
   min-width: 1.3rem;
   padding: 0.05rem 0.4rem;
@@ -770,3 +737,31 @@ header:has(~ main.umbra-chat) .banner-corner { display: none; }
    slide up under the logo and fade out. */
 main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
 /* #endregion */
+/* Side panel (_components/UmbraShell.tsx): Inbox and Artifacts in the gallery; Tasks, Edit,
+   Artifacts and Clear in a chat. */
+.umbra-side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem; }
+.umbra-sidebar .umbra-side-link {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  color: #e5e7f0;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer; }
+.umbra-sidebar .umbra-side-link:hover {
+  background: rgb(255 255 255 / 0.06); }
+.umbra-sidebar .umbra-side-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent; }

@@ -22,11 +22,6 @@
   font-size: 0.8rem;
   color: #9a9cb8;
   white-space: normal; }
-.umbra-intro-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem; }
 .umbra-artifact-icon {
   display: inline-flex;
   align-items: center;
@@ -40,14 +35,10 @@
 .umbra-artifact-actions {
   margin-top: 0;
   padding: 0 1rem 0.75rem 3.75rem; }
-/* In a chat's top bar the Artifacts button is a word on wide screens and just its icon on phones. */
-.umbra-chat-artifacts-icon { display: none; }
 .umbra-chat-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis; }
 @media (max-width: 768px) {
-  .umbra-artifact-actions { padding-left: 1rem; }
-  .umbra-chat-artifacts-icon { display: inline; }
-  .umbra-chat-artifacts-label { display: none; } }
+  .umbra-artifact-actions { padding-left: 1rem; } }
 /* #endregion artifacts */

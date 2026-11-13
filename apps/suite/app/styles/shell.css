@@ -87,7 +87,6 @@
   .umbra-task-actions { justify-content: flex-start; }
   .umbra-report-body { padding-left: 1rem; }
   .umbra-chat-bar { gap: 0.4rem; }
-  .umbra-chat-action { padding: 0.35rem 0.55rem; }
   .umbra-repo-select { font-size: 16px; }
   .umbra-page { padding: 1rem 1rem 2rem; }
   .umbra-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }

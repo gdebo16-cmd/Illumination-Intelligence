@@ -12,6 +12,7 @@ import { useBarHeight } from '@/hooks/use-bar-height';
 import { canSeeImages } from '@/config/models';
 import { MessagePhotos, PhotoButton, PhotoTray, releasePhotos, usePhotos } from '@/components/PhotoAttach';
 import Flame from './Flame';
+import { useUmbraSidebar } from './UmbraShell';
 import { Steps } from './Steps';
 import type { AgentStep, Bot, BotMessage } from './types';
 
@@ -261,6 +262,17 @@ export default function BotChat({ botId }: { botId: string }) {
     else setError((await res.json().catch(() => ({}))).error ?? 'Could not clear the chat.');
   };
 
+  // Tasks, Edit, Artifacts and Clear live in the side panel.
+  useUmbraSidebar(bot && {
+    title: bot.name,
+    items: [
+      { label: 'Tasks', href: `/umbra/${bot.id}/tasks` },
+      { label: 'Edit', href: `/umbra/${bot.id}/edit` },
+      { label: 'Artifacts', href: `/umbra/artifacts?source=${bot.id}` },
+      { label: 'Clear', onClick: clearChat, disabled: messages.length === 0 },
+    ],
+  });
+
   if (!bot) {
     return (
       <main className="umbra">
@@ -285,13 +297,6 @@ export default function BotChat({ botId }: { botId: string }) {
           <span className="umbra-chat-name">{bot.name}</span>
           {bot.purpose && <span className="umbra-chat-purpose">{bot.purpose}</span>}
         </div>
-        <Link href={`/umbra/${bot.id}/tasks`} className="umbra-chat-action">Tasks</Link>
-        <Link href={`/umbra/${bot.id}/edit`} className="umbra-chat-action">Edit</Link>
-        <Link href={`/umbra/artifacts?source=${bot.id}`} className="umbra-chat-action umbra-chat-artifacts" aria-label="Artifacts" title="Artifacts">
-          <span className="umbra-chat-artifacts-icon" aria-hidden>📄</span>
-          <span className="umbra-chat-artifacts-label">Artifacts</span>
-        </Link>
-        <button type="button" className="umbra-chat-action" onClick={clearChat} disabled={messages.length === 0}>Clear</button>
       </div>
       {usesWorkshop && (
         <div className="umbra-repo-bar">
