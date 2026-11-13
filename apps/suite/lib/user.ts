@@ -1,6 +1,7 @@
 
 import 'server-only';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 import { USERS, UserId } from './users';
 
 export { USERS, type UserId };
@@ -14,4 +15,9 @@ export async function getCurrentUserId(): Promise<UserId | null> {
   }
 
   return null;
+}
+
+/** What an API route answers when no profile is selected. */
+export function noProfile(headers?: HeadersInit) {
+  return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401, headers });
 }

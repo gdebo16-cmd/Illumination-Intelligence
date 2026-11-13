@@ -2,12 +2,12 @@
 // background and its report appears in the inbox when it's done.
 
 import { after, NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { getTask, runTaskNow } from '@/lib/umbra/tasks';
 
 export async function POST(_req: Request, { params }: { params: Promise<{ taskId: string }> }) {
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
   const task = getTask(userId, (await params).taskId);
   if (!task) return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
 

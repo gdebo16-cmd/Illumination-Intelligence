@@ -18,7 +18,7 @@
 // An edit keeps the shape of the picture you started from, so width/height are ignored.
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { generateImage, imageNeeds, type ImageRequest } from '@/lib/prism/comfy';
 import { startImageJob } from '@/lib/prism/imageJobs';
 import { readImageFile, saveImage } from '@/lib/prism/images';
@@ -33,7 +33,7 @@ const bad = (error: string, status = 400) => NextResponse.json({ error }, { stat
 export async function POST(req: Request) {
   // 1. Who is asking?
   const userId = await getCurrentUserId();
-  if (!userId) return bad('Please select a user profile first.', 401);
+  if (!userId) return noProfile();
 
   // 2. Read what they sent: JSON, or a form with a picture file.
   const fields: Record<string, unknown> = {};

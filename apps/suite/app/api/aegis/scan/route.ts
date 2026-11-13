@@ -3,7 +3,7 @@
 // a link is copied in for the scan and deleted afterwards.
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { RepoError } from '@/lib/aegis/repo';
 import { scanRepo } from '@/lib/aegis/scan';
 
@@ -11,7 +11,7 @@ export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
   const body = await req.json().catch(() => ({}));
   try {
     return NextResponse.json(await scanRepo(body.repo));

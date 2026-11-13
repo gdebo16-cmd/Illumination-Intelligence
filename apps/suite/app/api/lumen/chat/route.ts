@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '@/lib/db';
 import { buildMemoryBlock, extractMemories, extractModelFor } from '@/lib/memory';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 import { canSeeImages } from '@/config/models';
@@ -35,9 +35,7 @@ export async function POST(req: Request) {
   try {
     // 1. Identify the active user
     const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
-    }
+    if (!userId) return noProfile();
 
     // 2. Read the incoming request: JSON, or a form when photos are attached
     let fields: { conversationId?: unknown; prompt?: unknown; model?: unknown };

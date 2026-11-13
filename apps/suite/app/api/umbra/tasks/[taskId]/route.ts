@@ -3,11 +3,10 @@
 // DELETE /api/umbra/tasks/<taskId> — delete (its past reports stay in the inbox)
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { deleteTask, setTaskEnabled, updateTask, validateTask } from '@/lib/umbra/tasks';
 
 type Params = { params: Promise<{ taskId: string }> };
-const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
 const notFound = () => NextResponse.json({ error: 'Task not found.' }, { status: 404 });
 
 export async function PUT(req: Request, { params }: Params) {

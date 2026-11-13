@@ -18,7 +18,7 @@
 
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { pictureForUpscale, needsForPlan, upscaleImage } from '@/lib/prism/upscale';
 import { startImageJob } from '@/lib/prism/imageJobs';
 import { getImage, readImageFile, saveImage } from '@/lib/prism/images';
@@ -42,7 +42,7 @@ function targetFromFactor(factor: unknown): UpscaleTargetId {
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
-  if (!userId) return bad('Please select a user profile first.', 401);
+  if (!userId) return noProfile();
 
   const fields: Record<string, unknown> = {};
   let upload: File | null = null;

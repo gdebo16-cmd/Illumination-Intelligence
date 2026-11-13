@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { endWork, startWork, workFailed } from '@/lib/umbra/busy';
-import { getCurrentUserId, USERS } from '@/lib/user';
+import { getCurrentUserId, noProfile, USERS } from '@/lib/user';
 import { addMessage, getBot, listMessages, listNotes, systemPrompt } from '@/lib/umbra/bots';
 import { runAgent, type ChatMessage } from '@/lib/umbra/agent';
 import { canSeeImages } from '@/config/models';
@@ -23,7 +23,7 @@ const HISTORY = 40;
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // 1. Who is asking, and is it their bot?
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
   const bot = getBot(userId, (await params).id);
   if (!bot) return NextResponse.json({ error: 'Flicker not found.' }, { status: 404 });
 

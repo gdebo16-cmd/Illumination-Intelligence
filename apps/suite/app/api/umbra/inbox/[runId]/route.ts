@@ -2,11 +2,10 @@
 // DELETE /api/umbra/inbox/<runId> — delete the report
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { deleteRun, markRunRead } from '@/lib/umbra/tasks';
 
 type Params = { params: Promise<{ runId: string }> };
-const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
 const notFound = () => NextResponse.json({ error: 'Report not found.' }, { status: 404 });
 
 export async function PATCH(req: Request, { params }: Params) {

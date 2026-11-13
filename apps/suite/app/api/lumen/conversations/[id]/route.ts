@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 
 // Returns one chat's messages, only if it belongs to the signed-in profile.
@@ -10,9 +10,7 @@ export async function GET(
 ) {
   try {
     const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
-    }
+    if (!userId) return noProfile();
 
     const { id } = await params;
     const conversation = db
@@ -47,9 +45,7 @@ export async function DELETE(
 ) {
   try {
     const userId = await getCurrentUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
-    }
+    if (!userId) return noProfile();
 
     const { id } = await params;
     const conversation = db
