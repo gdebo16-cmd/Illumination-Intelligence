@@ -2,15 +2,16 @@ import type { ReactNode } from 'react';
 import AppBanner from './AppBanner';
 import AppLauncher from './AppLauncher';
 
-// The banner header used by every app except Lumen (which adds its chat-list button).
-// `left` is an optional button on the left. The nine-dot app switcher sits at the bottom of the screen:
-// beside the message box on chat pages, otherwise pinned to the bottom-left corner.
-const AppHeader = ({ appId, left }: { appId: string; left?: ReactNode }) => (
+// The banner header every app uses (through components/AppShell.tsx). `left` is an optional button
+// on the left, e.g. the side panel's ☰. The nine-dot app switcher sits at the bottom of the screen,
+// pinned to the bottom-left corner; `launcher={false}` leaves it out for an app that puts it
+// somewhere else (Lumen has it beside the message box).
+const AppHeader = ({ appId, left, launcher = true }: { appId: string; left?: ReactNode; launcher?: boolean }) => (
   <header>
     <AppBanner appId={appId} />
     {left ?? <span className="header-spacer" />}
     <span className="header-spacer" />
-    <AppLauncher placement="up" dock />
+    {launcher && <AppLauncher placement="up" dock />}
   </header>
 );
 

@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
-import AppHeader from "@/components/AppHeader";
-import SidebarToggle from "@/components/SidebarToggle";
+import AppShell from "@/components/AppShell";
+import useSidebar from "@/hooks/use-sidebar";
 import RefractTerminal from "./RefractTerminal";
 import RefractRemote from "./RefractRemote";
 import { powerActionAllowed, type PowerAction } from "@/lib/refract/power";
@@ -97,7 +96,7 @@ async function fetchWorkspaces(): Promise<Workshop[]> {
 }
 
 const Refract = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const panel = useSidebar();
   const [snapshots, setSnapshots] = useState<VmSnapshot[]>([]);
   const [workspaces, setWorkspaces] = useState<Workshop[]>([]);
   const [workspaceNote, setWorkspaceNote] = useState<string | null>(null);
@@ -257,195 +256,187 @@ const Refract = () => {
     };
   }, []);
 
-  return (
-    <div className={`site-container ${sidebarOpen ? "sidebar-open" : ""}`}>
-      <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        title="Workshop"
-        className="refract-sidebar"
-      >
-        <div className="refract-sidebar-content">
-          <div className="refract-sidebar-workspaces">
-            <span className="sidebar-separator">Copied-in work</span>
-            {workspaces.length === 0 ? (
-              <p className="refract-workspace-empty">
-                {workspaceNote ?? "No projects yet. A Flicker with the Refract workshop tool can copy a repo in."}
-              </p>
-            ) : (
-              workspaces.map((workspace) => (
-                <div key={workspace.name} className="chat-row refract-workspace-row">
-                  <div className="chat-button">
-                    {workspace.name}
-                    {workspace.git ? <span className="refract-workspace-git">{workspace.git}</span> : null}
-                    {workspace.snapshots.length > 0 ? (
-                      <span className="refract-workspace-snaps">
-                        {workspace.snapshots.length === 1
-                          ? "1 snapshot"
-                          : `${workspace.snapshots.length} snapshots`}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          <div className="refract-sidebar-snapshots">
-            <button type="button" className="new-chat-button" onClick={() => void addSnapshot()} disabled={busy}>
-              {taking ? "Taking snapshot\u2026" : "+ New snapshot"}
-            </button>
-            <span className="sidebar-separator">VM snapshots</span>
-            {snapshots.map((snapshot) => (
-              <div key={snapshot.id} className={`chat-row refract-snapshot-row ${snapshot.current ? "is-current" : ""}`}>
-                <div className="chat-button" aria-current={snapshot.current ? "true" : undefined}>
-                  {snapshot.name}
-                  {snapshot.current && <span className="refract-snapshot-current">Current</span>}
-                </div>
-                <button
-                  type="button"
-                  className="refract-snapshot-restore"
-                  aria-label={`Restore snapshot: ${snapshot.name}`}
-                  title="Restore this snapshot"
-                  disabled={busy}
-                  onClick={() => setConfirmTarget(snapshot)}
-                >
-                  {restoringId === snapshot.id ? "Restoring\u2026" : "Restore"}
-                </button>
-              </div>
-            ))}
-          </div>
-          <RefractTerminal vmState={vmState} />
-        </div>
-      </Sidebar>
-      <div className="content-area">
-        <AppHeader
-          appId="refract"
-          left={
-            <SidebarToggle
-              open={sidebarOpen}
-              onToggle={() => setSidebarOpen(!sidebarOpen)}
-              label="workshop and terminal"
-            />
-          }
-        />
-        <main className="refract">
-          <h1>Refract</h1>
-          <p className="refract-status" aria-live="polite">
-            {powering ? POWER_BUSY_LINES[powering] : restoringId ? "Restoring the virtual machine\u2026" : status}
+  const workshop = (
+    <div className="refract-sidebar-content">
+      <div className="refract-sidebar-workspaces">
+        <span className="sidebar-separator">Copied-in work</span>
+        {workspaces.length === 0 ? (
+          <p className="refract-workspace-empty">
+            {workspaceNote ?? "No projects yet. A Flicker with the Refract workshop tool can copy a repo in."}
           </p>
-          <div className="refract-power" role="group" aria-label="Virtual machine power">
-            <button
-              type="button"
-              className="refract-power-button"
-              disabled={!canPower("start")}
-              onClick={() => void runPower("start")}
-            >
-              {powering === "start" ? "Starting\u2026" : "Start"}
-            </button>
-            <button
-              type="button"
-              className="refract-power-button is-danger"
-              disabled={!canPower("stop")}
-              onClick={() => setPowerConfirm("stop")}
-            >
-              {powering === "stop" ? "Stopping\u2026" : "Stop"}
-            </button>
-            <button
-              type="button"
-              className="refract-power-button is-danger"
-              disabled={!canPower("reset")}
-              onClick={() => setPowerConfirm("reset")}
-            >
-              {powering === "reset" ? "Resetting\u2026" : "Reset"}
-            </button>
-          </div>
-          {error && <p className="refract-error" role="alert">{error}</p>}
-          {notice && !error && <p className="refract-notice">{notice}</p>}
-          <RefractRemote vmState={vmState} />
-        </main>
+        ) : (
+          workspaces.map((workspace) => (
+            <div key={workspace.name} className="chat-row refract-workspace-row">
+              <div className="chat-button">
+                {workspace.name}
+                {workspace.git ? <span className="refract-workspace-git">{workspace.git}</span> : null}
+                {workspace.snapshots.length > 0 ? (
+                  <span className="refract-workspace-snaps">
+                    {workspace.snapshots.length === 1
+                      ? "1 snapshot"
+                      : `${workspace.snapshots.length} snapshots`}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
       </div>
-      {confirmTarget && (
-        <div className="refract-confirm-backdrop" onClick={() => setConfirmTarget(null)}>
-          <div
-            className="refract-confirm"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="refract-confirm-title"
-            aria-describedby="refract-confirm-body"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="refract-confirm-title" className="refract-confirm-title">
-              Restore {"\u201c"}{confirmTarget.name}{"\u201d"}?
-            </h2>
-            <p id="refract-confirm-body" className="refract-confirm-body">
-              Restoring will stop the virtual machine and discard any work done since this snapshot was taken.
-              This can{"\u2019"}t be undone unless you take a snapshot first.
-            </p>
-            <p className="refract-confirm-note">If the virtual machine is running, it will start again from the snapshot.</p>
-            <div className="refract-confirm-actions">
-              <button
-                type="button"
-                className="refract-confirm-cancel"
-                autoFocus
-                onClick={() => setConfirmTarget(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="refract-confirm-restore"
-                onClick={() => void restoreSnapshot(confirmTarget)}
-              >
-                Restore
-              </button>
+      <div className="refract-sidebar-snapshots">
+        <button type="button" className="new-chat-button" onClick={() => void addSnapshot()} disabled={busy}>
+          {taking ? "Taking snapshot\u2026" : "+ New snapshot"}
+        </button>
+        <span className="sidebar-separator">VM snapshots</span>
+        {snapshots.map((snapshot) => (
+          <div key={snapshot.id} className={`chat-row refract-snapshot-row ${snapshot.current ? "is-current" : ""}`}>
+            <div className="chat-button" aria-current={snapshot.current ? "true" : undefined}>
+              {snapshot.name}
+              {snapshot.current && <span className="refract-snapshot-current">Current</span>}
             </div>
+            <button
+              type="button"
+              className="refract-snapshot-restore"
+              aria-label={`Restore snapshot: ${snapshot.name}`}
+              title="Restore this snapshot"
+              disabled={busy}
+              onClick={() => setConfirmTarget(snapshot)}
+            >
+              {restoringId === snapshot.id ? "Restoring\u2026" : "Restore"}
+            </button>
           </div>
-        </div>
-      )}
-      {powerConfirm && (
-        <div className="refract-confirm-backdrop" onClick={() => setPowerConfirm(null)}>
-          <div
-            className="refract-confirm"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="refract-power-confirm-title"
-            aria-describedby="refract-power-confirm-body"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="refract-power-confirm-title" className="refract-confirm-title">
-              {powerConfirm === "stop" ? "Stop the virtual machine?" : "Reset the virtual machine?"}
-            </h2>
-            <p id="refract-power-confirm-body" className="refract-confirm-body">
-              {powerConfirm === "stop"
-                ? "The virtual machine will shut down. Any unsaved work in the guest may be lost."
-                : "Reset restarts the virtual machine immediately, like pressing a reset button. Any unsaved work in the guest may be lost."}
-            </p>
-            <p className="refract-confirm-note">
-              {powerConfirm === "stop"
-                ? "It shuts down cleanly first; if that doesn\u2019t finish in time, it\u2019s powered off. The SSH terminal and virtual remote will disconnect."
-                : "The SSH terminal and virtual remote will disconnect; use Reconnect once it\u2019s back up."}
-            </p>
-            <div className="refract-confirm-actions">
-              <button
-                type="button"
-                className="refract-confirm-cancel"
-                autoFocus
-                onClick={() => setPowerConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="refract-confirm-restore"
-                onClick={() => void runPower(powerConfirm)}
-              >
-                {powerConfirm === "stop" ? "Stop" : "Reset"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
+      <RefractTerminal vmState={vmState} />
     </div>
+  );
+
+  return (
+    <AppShell
+      appId="refract"
+      sidebar={{ panel, title: "Workshop", label: "workshop and terminal", className: "refract-sidebar", content: workshop }}
+      overlays={
+        <>
+          {confirmTarget && (
+            <div className="refract-confirm-backdrop" onClick={() => setConfirmTarget(null)}>
+              <div
+                className="refract-confirm"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="refract-confirm-title"
+                aria-describedby="refract-confirm-body"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="refract-confirm-title" className="refract-confirm-title">
+                  Restore {"\u201c"}{confirmTarget.name}{"\u201d"}?
+                </h2>
+                <p id="refract-confirm-body" className="refract-confirm-body">
+                  Restoring will stop the virtual machine and discard any work done since this snapshot was taken.
+                  This can{"\u2019"}t be undone unless you take a snapshot first.
+                </p>
+                <p className="refract-confirm-note">If the virtual machine is running, it will start again from the snapshot.</p>
+                <div className="refract-confirm-actions">
+                  <button
+                    type="button"
+                    className="refract-confirm-cancel"
+                    autoFocus
+                    onClick={() => setConfirmTarget(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="refract-confirm-restore"
+                    onClick={() => void restoreSnapshot(confirmTarget)}
+                  >
+                    Restore
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {powerConfirm && (
+            <div className="refract-confirm-backdrop" onClick={() => setPowerConfirm(null)}>
+              <div
+                className="refract-confirm"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="refract-power-confirm-title"
+                aria-describedby="refract-power-confirm-body"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <h2 id="refract-power-confirm-title" className="refract-confirm-title">
+                  {powerConfirm === "stop" ? "Stop the virtual machine?" : "Reset the virtual machine?"}
+                </h2>
+                <p id="refract-power-confirm-body" className="refract-confirm-body">
+                  {powerConfirm === "stop"
+                    ? "The virtual machine will shut down. Any unsaved work in the guest may be lost."
+                    : "Reset restarts the virtual machine immediately, like pressing a reset button. Any unsaved work in the guest may be lost."}
+                </p>
+                <p className="refract-confirm-note">
+                  {powerConfirm === "stop"
+                    ? "It shuts down cleanly first; if that doesn\u2019t finish in time, it\u2019s powered off. The SSH terminal and virtual remote will disconnect."
+                    : "The SSH terminal and virtual remote will disconnect; use Reconnect once it\u2019s back up."}
+                </p>
+                <div className="refract-confirm-actions">
+                  <button
+                    type="button"
+                    className="refract-confirm-cancel"
+                    autoFocus
+                    onClick={() => setPowerConfirm(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="refract-confirm-restore"
+                    onClick={() => void runPower(powerConfirm)}
+                  >
+                    {powerConfirm === "stop" ? "Stop" : "Reset"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+    
+        </>
+      }
+    >
+      <main className="refract">
+        <h1>Refract</h1>
+        <p className="refract-status" aria-live="polite">
+          {powering ? POWER_BUSY_LINES[powering] : restoringId ? "Restoring the virtual machine\u2026" : status}
+        </p>
+        <div className="refract-power" role="group" aria-label="Virtual machine power">
+          <button
+            type="button"
+            className="refract-power-button"
+            disabled={!canPower("start")}
+            onClick={() => void runPower("start")}
+          >
+            {powering === "start" ? "Starting\u2026" : "Start"}
+          </button>
+          <button
+            type="button"
+            className="refract-power-button is-danger"
+            disabled={!canPower("stop")}
+            onClick={() => setPowerConfirm("stop")}
+          >
+            {powering === "stop" ? "Stopping\u2026" : "Stop"}
+          </button>
+          <button
+            type="button"
+            className="refract-power-button is-danger"
+            disabled={!canPower("reset")}
+            onClick={() => setPowerConfirm("reset")}
+          >
+            {powering === "reset" ? "Resetting\u2026" : "Reset"}
+          </button>
+        </div>
+        {error && <p className="refract-error" role="alert">{error}</p>}
+        {notice && !error && <p className="refract-notice">{notice}</p>}
+        <RefractRemote vmState={vmState} />
+      </main>
+    </AppShell>
   );
 };
 

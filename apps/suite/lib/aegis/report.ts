@@ -3,7 +3,7 @@
 // you hand to a coding agent to make the fixes.
 
 import type { RepoFile } from './files';
-import type { Finding, Lesson } from './types';
+import type { Finding, Lesson, WrittenSuggestion } from './types';
 
 const LESSONS: Record<string, Lesson> = {
   'duplicate-files': {
@@ -66,6 +66,10 @@ const LESSONS: Record<string, Lesson> = {
     title: 'Finish or remove both halves',
     body: "A feature that crosses the network has two halves: the page that asks and the route that answers. When one half is missing, nothing crashes; the request just fails and the page falls back to a default, so nobody notices. When you add or delete a feature, check both ends in the same change.",
   },
+  unify: {
+    title: 'Same job, one home',
+    body: "When several pages each build the same thing (a layout, a panel, a loading pattern), they drift: one gets a fix, another gets a different default, and the same part of the app behaves differently depending on where you are. Build it once, as a component or a hook, and pass in only what really differs. Copies that look different but do the same job are the hardest to spot, which is why they're worth a deliberate look.",
+  },
   'pass-through': {
     title: 'Every layer has to earn its place',
     body: "A wrapper that only passes things along adds a second place to look, without adding behavior. Layers are worth it when they hide a decision (which database, which API) or enforce a rule. If a layer doesn't do either, remove it and import the real thing directly.",
@@ -77,14 +81,14 @@ const ALL_CLEAR: Lesson = {
   body: "Nothing stood out. The habits that keep a repo like this tidy are small: delete instead of archiving, edit rules instead of overriding them, and update docs in the same change as the code.",
 };
 
-export function lessonsFor(findings: Finding[]): Lesson[] {
+export function lessonsFor(findings: Finding[], hasSuggestions = false): Lesson[] {
   const kinds = [...new Set(findings.map((f) => f.kind))];
-  const lessons = kinds.map((k) => LESSONS[k]).filter(Boolean);
+  const lessons = [...kinds, ...(hasSuggestions ? ['unify'] : [])].map((k) => LESSONS[k]).filter(Boolean);
   return lessons.length ? lessons : [ALL_CLEAR];
 }
 
 /** The project's own lint, type-check, test and build commands, from its package.json files. */
-function verifyCommands(files: RepoFile[]): string[] {
+export function verifyCommands(files: RepoFile[]): string[] {
   const commands: string[] = [];
   const manifests = files.filter((f) => f.path.endsWith('package.json') && f.text && !f.path.includes('/node_modules/'));
   manifests.sort((a, b) => a.path.split('/').length - b.path.split('/').length);
@@ -108,26 +112,27 @@ function verifyCommands(files: RepoFile[]): string[] {
 
 const SEVERITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' } as const;
 
-export function buildPrompt(repo: string, findings: Finding[], files: RepoFile[]): string {
-  if (!findings.length) {
-    return `An automated scan of the repository "${repo}" found no over-engineering, redundant layers or organization problems. No changes are needed.`;
-  }
-  const commands = verifyCommands(files);
+/**
+ * The prompt for a coding agent, from the findings and suggestions you ticked on the page.
+ * `commands` are the project's own checks (verifyCommands, run by the scan).
+ */
+export function buildPrompt(repo: string, findings: Finding[], suggestions: WrittenSuggestion[], commands: string[]): string {
+  if (!findings.length && !suggestions.length) return '';
+  const both = findings.length > 0 && suggestions.length > 0;
   const lines: string[] = [
-    `You are cleaning up the repository "${repo}". An automated scan (Aegis) found the issues below: over-engineering, redundant layers and poor organization. Fix them without changing what the software does.`,
+    `You are cleaning up the repository "${repo}". An automated scan (Aegis) found the items below: ${[findings.length ? 'over-engineering, redundant layers and poor organization' : '', suggestions.length ? 'code that does the same job in several places and could be unified' : ''].filter(Boolean).join(', plus ')}. Fix them without changing what the software does.`,
     '',
     'How to work:',
-    '1. Work through the findings in order. They are sorted from most to least important.',
-    '2. Before changing anything, check the finding is real. The scan uses patterns, not a full understanding of the code, so search for references (including paths built from variables, tool configs and docs). If a finding is wrong or the code has a good reason to be that way, skip it and say why.',
-    '3. Keep behavior exactly the same. No new features, no reformatting of untouched code, no dependency changes.',
+    `1. Work through the ${findings.length ? 'findings in order (most important first)' : 'suggestions in order'}${both ? ', then the suggestions' : ''}.`,
+    '2. Before changing anything, check the item is real. The scan uses patterns, not a full understanding of the code, so search for references (including paths built from variables, tool configs and docs). If an item is wrong or the code has a good reason to be that way, skip it and say why.',
+    `3. Keep behavior the same. No new features, no reformatting of untouched code, no dependency changes.${suggestions.length ? ' Where a suggestion says the copies behave differently today and picks one behavior to keep, follow it and say so in the commit message.' : ''}`,
     commands.length
-      ? `4. After each finding, run the project's checks and fix anything you broke: ${commands.map((c) => `\`${c}\``).join(', ')}.`
-      : "4. After each finding, run the project's build and tests (if it has any) and fix anything you broke.",
-    '5. Make one commit per finding, with a message that says what changed and why.',
-    '6. Only delete files the findings name, and only after confirming nothing uses them.',
-    '',
-    'Findings:',
+      ? `4. After each item, run the project's checks and fix anything you broke: ${commands.map((c) => `\`${c}\``).join(', ')}.`
+      : "4. After each item, run the project's build and tests (if it has any) and fix anything you broke.",
+    '5. Make one commit per item, with a message that says what changed and why.',
+    '6. Only delete files the items name, and only after confirming nothing uses them.',
   ];
+  if (findings.length) lines.push('', 'Findings:');
   findings.forEach((f, i) => {
     lines.push('', `${i + 1}. [${SEVERITY_LABEL[f.severity]}] ${f.title}`);
     lines.push(`   Why it matters: ${f.why}`);
@@ -135,9 +140,25 @@ export function buildPrompt(repo: string, findings: Finding[], files: RepoFile[]
     for (const e of f.evidence) lines.push(`   - ${e}`);
     lines.push(`   Fix: ${f.fix}`);
   });
-  lines.push(
-    '',
-    'When you are done, report: what you changed for each finding, which findings you skipped and why, and the result of the checks.',
-  );
+  if (suggestions.length) lines.push('', suggestionsForPrompt(suggestions, findings.length + 1));
+  lines.push('', `When you are done, report: what you changed for each ${both ? 'finding and suggestion' : findings.length ? 'finding' : 'suggestion'}, which you skipped and why, and the result of the checks.`);
+  return lines.join('\n');
+}
+
+/** The written suggestions, as a section of the agent prompt (numbered after the findings). */
+function suggestionsForPrompt(written: WrittenSuggestion[], startAt: number): string {  if (!written.length) return '';
+  const lines = ['Suggestions (unify code that does the same job):'];
+  written.forEach((w, i) => {
+    lines.push('', `${startAt + i}. ${w.title}`, `   ${w.summary}`);
+    if (w.alreadyShared.length) lines.push(`   Already shared: ${w.alreadyShared.join('; ')}`);
+    if (w.repeated.length) {
+      lines.push('   Repeated today:');
+      for (const r of w.repeated) lines.push(`   - ${r.file}: ${r.what}`);
+    }
+    lines.push('   Plan:');
+    w.plan.forEach((step, n) => lines.push(`   ${n + 1}) ${step}`));
+    if (w.sketch.trim()) lines.push('   Sketch:', ...w.sketch.trimEnd().split('\n').map((l) => `     ${l}`));
+    if (w.payoff) lines.push(`   Payoff: ${w.payoff}`);
+  });
   return lines.join('\n');
 }

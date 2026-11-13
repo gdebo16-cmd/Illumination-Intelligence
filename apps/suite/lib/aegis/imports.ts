@@ -29,6 +29,8 @@ export interface ImportGraph {
   edges: Edge[];
   importers: Map<string, Edge[]>;
   imports: Map<string, Edge[]>;
+  /** The repo file an import in `from` points to, or null for a package or a file we can't find. */
+  resolve: (from: string, spec: string) => string | null;
 }
 
 // Takes out line and block comments, leaving strings alone (so "@/*" in a tsconfig survives).
@@ -139,7 +141,7 @@ export function buildGraph(all: RepoFile[]): ImportGraph {
     importers.get(e.to)!.push(e);
     imports.get(e.from)!.push(e);
   }
-  return { files, edges, importers, imports };
+  return { files, edges, importers, imports, resolve };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -282,7 +284,8 @@ function exportedSignatures(src: string): { name: string; text: string }[] {
     let j = i;
     const isType = /^export\s+(?:declare\s+)?(?:type|interface)\b/.test(lines[i]);
     if (isType) while (j < lines.length - 1 && !/^[}\]]|;\s*$/.test(lines[j])) j++;
-    else while (j < lines.length - 1 && j - i < 8 && !lines[j].includes('{') && !/;\s*$/.test(lines[j])) j++;
+    // A function's signature runs to where its body opens: `) {`, `): T {` or `=> {`, maybe many lines down.
+    else while (j < lines.length - 1 && j - i < 30 && !/(\)\s*(:[^=]*)?|=>)\s*\{\s*$/.test(lines[j]) && !(j === i && /;\s*$/.test(lines[j]))) j++;
     out.push({ name: m[1], text: lines.slice(i, j + 1).join('\n') });
   }
   return out;

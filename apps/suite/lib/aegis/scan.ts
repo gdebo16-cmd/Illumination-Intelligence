@@ -6,7 +6,8 @@ import { checkCss, checkDumpingGrounds, checkDuplicateFiles, checkLargeFiles, ch
 import { CODE_EXTS, listFiles, type RepoFile } from './files';
 import { buildGraph, checkCycles, checkOrphans, checkPassThrough, checkUnusedExports, type ImportGraph } from './imports';
 import { openRepo } from './repo';
-import { buildPrompt, lessonsFor } from './report';
+import { lessonsFor, verifyCommands } from './report';
+import { findSuggestions } from './suggest';
 import type { Finding, ScanReport } from './types';
 
 /** Every check, with the line shown under "came back clean" when it finds nothing. */
@@ -50,6 +51,7 @@ export async function scanRepo(input: unknown): Promise<ScanReport> {
       else clean.push(check.clean);
     }
     findings.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
+    const suggestions = findSuggestions(files, graph);
 
     const code = files.filter((f) => CODE_EXTS.has(f.ext) && f.text !== undefined);
     return {
@@ -64,9 +66,10 @@ export async function scanRepo(input: unknown): Promise<ScanReport> {
       },
       truncated,
       findings,
+      suggestions,
       clean,
-      lessons: lessonsFor(findings),
-      prompt: buildPrompt(repo.name, findings, files),
+      lessons: lessonsFor(findings, suggestions.length > 0),
+      commands: verifyCommands(files),
     };
   } finally {
     await repo.close();

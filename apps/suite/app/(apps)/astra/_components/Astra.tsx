@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Sidebar from "@/components/Sidebar";
-import AppHeader from "@/components/AppHeader";
-import SidebarToggle from "@/components/SidebarToggle";
+import AppShell from "@/components/AppShell";
+import useSidebar from "@/hooks/use-sidebar";
 import GlyphPad, { GlyphArt } from "./GlyphPad";
 import FontPreview from "./FontPreview";
 import SheetImport, { type SheetLetter } from "./SheetImport";
@@ -33,7 +32,7 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 const glyphUrl = (fontId: string, char: string) => `/api/astra/fonts/${fontId}/glyphs/${char.codePointAt(0)}`;
 
 const Astra = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const panel = useSidebar();
   const [fonts, setFonts] = useState<Font[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState(""); // what's typed in the name box right now
@@ -166,154 +165,155 @@ const Astra = () => {
     if (font.id === selectedId) selectFont(rest[0]); // deleted the open one: open the next
   };
 
-  return (
-    <div className={`site-container ${sidebarOpen ? "sidebar-open" : ""}`}>
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} title="Fonts" className="astra-sidebar">
-        <div className="astra-sidebar-content">
-          <button type="button" className="new-chat-button" onClick={addFont}>
-            + New font
-          </button>
-          <span className="sidebar-separator">Your fonts</span>
-          <div className="chat-list">
-            {fonts.map((font) => (
-              <div key={font.id} className={`chat-row ${font.id === selectedId ? "is-current" : ""}`}>
-                <button
-                  type="button"
-                  className="chat-button"
-                  aria-current={font.id === selectedId}
-                  onClick={() => selectFont(font)}
-                >
-                  {font.name}
-                </button>
-                <button
-                  type="button"
-                  className="chat-delete"
-                  aria-label={`Delete font: ${font.name}`}
-                  title="Delete font"
-                  onClick={() => removeFont(font)}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+  const fontList = (
+    <div className="astra-sidebar-content">
+      <button type="button" className="new-chat-button" onClick={addFont}>
+        + New font
+      </button>
+      <span className="sidebar-separator">Your fonts</span>
+      <div className="chat-list">
+        {fonts.map((font) => (
+          <div key={font.id} className={`chat-row ${font.id === selectedId ? "is-current" : ""}`}>
+            <button
+              type="button"
+              className="chat-button"
+              aria-current={font.id === selectedId}
+              onClick={() => {
+                selectFont(font);
+                panel.closeOnPhone();
+              }}
+            >
+              {font.name}
+            </button>
+            <button
+              type="button"
+              className="chat-delete"
+              aria-label={`Delete font: ${font.name}`}
+              title="Delete font"
+              onClick={() => removeFont(font)}
+            >
+              ✕
+            </button>
           </div>
-        </div>
-      </Sidebar>
-      <div className="content-area">
-        <AppHeader
-          appId="astra"
-          left={<SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} label="font list" />}
-        />
-        <main className="astra">
-          {error && <p className="astra-error" role="alert">{error}</p>}
-          {selected ? (
-            <>
-              <input
-                className="astra-name"
-                aria-label="Font name"
-                value={nameDraft}
-                maxLength={60}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={saveName}
-                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              />
-              <div className="astra-actions">
-                <button type="button" className="astra-action" onClick={() => setSheetOpen(true)}>
-                  Upload a sheet
-                </button>
-                <button type="button" className="astra-action" onClick={() => setAiOpen(true)}>
-                  Make with AI
-                </button>
-                {Object.keys(selected.glyphs).length > 0 ? (
-                  <DownloadFontButton fontId={selected.id} name={selected.name} updatedAt={selected.updatedAt} />
-                ) : (
-                  <span className="astra-action is-disabled" title="Make at least one character first">
-                    Download font (.ttf)
-                  </span>
-                )}
-                <label className="astra-pen" title="How thick drawn pen strokes are, in every character of this font">
-                  Pen thickness
-                  <input
-                    type="range"
-                    min={MIN_PEN_WIDTH}
-                    max={MAX_PEN_WIDTH}
-                    step={5}
-                    value={selected.penWidth}
-                    onChange={(e) => changePen(Number(e.target.value))}
-                  />
-                  <svg viewBox="0 0 200 40" aria-hidden="true">
-                    <line x1={20} y1={20} x2={180} y2={20} stroke="currentColor" strokeLinecap="round" strokeWidth={selected.penWidth / 5} />
-                  </svg>
-                </label>
-              </div>
-              {CHARACTER_GROUPS.map((group) => (
-                <section key={group.id} className="astra-group" aria-label={group.name}>
-                  <h2>
-                    {group.name}
-                    <span>
-                      {group.characters.filter((char) => selected.glyphs[char]).length} of {group.characters.length}
-                    </span>
-                  </h2>
-                  <div className="astra-glyph-grid">
-                    {group.characters.map((char) => {
-                      const glyph = selected.glyphs[char];
-                      return (
-                        <button
-                          key={char}
-                          type="button"
-                          className={`astra-glyph-slot ${glyph ? "is-drawn" : ""}`}
-                          aria-label={glyph ? `Redo ${char}` : `Make ${char}`}
-                          onClick={() => setEditing(char)}
-                        >
-                          {glyph ? (
-                            <svg className="astra-glyph-art" viewBox={`0 0 ${GLYPH_SIZE} ${GLYPH_SIZE}`} aria-hidden="true">
-                              <GlyphArt glyph={glyph} penWidth={selected.penWidth} />
-                            </svg>
-                          ) : (
-                            char
-                          )}
-                          {glyph && <span className="astra-glyph-label">{char}</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-              <FontPreview glyphs={selected.glyphs} penWidth={selected.penWidth} onMake={setEditing} />
-              {sheetOpen && (
-                <SheetImport
-                  key={selected.id}
-                  glyphs={selected.glyphs}
-                  onSave={saveSheet}
-                  onClose={() => setSheetOpen(false)}
-                />
-              )}
-              {aiOpen && (
-                <AiAlphabet
-                  key={selected.id}
-                  glyphs={selected.glyphs}
-                  onSave={saveSheet}
-                  onClose={() => setAiOpen(false)}
-                />
-              )}
-              {editing && (
-                <GlyphPad
-                  key={`${selected.id}-${editing}`}
-                  letter={editing}
-                  initial={selected.glyphs[editing] ?? EMPTY_GLYPH}
-                  penWidth={selected.penWidth}
-                  saving={savingGlyph}
-                  onSave={(glyph) => saveGlyph(editing, glyph)}
-                  onCancel={() => setEditing(null)}
-                />
-              )}
-            </>
-          ) : (
-            loaded && <p className="astra-empty">Create a font to get started.</p>
-          )}
-        </main>
+        ))}
       </div>
     </div>
+  );
+
+  return (
+    <AppShell
+      appId="astra"
+      sidebar={{ panel, title: "Fonts", label: "font list", className: "astra-sidebar", content: fontList }}
+    >
+      <main className="astra">
+        {error && <p className="astra-error" role="alert">{error}</p>}
+        {selected ? (
+          <>
+            <input
+              className="astra-name"
+              aria-label="Font name"
+              value={nameDraft}
+              maxLength={60}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            />
+            <div className="astra-actions">
+              <button type="button" className="astra-action" onClick={() => setSheetOpen(true)}>
+                Upload a sheet
+              </button>
+              <button type="button" className="astra-action" onClick={() => setAiOpen(true)}>
+                Make with AI
+              </button>
+              {Object.keys(selected.glyphs).length > 0 ? (
+                <DownloadFontButton fontId={selected.id} name={selected.name} updatedAt={selected.updatedAt} />
+              ) : (
+                <span className="astra-action is-disabled" title="Make at least one character first">
+                  Download font (.ttf)
+                </span>
+              )}
+              <label className="astra-pen" title="How thick drawn pen strokes are, in every character of this font">
+                Pen thickness
+                <input
+                  type="range"
+                  min={MIN_PEN_WIDTH}
+                  max={MAX_PEN_WIDTH}
+                  step={5}
+                  value={selected.penWidth}
+                  onChange={(e) => changePen(Number(e.target.value))}
+                />
+                <svg viewBox="0 0 200 40" aria-hidden="true">
+                  <line x1={20} y1={20} x2={180} y2={20} stroke="currentColor" strokeLinecap="round" strokeWidth={selected.penWidth / 5} />
+                </svg>
+              </label>
+            </div>
+            {CHARACTER_GROUPS.map((group) => (
+              <section key={group.id} className="astra-group" aria-label={group.name}>
+                <h2>
+                  {group.name}
+                  <span>
+                    {group.characters.filter((char) => selected.glyphs[char]).length} of {group.characters.length}
+                  </span>
+                </h2>
+                <div className="astra-glyph-grid">
+                  {group.characters.map((char) => {
+                    const glyph = selected.glyphs[char];
+                    return (
+                      <button
+                        key={char}
+                        type="button"
+                        className={`astra-glyph-slot ${glyph ? "is-drawn" : ""}`}
+                        aria-label={glyph ? `Redo ${char}` : `Make ${char}`}
+                        onClick={() => setEditing(char)}
+                      >
+                        {glyph ? (
+                          <svg className="astra-glyph-art" viewBox={`0 0 ${GLYPH_SIZE} ${GLYPH_SIZE}`} aria-hidden="true">
+                            <GlyphArt glyph={glyph} penWidth={selected.penWidth} />
+                          </svg>
+                        ) : (
+                          char
+                        )}
+                        {glyph && <span className="astra-glyph-label">{char}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+            <FontPreview glyphs={selected.glyphs} penWidth={selected.penWidth} onMake={setEditing} />
+            {sheetOpen && (
+              <SheetImport
+                key={selected.id}
+                glyphs={selected.glyphs}
+                onSave={saveSheet}
+                onClose={() => setSheetOpen(false)}
+              />
+            )}
+            {aiOpen && (
+              <AiAlphabet
+                key={selected.id}
+                glyphs={selected.glyphs}
+                onSave={saveSheet}
+                onClose={() => setAiOpen(false)}
+              />
+            )}
+            {editing && (
+              <GlyphPad
+                key={`${selected.id}-${editing}`}
+                letter={editing}
+                initial={selected.glyphs[editing] ?? EMPTY_GLYPH}
+                penWidth={selected.penWidth}
+                saving={savingGlyph}
+                onSave={(glyph) => saveGlyph(editing, glyph)}
+                onCancel={() => setEditing(null)}
+              />
+            )}
+          </>
+        ) : (
+          loaded && <p className="astra-empty">Create a font to get started.</p>
+        )}
+      </main>
+    </AppShell>
   );
 };
 

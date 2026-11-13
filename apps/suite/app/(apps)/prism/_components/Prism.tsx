@@ -13,14 +13,13 @@
 //   POST /api/prism/videos     start a video (it's made in the background)
 //   GET  /api/prism/videos     your videos, and the length choices with their usual wait
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import { DEFAULT_PRISM_MODEL, PRISM_MODELS } from '@/config/prism-models';
 import type { EnlargeChoice } from '@/lib/prism/upscale-plan';
-import AppHeader from '@/components/AppHeader';
+import AppShell from '@/components/AppShell';
+import useSidebar from '@/hooks/use-sidebar';
 import QueueNotice from '@/components/QueueNotice';
-import Sidebar from '@/components/Sidebar';
-import SidebarToggle from '@/components/SidebarToggle';
 import EnlargeButtons from './EnlargeButtons';
 import usePictureSize from './use-picture-size';
 import Gallery from './Gallery';
@@ -45,17 +44,6 @@ import {
   type TrackedJob,
 } from './types';
 
-// "Is the window wide?" (a computer or a tablet on its side, not a phone). React keeps asking
-// the browser, so the answer stays right when the window is resized.
-const WIDE_SCREEN = '(min-width: 1024px)';
-const watchWide = (onChange: () => void) => {
-  const query = window.matchMedia(WIDE_SCREEN);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-};
-const isWideNow = () => window.matchMedia(WIDE_SCREEN).matches;
-const isWideOnServer = () => false; // the server can't see the window; the browser corrects it
-
 const Prism = () => {
   // The form
   const [prompt, setPrompt] = useState('');
@@ -74,16 +62,12 @@ const Prism = () => {
   const uploadSize = usePictureSize(source?.kind === 'upload' ? source.preview : null);
   const promptBox = useRef<HTMLTextAreaElement>(null);
 
-  // The side panel (settings and your pictures). It starts open on a wide screen and closed on
-  // a phone, where it slides over the page.
-  // Until you open or close it yourself (sidebarChoice), it simply follows the screen width.
-  const isWide = useSyncExternalStore(watchWide, isWideNow, isWideOnServer);
-  const [sidebarChoice, setSidebarOpen] = useState<boolean | null>(null);
-  const sidebarOpen = sidebarChoice ?? isWide;
+  // The side panel (settings and your pictures); see hooks/use-sidebar.ts for how it behaves.
+  const panel = useSidebar();
   /** Show a picture or video big. On a phone that also closes the panel, which would cover it. */
   const show = (next: Shown) => {
     setShown(next);
-    if (window.innerWidth < 768) setSidebarOpen(false);
+    panel.closeOnPhone();
   };
 
   // What's happening
@@ -461,129 +445,127 @@ const Prism = () => {
   };
 
 
+  const studio = (
+    <>
+      <StudioSettings
+        animating={animating}
+        editing={editing}
+        models={models}
+        model={model}
+        setModel={setModel}
+        expand={expand}
+        setExpand={setExpand}
+        style={style}
+        setStyle={setStyle}
+        shape={shape}
+        setShape={setShape}
+      />
+
+      <Gallery jobs={jobs} images={images} recent={recent} shown={shown} show={show} remove={remove} />
+    </>
+  );
+
   return (
-    <div className={`site-container ${sidebarOpen ? 'sidebar-open' : ''}`}>
-      {/* ------------------------------------------------------------ the side panel */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} title="Studio" className="prism-sidebar">
-        <StudioSettings
-          animating={animating}
-          editing={editing}
-          models={models}
-          model={model}
-          setModel={setModel}
-          expand={expand}
-          setExpand={setExpand}
-          style={style}
-          setStyle={setStyle}
-          shape={shape}
-          setShape={setShape}
-        />
-
-        <Gallery jobs={jobs} images={images} recent={recent} shown={shown} show={show} remove={remove} />
-      </Sidebar>
-
-      <div className="content-area">
-        <AppHeader
-          appId="prism"
-          left={<SidebarToggle open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} label="settings and pictures" />}
-        />
-    <main className="prism">
-      <QueueNotice active={busy} />
-      <div className="prism-workspace">
-        {/* ---------------------------------------------------------- controls */}
-        <form
-          className="prism-controls"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void generate();
-          }}
-        >
-          {/* With a picture: change it, or make a video from it */}
-          {source && (
-            <div className="prism-modes" role="radiogroup" aria-label="What to make">
-              <button type="button" role="radio" aria-checked={make === 'edit'} onClick={() => setMake('edit')}>
-                Edit picture
-              </button>
-              <button type="button" role="radio" aria-checked={make === 'video'} onClick={() => setMake('video')}>
-                Make video
-              </button>
-            </div>
-          )}
-
-          {source?.kind === 'upload' && !animating && (
-            <>
-              <span className="prism-label" id="prism-enlarge-label">Enlarge</span>
-              <EnlargeButtons
-                width={uploadSize?.width ?? 0}
-                height={uploadSize?.height ?? 0}
-                disabled={busy}
-                onEnlarge={(choice) => void enlarge(choice)}
-              />
-            </>
-          )}
-
-          {animating && (
-            <>
-              <span className="prism-label" id="prism-length-label">Video length</span>
-              <div className="prism-lengths" role="radiogroup" aria-labelledby="prism-length-label">
-                {lengths.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={length === l.id}
-                    className="prism-length"
-                    onClick={() => setLength(l.id)}
-                  >
-                    <strong>{l.seconds} sec</strong>
-                    <span>{aboutTime(l.wait)}</span>
-                    <small>{l.runs ? `average of ${l.runs}` : 'estimate'}</small>
-                  </button>
-                ))}
+    <AppShell
+      appId="prism"
+      sidebar={{ panel, title: 'Studio', label: 'settings and pictures', className: 'prism-sidebar', content: studio }}
+    >
+      <main className="prism">
+        <QueueNotice active={busy} />
+        <div className="prism-workspace">
+          {/* ---------------------------------------------------------- controls */}
+          <form
+            className="prism-controls"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void generate();
+            }}
+          >
+            {/* With a picture: change it, or make a video from it */}
+            {source && (
+              <div className="prism-modes" role="radiogroup" aria-label="What to make">
+                <button type="button" role="radio" aria-checked={make === 'edit'} onClick={() => setMake('edit')}>
+                  Edit picture
+                </button>
+                <button type="button" role="radio" aria-checked={make === 'video'} onClick={() => setMake('video')}>
+                  Make video
+                </button>
               </div>
-              <p className="prism-note">
-                The time is how long making it takes. You can leave the page; your video will be waiting here.
-              </p>
-            </>
-          )}
+            )}
 
-          <PromptBox
-            promptBox={promptBox}
-            source={source}
-            setSource={setSource}
-            animating={animating}
-            editing={editing}
-            prompt={prompt}
-            setPrompt={setPrompt}
-            generate={generate}
-            pickFile={pickFile}
+            {source?.kind === 'upload' && !animating && (
+              <>
+                <span className="prism-label" id="prism-enlarge-label">Enlarge</span>
+                <EnlargeButtons
+                  width={uploadSize?.width ?? 0}
+                  height={uploadSize?.height ?? 0}
+                  disabled={busy}
+                  onEnlarge={(choice) => void enlarge(choice)}
+                />
+              </>
+            )}
+
+            {animating && (
+              <>
+                <span className="prism-label" id="prism-length-label">Video length</span>
+                <div className="prism-lengths" role="radiogroup" aria-labelledby="prism-length-label">
+                  {lengths.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={length === l.id}
+                      className="prism-length"
+                      onClick={() => setLength(l.id)}
+                    >
+                      <strong>{l.seconds} sec</strong>
+                      <span>{aboutTime(l.wait)}</span>
+                      <small>{l.runs ? `average of ${l.runs}` : 'estimate'}</small>
+                    </button>
+                  ))}
+                </div>
+                <p className="prism-note">
+                  The time is how long making it takes. You can leave the page; your video will be waiting here.
+                </p>
+              </>
+            )}
+
+            <PromptBox
+              promptBox={promptBox}
+              source={source}
+              setSource={setSource}
+              animating={animating}
+              editing={editing}
+              prompt={prompt}
+              setPrompt={setPrompt}
+              generate={generate}
+              pickFile={pickFile}
+              busy={busy}
+              buttonText={buttonText}
+            />
+            {/* While it works: what it's doing and for how long (the button only shows a spinner) */}
+            {busy && <p className="prism-status" role="status">{buttonText}</p>}
+
+            {error && <p className="prism-error" role="alert">{error}</p>}
+          </form>
+
+          {/* ---------------------------------------------------------- the picture or video */}
+          <Stage
+            shownImage={shownImage}
+            shownVideo={shownVideo}
             busy={busy}
-            buttonText={buttonText}
+            animating={animating}
+            lengths={lengths}
+            now={now}
+            startFrom={startFrom}
+            reuse={reuse}
+            reuseVideo={reuseVideo}
+            enlarge={enlarge}
           />
-          {/* While it works: what it's doing and for how long (the button only shows a spinner) */}
-          {busy && <p className="prism-status" role="status">{buttonText}</p>}
+        </div>
 
-          {error && <p className="prism-error" role="alert">{error}</p>}
-        </form>
-
-        {/* ---------------------------------------------------------- the picture or video */}
-        <Stage
-          shownImage={shownImage}
-          shownVideo={shownVideo}
-          busy={busy}
-          animating={animating}
-          lengths={lengths}
-          now={now}
-          startFrom={startFrom}
-          reuse={reuse}
-          reuseVideo={reuseVideo}
-          enlarge={enlarge}
-        />
-      </div>
-
-    </main>
-      </div>
-    </div>
+      </main>
+    </AppShell>
   );
 };
 

@@ -35,7 +35,8 @@ main {
   flex-direction: column;
   flex: 1;
   height: var(--app-height, 100dvh);
-  width: 100dvw;
+  /* The space beside the side panel when it's open (the whole width when it isn't). */
+  width: 100%;
   overflow: hidden;}
 /* #endregion */
 /* #region Header Styles */
@@ -68,6 +69,7 @@ header > :not(.header-spacer) { pointer-events: auto; }
 .content-area {
   display: flex;
   flex-direction: column;
+  flex: 1;
   height: var(--app-height, 100dvh);
   min-width: 0;
   transition: margin-left 0.2s ease;}

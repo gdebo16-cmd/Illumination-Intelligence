@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import AppHeader from '@/components/AppHeader';
-import type { Finding, ScanReport, Severity } from '@/lib/aegis/types';
+import AppShell from '@/components/AppShell';
+import { buildPrompt } from '@/lib/aegis/report';
+import type { Finding, ScanReport, Severity, WrittenSuggestion } from '@/lib/aegis/types';
+import Suggestions from './Suggestions';
 
 // Aegis: enter a repo, press Scan, and read what it found. The scan itself is lib/aegis/scan.ts.
 
@@ -58,10 +60,18 @@ const Section = ({ title, note, children }: { title: string; note?: string; chil
   </section>
 );
 
-function FindingCard({ finding, n }: { finding: Finding; n: number }) {
+function FindingCard({ finding, n, picked, onPick }: { finding: Finding; n: number; picked: boolean; onPick: (on: boolean) => void }) {
   return (
     <article className={`aegis-finding sev-${finding.severity}`}>
       <div className="aegis-finding-head">
+        <input
+          type="checkbox"
+          className="aegis-pick"
+          checked={picked}
+          onChange={(e) => onPick(e.target.checked)}
+          aria-label="Include in the AI prompt"
+          title="Include in the AI prompt"
+        />
         <span className="aegis-num">{n}</span>
         <span className={`aegis-sev sev-${finding.severity}`}>{SEVERITY_NAME[finding.severity]}</span>
         <h3><Ticks text={finding.title} /></h3>
@@ -75,6 +85,9 @@ function FindingCard({ finding, n }: { finding: Finding; n: number }) {
   );
 }
 
+/** Every finding and suggestion in a report, ticked. */
+const allKeys = (r: ScanReport) => new Set([...r.findings.map((_, i) => `f${i}`), ...r.suggestions.map((s) => s.id)]);
+
 export default function Aegis() {
   const [repo, setRepo] = useState('');
   const [recent, setRecent] = useState<string[]>([]);
@@ -83,6 +96,16 @@ export default function Aegis() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ScanReport | null>(null);
   const [copied, setCopied] = useState(false);
+  const [written, setWritten] = useState<Record<string, WrittenSuggestion>>({});
+  // What goes in the AI prompt: findings by "f<index>", suggestions by their id. All ticked after a scan.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const pick = (key: string, on: boolean) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const reportRef = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage only exists in the browser
@@ -112,6 +135,7 @@ export default function Aegis() {
       const data = await res.json().catch(() => ({ error: 'The server sent back something unexpected.' }));
       if (!res.ok || data.error) throw new Error(data.error ?? `The scan failed (${res.status}).`);
       setReport(data as ScanReport);
+      setPicked(allKeys(data as ScanReport));
       const next = [value, ...recent.filter((r) => r !== value)].slice(0, 5);
       setRecent(next);
       saveRecent(next);
@@ -123,8 +147,16 @@ export default function Aegis() {
     }
   };
 
+  // The agent prompt, from what's ticked. A ticked suggestion joins it once it's been written.
+  const pickedFindings = report ? report.findings.filter((_, i) => picked.has(`f${i}`)) : [];
+  const pickedSuggestions = report ? report.suggestions.filter((s) => picked.has(s.id)) : [];
+  const readySuggestions = pickedSuggestions.flatMap((s) => (written[s.id] ? [written[s.id]] : []));
+  const stillWriting = pickedSuggestions.length - readySuggestions.length;
+  const prompt = report ? buildPrompt(report.repo, pickedFindings, readySuggestions, report.commands) : '';
+  const total = report ? report.findings.length + report.suggestions.length : 0;
+
   const copyPrompt = async () => {
-    if (report && (await copyText(report.prompt))) {
+    if (report && (await copyText(prompt))) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -135,113 +167,134 @@ export default function Aegis() {
     : [];
 
   return (
-    <div className="site-container">
-      <div className="content-area">
-        <AppHeader appId="aegis" />
-        <main className="aegis">
-          <div className="aegis-intro">
-            <h1>Repo scan</h1>
-            <p>Finds over-engineering, redundant layers and messy organization, explains why each one matters, and writes a prompt you can hand to a coding agent to fix them.</p>
+    <AppShell appId="aegis">
+      <main className="aegis">
+        <div className="aegis-intro">
+          <h1>Repo scan</h1>
+          <p>Finds over-engineering, redundant layers and messy organization, explains why each one matters, and writes a prompt you can hand to a coding agent to fix them.</p>
+        </div>
+
+        <form
+          className="aegis-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            scan();
+          }}
+        >
+          <input
+            className="aegis-input"
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            placeholder="C:\code\my-app, https://github.com/owner/repo, or owner/repo"
+            aria-label="Repo to scan"
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            disabled={scanning}
+          />
+          <button className="aegis-button" type="submit" disabled={scanning || !repo.trim()}>
+            {scanning ? 'Scanning…' : 'Scan'}
+          </button>
+        </form>
+        <p className="aegis-hint">
+          A folder on the computer running the suite is read in place and never changed. A link is copied in for the scan, then deleted.
+        </p>
+        {recent.length > 0 && !scanning && (
+          <div className="aegis-recent">
+            {recent.map((r) => (
+              <button key={r} type="button" onClick={() => scan(r)} title={`Scan ${r} again`}>{r}</button>
+            ))}
           </div>
+        )}
 
-          <form
-            className="aegis-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              scan();
-            }}
-          >
-            <input
-              className="aegis-input"
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              placeholder="C:\code\my-app, https://github.com/owner/repo, or owner/repo"
-              aria-label="Repo to scan"
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-              disabled={scanning}
-            />
-            <button className="aegis-button" type="submit" disabled={scanning || !repo.trim()}>
-              {scanning ? 'Scanning…' : 'Scan'}
-            </button>
-          </form>
-          <p className="aegis-hint">
-            A folder on the computer running the suite is read in place and never changed. A link is copied in for the scan, then deleted.
+        {scanning && (
+          <p className="aegis-status" role="status">
+            <span className="aegis-spinner" aria-hidden /> Scanning{elapsed >= 2 ? ` · ${elapsed}s` : ''}
+            {elapsed >= 5 && ' (copying a repo from a link can take a minute)'}
           </p>
-          {recent.length > 0 && !scanning && (
-            <div className="aegis-recent">
-              {recent.map((r) => (
-                <button key={r} type="button" onClick={() => scan(r)} title={`Scan ${r} again`}>{r}</button>
-              ))}
-            </div>
-          )}
+        )}
+        {error && <p className="aegis-error" role="alert">{error}</p>}
 
-          {scanning && (
-            <p className="aegis-status" role="status">
-              <span className="aegis-spinner" aria-hidden /> Scanning{elapsed >= 2 ? ` · ${elapsed}s` : ''}
-              {elapsed >= 5 && ' (copying a repo from a link can take a minute)'}
-            </p>
-          )}
-          {error && <p className="aegis-error" role="alert">{error}</p>}
+        {report && !scanning && (
+          <div className="aegis-report" ref={reportRef}>
+            <section className="aegis-summary">
+              <div>
+                <h2>{report.repo}</h2>
+                <p className="aegis-note">
+                  {report.stats.files.toLocaleString()} files · {report.stats.codeFiles.toLocaleString()} code files · {report.stats.codeLines.toLocaleString()} lines of code · {report.seconds}s
+                </p>
+                {report.truncated && <p className="aegis-note">This repo is very large, so only its first 20,000 files were scanned.</p>}
+              </div>
+              <div className="aegis-counts">
+                {counts.map(([s, n]) => (
+                  <span key={s} className={`aegis-count sev-${s}`}><b>{n}</b> {SEVERITY_NAME[s]}</span>
+                ))}
+              </div>
+            </section>
 
-          {report && !scanning && (
-            <div className="aegis-report" ref={reportRef}>
-              <section className="aegis-summary">
-                <div>
-                  <h2>{report.repo}</h2>
-                  <p className="aegis-note">
-                    {report.stats.files.toLocaleString()} files · {report.stats.codeFiles.toLocaleString()} code files · {report.stats.codeLines.toLocaleString()} lines of code · {report.seconds}s
-                  </p>
-                  {report.truncated && <p className="aegis-note">This repo is very large, so only its first 20,000 files were scanned.</p>}
-                </div>
-                <div className="aegis-counts">
-                  {counts.map(([s, n]) => (
-                    <span key={s} className={`aegis-count sev-${s}`}><b>{n}</b> {SEVERITY_NAME[s]}</span>
-                  ))}
-                </div>
-              </section>
+            <Section
+              title="Findings"
+              note={report.findings.length ? 'Most important first. The scan works from patterns, so check each one before acting on it.' : undefined}
+            >
+              {report.findings.length
+                ? report.findings.map((f, i) => (
+                    <FindingCard key={i} finding={f} n={i + 1} picked={picked.has(`f${i}`)} onPick={(on) => pick(`f${i}`, on)} />
+                  ))
+                : <p>Nothing stood out. Nice work.</p>}
+            </Section>
 
-              <Section
-                title="Findings"
-                note={report.findings.length ? 'Most important first. The scan works from patterns, so check each one before acting on it.' : undefined}
-              >
-                {report.findings.length
-                  ? report.findings.map((f, i) => <FindingCard key={i} finding={f} n={i + 1} />)
-                  : <p>Nothing stood out. Nice work.</p>}
+            <Section
+              title="Suggestions"
+              note="Code that does the same job in several places and could live in one. A local model reads the code and writes each one up; ticked ones join the AI Prompt as they finish."
+            >
+              <Suggestions candidates={report.suggestions} onWritten={setWritten} picked={picked} onPick={pick} />
+            </Section>
+
+            {report.clean.length > 0 && (
+              <Section title="Came back clean">
+                <ul className="aegis-clean">
+                  {report.clean.map((c) => <li key={c}>{c}</li>)}
+                </ul>
               </Section>
+            )}
 
-              {report.clean.length > 0 && (
-                <Section title="Came back clean">
-                  <ul className="aegis-clean">
-                    {report.clean.map((c) => <li key={c}>{c}</li>)}
-                  </ul>
-                </Section>
+            <Section title="Learning opportunities" note="The idea behind each kind of problem, so it doesn't come back.">
+              <div className="aegis-lessons">
+                {report.lessons.map((l) => (
+                  <article key={l.title} className="aegis-lesson">
+                    <h3>{l.title}</h3>
+                    <p><Ticks text={l.body} /></p>
+                  </article>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="AI Prompt" note="Give this to a coding agent (Claude Code, Cursor, an Umbra Flicker) in the repo to make the fixes. It covers the findings and suggestions you've ticked.">
+              {total > 0 && (
+                <div className="aegis-picked">
+                  <span>
+                    {pickedFindings.length} of {report.findings.length} findings
+                    {report.suggestions.length > 0 && <>, {pickedSuggestions.length} of {report.suggestions.length} suggestions</>}
+                    {stillWriting > 0 && <> ({stillWriting} still being written, added when ready)</>}
+                  </span>
+                  <button type="button" onClick={() => setPicked(allKeys(report))}>Tick all</button>
+                  <button type="button" onClick={() => setPicked(new Set())}>Untick all</button>
+                </div>
               )}
-
-              <Section title="Learning opportunities" note="The idea behind each kind of problem, so it doesn't come back.">
-                <div className="aegis-lessons">
-                  {report.lessons.map((l) => (
-                    <article key={l.title} className="aegis-lesson">
-                      <h3>{l.title}</h3>
-                      <p><Ticks text={l.body} /></p>
-                    </article>
-                  ))}
-                </div>
-              </Section>
-
-              <Section title="AI Prompt" note="Give this to a coding agent (Claude Code, Cursor, an Umbra Flicker) in the repo to make the fixes.">
+              {prompt ? (
                 <div className="aegis-prompt">
                   <button type="button" className="aegis-button aegis-copy" onClick={copyPrompt}>
                     {copied ? 'Copied' : 'Copy'}
                   </button>
-                  <pre>{report.prompt}</pre>
+                  <pre>{prompt}</pre>
                 </div>
-              </Section>
-            </div>
-          )}
-        </main>
-      </div>
-    </div>
+              ) : (
+                <p className="aegis-note">{total ? 'Tick a finding or a suggestion to put it in the prompt.' : 'Nothing to fix, so there\'s no prompt.'}</p>
+              )}
+            </Section>
+          </div>
+        )}
+      </main>
+    </AppShell>
   );
 }
