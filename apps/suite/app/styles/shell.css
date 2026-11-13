@@ -265,7 +265,7 @@
   font-size: 0.85rem;
   color: inherit;
   background: rgb(255 255 255 / 0.03);
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 14px;
   cursor: pointer;
 }
@@ -333,7 +333,7 @@
   margin: 0.25rem 0 0.1rem;
   padding: 0 0 0 0.6rem;
   border-bottom: none;
-  border-left: 2px solid color-mix(in srgb, var(--mate-color, var(--bot-color)) 35%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--mate-color, var(--bot-color)) 35%, transparent);
 }
 .umbra-step-detail {
   margin-top: 0.15rem;

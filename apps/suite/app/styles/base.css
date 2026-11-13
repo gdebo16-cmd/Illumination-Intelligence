@@ -366,7 +366,7 @@ textarea.input-field {
   font-size: 5rem;
   font-weight: 600;
   color: #f4f4f5;
-  border-bottom: 2px solid #71717a;
+  border-bottom: 1px solid #71717a;
   padding-bottom: 1rem;}
 .sub-signin {
   font-size: 2rem;
@@ -571,7 +571,7 @@ textarea.input-field {
 .home-icon-option {
   padding: 2px;
   background: transparent;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 24%;
   cursor: pointer;
   line-height: 0;}
