@@ -22,7 +22,7 @@ export const LOADERS: Record<string, string> = {
   UNETLoader: 'unet_name',
   CLIPLoader: 'clip_name',
   VAELoader: 'vae_name',
-  UpscaleModelLoader: 'model_name', // Prism's Upscale button
+  UpscaleModelLoader: 'model_name', // Prism's Fast 4×, Photo 4×, and the 8K 2× pass
   LoraLoaderModelOnly: 'lora_name', // an art style's LoRA (config/prism-styles.ts)
 };
 

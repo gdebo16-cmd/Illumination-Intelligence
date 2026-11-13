@@ -1,0 +1,215 @@
+{
+  "14": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png"
+    },
+    "_meta": {
+      "title": "Your picture"
+    }
+  },
+  "20": {
+    "class_type": "ImageScaleToTotalPixels",
+    "inputs": {
+      "image": [
+        "14",
+        0
+      ],
+      "upscale_method": "area",
+      "megapixels": 0.35,
+      "resolution_steps": 1
+    },
+    "_meta": {
+      "title": "Shrink to about 0.35 megapixels first (Comfy's SeedVR2 advice)"
+    }
+  },
+  "21": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 4096,
+      "height": 4096,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Lanczos up to the size SeedVR2 works at (about 4K, less when an 8K 2× follows)"
+    }
+  },
+  "52": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "seedvr2_7b_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "SeedVR2 7B int8. Leave the dtype on default so it stays int8 (fp16 does not fit in 16 GB)."
+    }
+  },
+  "51": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "seedvr2_ema_vae_fp16.safetensors"
+    },
+    "_meta": {
+      "title": "SeedVR2 VAE"
+    }
+  },
+  "58": {
+    "class_type": "SeedVR2Preprocess",
+    "inputs": {
+      "resized_images": [
+        "21",
+        0
+      ]
+    }
+  },
+  "48": {
+    "class_type": "VAEEncodeTiled",
+    "inputs": {
+      "pixels": [
+        "58",
+        0
+      ],
+      "vae": [
+        "51",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 128,
+      "temporal_size": 4096,
+      "temporal_overlap": 8
+    }
+  },
+  "61": {
+    "class_type": "SeedVR2Conditioning",
+    "inputs": {
+      "model": [
+        "52",
+        0
+      ],
+      "vae_conditioning": [
+        "48",
+        0
+      ]
+    }
+  },
+  "54": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "52",
+        0
+      ],
+      "positive": [
+        "61",
+        0
+      ],
+      "negative": [
+        "61",
+        1
+      ],
+      "latent_image": [
+        "48",
+        0
+      ],
+      "seed": 0,
+      "steps": 1,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1
+    },
+    "_meta": {
+      "title": "One step, as in Comfy's SeedVR2 7B int8 image template"
+    }
+  },
+  "55": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "54",
+        0
+      ],
+      "vae": [
+        "51",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 128,
+      "temporal_size": 4096,
+      "temporal_overlap": 8
+    }
+  },
+  "59": {
+    "class_type": "SeedVR2PostProcessing",
+    "inputs": {
+      "images": [
+        "55",
+        0
+      ],
+      "original_resized_images": [
+        "21",
+        0
+      ],
+      "color_correction_method": "lab"
+    },
+    "_meta": {
+      "title": "Line the result back up and keep the original colours (LAB)"
+    }
+  },
+  "1": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": {
+      "model_name": "RealESRGAN_x2plus.pth"
+    },
+    "_meta": {
+      "title": "Faithful 2× after SeedVR2. Removed from the recipe for 4K targets."
+    }
+  },
+  "2": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": [
+        "1",
+        0
+      ],
+      "image": [
+        "59",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "8K only: double the ~4K SeedVR2 result"
+    }
+  },
+  "3": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "2",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 8192,
+      "height": 8192,
+      "crop": "disabled"
+    },
+    "_meta": {
+      "title": "Exact target size (4K UHD, 8K UHD, or the long edge you asked for)"
+    }
+  },
+  "13": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "3",
+        0
+      ],
+      "filename_prefix": "Prism/prism-upscale"
+    }
+  }
+}

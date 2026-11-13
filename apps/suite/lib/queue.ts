@@ -359,6 +359,6 @@ class GpuQueue {
 
 // Keep a single instance even when Next reloads modules in dev.
 // (The key changes whenever the class changes, so dev mode doesn't keep an outdated copy.
-// Bump it too when lib/gpu/health.ts changes: the old queue keeps using the old copy of it.)
-const g = globalThis as unknown as { gpuQueueV7?: GpuQueue };
-export const gpuQueue = (g.gpuQueueV7 ??= new GpuQueue());
+// Bump it too when lib/gpu/health.ts or lib/gpu/router.ts changes: the old queue keeps the old copy.)
+const g = globalThis as unknown as { gpuQueueV8?: GpuQueue };
+export const gpuQueue = (g.gpuQueueV8 ??= new GpuQueue());
