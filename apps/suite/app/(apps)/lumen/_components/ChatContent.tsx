@@ -157,7 +157,6 @@ const Chat = () => {
       <div ref={listRef} className="messages-container">
         {messages.length === 0 && !loadingConversation && (
           <div className="messages-empty">
-            <p className="messages-empty-subtitle">Select your model above and write a prompt to begin.</p>
           </div>
         )}
         {loadingConversation && (
@@ -240,4 +239,4 @@ const Chat = () => {
   );
 };
 
-export default Chat;
+export default Chat;
