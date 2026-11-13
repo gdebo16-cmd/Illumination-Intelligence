@@ -155,7 +155,6 @@ function backfillOnce(): void {
   if (backfilled) return;
   backfilled = true;
   try {
-    db.exec('CREATE TABLE IF NOT EXISTS ArtifactMeta (key TEXT PRIMARY KEY)');
     const done = db.prepare("INSERT OR IGNORE INTO ArtifactMeta (key) VALUES ('lumen-backfill')").run();
     // Another copy of the app (production and dev may both run) already did it.
     if (done.changes === 0) return;
