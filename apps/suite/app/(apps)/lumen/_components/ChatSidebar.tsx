@@ -1,13 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import SidebarFrame from '@/components/Sidebar';
 import { useChat } from './ChatContext';
 import ModelSelect from './ModelSelect';
 
 // What Lumen puts in the side panel: New chat, your previous chats, Switch Profile and the
-// model picker. The panel itself (frame, title, ✕, backdrop) is the shared components/Sidebar.tsx.
-const Sidebar = () => {
+// model picker. The panel itself (frame, title, ✕, backdrop) comes from components/AppShell.tsx.
+// Picking a chat or a document closes the panel on a phone, so you can see it.
+const ChatSidebar = () => {
   const router = useRouter();
   const {
     conversations,
@@ -16,16 +16,15 @@ const Sidebar = () => {
     deleteConversation,
     startNewChat,
     setSelectedModel,
-    isSidebarOpen,
-    closeSidebar,
+    panel,
     artifacts,
     openArtifact,
     deleteArtifact,
   } = useChat();
 
   return (
-    <SidebarFrame open={isSidebarOpen} onClose={closeSidebar} title="Chats">
-      <button className='new-chat-button' onClick={() => { startNewChat(); closeSidebar(); }}>+ New chat</button>
+    <>
+      <button className='new-chat-button' onClick={() => { startNewChat(); panel.closeOnPhone(); }}>+ New chat</button>
       <span className='sidebar-separator'>Previous Chats</span>
       <div className='chat-list'>
         {conversations.map((c) => (
@@ -33,7 +32,7 @@ const Sidebar = () => {
             <button
               className='chat-button'
               aria-current={c.id === conversationId}
-              onClick={() => { loadConversation(c.id); closeSidebar(); }}
+              onClick={() => { loadConversation(c.id); panel.closeOnPhone(); }}
             >
               {c.title}
             </button>
@@ -59,7 +58,7 @@ const Sidebar = () => {
             <button
               className='chat-button artifact-button'
               title={`From: ${a.sourceName}`}
-              onClick={() => { void openArtifact(a); closeSidebar(); }}
+              onClick={() => { void openArtifact(a); panel.closeOnPhone(); }}
             >
               <span className='artifact-icon' aria-hidden>📄</span>
               <span className='artifact-title'>{a.title}</span>
@@ -87,8 +86,8 @@ const Sidebar = () => {
         Model
       </span>
       <ModelSelect pageType="chat" onChange={setSelectedModel} />
-    </SidebarFrame>
+    </>
   );
 };
 
-export default Sidebar;
+export default ChatSidebar;

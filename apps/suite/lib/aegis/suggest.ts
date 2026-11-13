@@ -274,7 +274,7 @@ function followHooks(decls: string[], file: string, sources: Map<string, string>
   return out;
 }
 
-export function findRepeatedLayouts(files: RepoFile[], graph: ImportGraph): SuggestionCandidate[] {
+function findRepeatedLayouts(files: RepoFile[], graph: ImportGraph): SuggestionCandidate[] {
   interface Seen { file: string; sf: ts.SourceFile; frame: FrameNode }
   const byRoot = new Map<string, Seen[]>();
   for (const f of files) {
@@ -417,7 +417,7 @@ function normalizedTokens(f: RepoFile): Tok[] {
   return out;
 }
 
-export function findLookalikeCode(files: RepoFile[]): SuggestionCandidate[] {
+function findLookalikeCode(files: RepoFile[]): SuggestionCandidate[] {
   const code = files.filter((f) => CODE_FILES.has(f.ext) && f.text && !isTest(f.path) && !/@generated|do not edit/i.test(f.text.slice(0, 400)));
   const tokens = new Map(code.map((f) => [f.path, normalizedTokens(f)]));
   // Every window of tokens, by its shape: which files have it, and where.
