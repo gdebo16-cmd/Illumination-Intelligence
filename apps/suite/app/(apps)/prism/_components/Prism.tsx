@@ -6,7 +6,7 @@
 // change, or bring it to life as a short video ("Make video").
 // It talks to these API routes:
 //   POST /api/prism/generate   start a picture, or an edit (it's made in the background)
-//   POST /api/prism/upscale    start a bigger copy of a picture (also in the background)
+//   POST /api/prism/upscale    enlarge a picture (Fast 4×, Photo 4×, or Enhance to 4K / 8K)
 //   GET  /api/prism/jobs       pictures still being made, and how the latest ones went
 //   GET  /api/prism/images     your recent pictures
 //   GET  /api/prism/models     the picture models, and whether each one is downloaded yet
@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { PRISM_STYLES } from '@/config/prism-styles';
 import { DEFAULT_PRISM_MODEL, PRISM_MODELS, findPrismModel } from '@/config/prism-models';
+import { choicesFor, type EnlargeChoice } from '@/lib/prism/upscale-plan';
 import AppHeader from '@/components/AppHeader';
 import QueueNotice from '@/components/QueueNotice';
 import Sidebar from '@/components/Sidebar';
@@ -28,10 +29,6 @@ const SHAPES = [
   { id: 'landscape', name: 'Landscape', width: 1216, height: 832 },
   { id: 'phone', name: 'Phone', width: 768, height: 1344 },
 ] as const;
-
-// A picture with a side longer than this has no Upscale button (the same limit as
-// UPSCALE_MAX_SIDE in lib/prism/comfy.ts, which the server enforces).
-const MAX_UPSCALE_SIDE = 2048;
 
 // What the API sends back for each picture.
 interface PrismImage {
@@ -167,6 +164,7 @@ const Prism = () => {
   const [length, setLength] = useState('short');
   const editing = source !== null && make === 'edit';
   const animating = source !== null && make === 'video';
+  const uploadSize = usePictureSize(source?.kind === 'upload' ? source.preview : null);
   const fileInput = useRef<HTMLInputElement>(null);
   const promptBox = useRef<HTMLTextAreaElement>(null);
 
@@ -185,11 +183,12 @@ const Prism = () => {
   // What's happening
   // `sending`: a request is on its way to the server. `jobs`: pictures the server is making.
   const [sending, setSending] = useState<'make' | 'upscale' | null>(null);
+  const [upscaleLabel, setUpscaleLabel] = useState('Upscaling');
   const [jobs, setJobs] = useState<TrackedJob[]>([]);
   const jobsRef = useRef<TrackedJob[]>([]); // the same list, for code that runs outside a render
   const pictureJob = jobs.find((j) => j.status === 'working');
   const busy = sending !== null || pictureJob !== undefined;
-  const upscaling = sending === 'upscale' || pictureJob?.mode === 'upscale'; // busy because of the Upscale button
+  const upscaling = sending === 'upscale' || pictureJob?.mode === 'upscale'; // busy because of an Enlarge button
   // Set when the app goes into the background, so a request cut off by that isn't called a failure.
   const wentAway = useRef(false);
   const [elapsed, setElapsed] = useState(0);
@@ -447,20 +446,26 @@ const Prism = () => {
     }
   };
 
-  // "Upscale" on the big picture: make a copy twice as big and sharper. The original is kept.
-  const upscale = async (image: PrismImage) => {
+  // Enlarge the big picture, or a picture just loaded from this device. The original is kept.
+  const enlarge = async (choice: EnlargeChoice, image?: PrismImage) => {
     if (busy) return;
+    const file = !image && source?.kind === 'upload' ? source.file : null;
+    if (!image && !file) return;
+    setUpscaleLabel(choice.label);
     setSending('upscale');
     setElapsed(0);
     setError('');
     wentAway.current = false;
     const sentAt = Date.now();
     try {
-      const res = await fetch('/api/prism/upscale', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: image.id, factor: 2 }),
-      });
+      const fields = { target: choice.target, ...(choice.fastModel ? { fastModel: choice.fastModel } : {}) };
+      const res = file
+        ? await send('/api/prism/upscale', fields)
+        : await fetch('/api/prism/upscale', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...fields, imageId: image!.id }),
+          });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Something went wrong (${res.status}).`);
       setTracked([track(data as ImageJob), ...jobsRef.current]);
@@ -514,8 +519,9 @@ const Prism = () => {
     ...videos.map((video) => ({ kind: 'video' as const, id: video.id, at: video.createdAt, video })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
+  const upscaleWord = sending === 'upscale' ? upscaleLabel : 'Upscaling';
   const buttonText = upscaling
-    ? `Upscaling… ${elapsed.toFixed(1)}s`
+    ? `${upscaleWord}… ${elapsed.toFixed(1)}s`
     : busy
     ? animating && !pictureJob
       ? 'Starting…'
@@ -706,6 +712,18 @@ const Prism = () => {
             </div>
           )}
 
+          {source?.kind === 'upload' && !animating && (
+            <>
+              <span className="prism-label" id="prism-enlarge-label">Enlarge</span>
+              <EnlargeButtons
+                width={uploadSize?.width ?? 0}
+                height={uploadSize?.height ?? 0}
+                disabled={busy}
+                onEnlarge={(choice) => void enlarge(choice)}
+              />
+            </>
+          )}
+
           {animating && (
             <>
               <span className="prism-label" id="prism-length-label">Video length</span>
@@ -880,14 +898,14 @@ const Prism = () => {
                 <span className="prism-caption-actions">
                   <button type="button" onClick={() => startFrom(shownImage, 'edit')}>Edit this</button>
                   <button type="button" onClick={() => startFrom(shownImage, 'video')}>Make video</button>
-                  {/* Not offered for a picture that's already as big as Prism makes them */}
-                  {Math.max(shownImage.width, shownImage.height) <= MAX_UPSCALE_SIDE && (
-                    <button type="button" onClick={() => void upscale(shownImage)} disabled={busy}>
-                      {upscaling ? 'Upscaling…' : 'Upscale 2×'}
-                    </button>
-                  )}
                   <button type="button" onClick={() => reuse(shownImage)}>Reuse settings</button>
                   <SaveButton key={shownImage.url} url={shownImage.url} name={`prism-${shownImage.id.slice(0, 8)}.png`} type="image/png" />
+                  <EnlargeButtons
+                    width={shownImage.width}
+                    height={shownImage.height}
+                    disabled={busy}
+                    onEnlarge={(choice) => void enlarge(choice, shownImage)}
+                  />
                 </span>
               </figcaption>
             </figure>
@@ -924,6 +942,56 @@ function VideoProgress({ video, lengths, now }: { video: PrismVideo; lengths: Le
 }
 
 export default Prism;
+
+/** Width and height of a preview URL, once the browser has read the file. */
+function usePictureSize(url: string | null): { width: number; height: number } | null {
+  const [size, setSize] = useState<{ url: string; width: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    const img = new Image();
+    let live = true;
+    img.onload = () => {
+      if (live) setSize({ url, width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = url;
+    return () => {
+      live = false;
+    };
+  }, [url]);
+  return url && size?.url === url ? size : null;
+}
+
+/** Fast 4×, Photo 4×, and Enhance to 4K or 8K. Hidden once the picture is already that big. */
+function EnlargeButtons({
+  width,
+  height,
+  disabled,
+  onEnlarge,
+}: {
+  width: number;
+  height: number;
+  disabled: boolean;
+  onEnlarge: (choice: EnlargeChoice) => void;
+}) {
+  const choices = choicesFor(width, height);
+  if (!choices.length) return null;
+  return (
+    <span className="prism-enlarge">
+      <span className="prism-enlarge-note">Fast and Photo only enlarge. Enhance can invent fine detail, such as hair.</span>
+      {choices.map((choice) => (
+        <button
+          key={`${choice.target}-${choice.fastModel ?? 'enhance'}`}
+          type="button"
+          title={choice.title}
+          disabled={disabled}
+          onClick={() => onEnlarge(choice)}
+        >
+          {choice.label}
+        </button>
+      ))}
+    </span>
+  );
+}
 
 // "Save" for a picture or video. On a phone it opens the share sheet, where "Save Image" or
 // "Save Video" puts it in Photos. (A plain download link in the Home Screen app opens a

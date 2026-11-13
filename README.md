@@ -5,7 +5,7 @@ Gabriel DeBoer's suite of local AI apps: Lumen, Prism, Umbra, Astra, Eclipse, an
 Working apps:
 
 - **Lumen**: local chat through Ollama. With a model that can see images, an add-photo button appears in the message box.
-- **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes. ComfyUI must be running (`run_nvidia_gpu.bat`).
+- **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes, and can enlarge them (Fast 4×, Photo 4×, or Enhance to 4K / 8K). ComfyUI must be running (`run_nvidia_gpu.bat`). Which model files go where is in [docs/prism-upscale.md](docs/prism-upscale.md).
 - **Umbra**: agent bots. Create bots with a flame avatar, a personality, a purpose and a local model, then chat with them. (Stage 1 of 4: tools, background tasks and teams come next.)
 
 Photos in chat (Lumen and a Flicker's chat in Umbra): the add-photo button only shows for models listed in `VISION_MODELS` in `apps/suite/config/models.ts`. Add a model's id there when you install one that can see images.

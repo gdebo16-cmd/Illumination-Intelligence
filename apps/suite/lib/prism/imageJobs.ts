@@ -90,7 +90,12 @@ export function friendlyImageError(err: unknown, modelName?: string): string {
   // ComfyUI says "value_not_in_list" when a recipe names a model file it doesn't have.
   if (/fetch failed|ECONNREFUSED/i.test(message)) return 'ComfyUI isn’t running. Start it with run_nvidia_gpu.bat and try again.';
   if (/value_not_in_list/.test(message)) {
-    return `${modelName ?? 'That model'} isn’t downloaded into ComfyUI yet. Pick another model, or add its files first.`;
+    const file = message.match(/[\w.-]+\.(?:safetensors|pth|gguf)/i)?.[0];
+    const missing = file ? ` (missing ${file})` : '';
+    return `${modelName ?? 'That model'} isn’t downloaded into ComfyUI yet${missing}. Pick another option, or add its files first.`;
+  }
+  if (/does not exist/i.test(message) && /node|SeedVR2/i.test(message)) {
+    return 'This ComfyUI doesn’t have SeedVR2 yet. Update ComfyUI, or use Fast 4× or Photo 4×.';
   }
   // still failing after generateImage's own second try
   if (ranOutOfMemory(err)) return 'The computer ran out of memory for this picture. Close a few programs and try again.';

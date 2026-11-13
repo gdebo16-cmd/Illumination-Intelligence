@@ -24,6 +24,11 @@ export interface GpuNeeds {
   ramHeavy?: boolean;
   /** Every model file the job's recipe loads. A machine missing any of them can't run it. */
   files: string[];
+  /**
+   * File names for one model that ships under more than one name (.pth and .safetensors).
+   * A machine needs at least one of them. Leave it out when every file in `files` is enough.
+   */
+  oneOf?: string[];
 }
 
 // How much of a machine's RAM a model may spill into. ComfyUI can keep part of a model in RAM
@@ -33,12 +38,13 @@ const RAM_SPILL_SHARE = 0.5;
 const fitsOnCard = (needs: GpuNeeds, s: WorkerState) => s.worker.vramGB >= needs.vramGB;
 const fitsWithSpill = (needs: GpuNeeds, s: WorkerState) =>
   s.worker.vramGB + s.worker.ramGB * RAM_SPILL_SHARE >= needs.vramGB;
+const hasFiles = (needs: GpuNeeds, s: WorkerState) =>
+  needs.files.every((file) => s.files.has(file))
+  && (!needs.oneOf?.length || needs.oneOf.some((file) => s.files.has(file)));
 
 /** The machines that can run this job, best first. Empty when none can. */
 export function rankWorkers(needs: GpuNeeds, states: WorkerState[]): WorkerState[] {
-  const able = states.filter(
-    (s) => s.online && needs.files.every((file) => s.files.has(file)) && fitsWithSpill(needs, s),
-  );
+  const able = states.filter((s) => s.online && hasFiles(needs, s) && fitsWithSpill(needs, s));
   return able.sort((a, b) => {
     if (needs.ramHeavy && a.worker.ramGB !== b.worker.ramGB) return b.worker.ramGB - a.worker.ramGB;
     const aFits = fitsOnCard(needs, a);
@@ -55,6 +61,10 @@ export function noWorkerMessage(needs: GpuNeeds, states: WorkerState[]): string 
   const missing = needs.files.filter((file) => !online.some((s) => s.files.has(file)));
   if (missing.length) {
     return `${needs.label}: the model isn’t downloaded into ComfyUI on any machine yet (missing ${missing.join(', ')}). Pick another model, or add its files first.`;
+  }
+  const oneOf = needs.oneOf ?? [];
+  if (oneOf.length && !online.some((s) => oneOf.some((file) => s.files.has(file)))) {
+    return `${needs.label}: ComfyUI doesn’t have ${oneOf.join(' or ')} yet. Add one of those files and try again.`;
   }
   return `${needs.label}: no machine has every file it needs, or enough memory for it.`;
 }

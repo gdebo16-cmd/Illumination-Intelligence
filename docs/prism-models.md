@@ -1,6 +1,6 @@
 # More models for Prism: what could go in a model picker
 
-Research notes, November 2026. Nothing here is built yet.
+Research notes, November 2026. Upscale is built (see [prism-upscale.md](prism-upscale.md)). The other models here are not.
 
 **Your PC:** RTX 5080 Laptop (16 GB of graphics memory), 32 GB of normal memory, ComfyUI.
 **Prism today:** FLUX.2 Klein 4B for pictures and picture edits, Wan 2.2 TI2V 5B for picture → video.
@@ -22,7 +22,7 @@ How to read the tables:
 | **FLUX.2 Klein 9B** (Black Forest Labs) | Same kind of model you have now, but bigger and better looking. Easiest swap. | 9B. Fits as FP8. A bit slower than the 4B. | Personal only (FLUX non-commercial). Your 4B is Apache 2.0. |
 | **SDXL anime models** (for example Illustrious) | **Anime and cartoon** styles, plus thousands of free style add-ons ("LoRAs") from the community. | About 7 GB. Fast. | Free with some rules (OpenRAIL) |
 | **Hunyuan3D 2.1** (Tencent) | A new kind of creation: **picture → 3D model** you can spin around or 3D print. | Fits in 16 GB for the shape. Around a minute. | Tencent community license (free at home; not allowed in the EU, UK or South Korea) |
-| **An upscaler** (for example SeedVR2, or 4x-UltraSharp) | Makes any picture or video **bigger and sharper**. Good as an "Enlarge" button. | Small. Seconds. | Free (check each one) |
+| **Upscale, now in Prism** | Fast 4× (Real-ESRGAN or Nomos DAT) and Enhance to 4K / 8K (SeedVR2 7B int8, then a faithful 2× for 8K). Setup is in [prism-upscale.md](prism-upscale.md). 4x-UltraSharp and SUPIR are not used (non-commercial licences). | Fast path is small. SeedVR2 int8 is most of 16 GB. | Apache-2.0, BSD-3, CC-BY-4.0 |
 
 ## Videos
 

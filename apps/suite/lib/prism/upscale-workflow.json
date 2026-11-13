@@ -5,7 +5,7 @@
       "model_name": "RealESRGAN_x4plus.safetensors"
     },
     "_meta": {
-      "title": "Load the upscale model (it always makes a picture 4 times bigger)"
+      "title": "Fast 4× model (Real-ESRGAN, or Nomos when Photo 4× is picked). Always 4×."
     }
   },
   "2": {
@@ -21,28 +21,30 @@
       ]
     },
     "_meta": {
-      "title": "Make it 4 times bigger"
+      "title": "Faithful enlarge (tiles on its own, so video memory stays small)"
     }
   },
   "3": {
-    "class_type": "ImageScaleBy",
+    "class_type": "ImageScale",
     "inputs": {
       "image": [
         "2",
         0
       ],
       "upscale_method": "lanczos",
-      "scale_by": 0.5
+      "width": 2048,
+      "height": 2048,
+      "crop": "disabled"
     },
     "_meta": {
-      "title": "Shrink to the size asked for (0.5 = twice the original)"
+      "title": "Only for the old 2× button: shrink the 4× result. Fast 4× skips this box."
     }
   },
   "13": {
     "class_type": "SaveImage",
     "inputs": {
       "images": [
-        "3",
+        "2",
         0
       ],
       "filename_prefix": "Prism/prism-upscale"
@@ -54,7 +56,7 @@
       "image": "example.png"
     },
     "_meta": {
-      "title": "Load Image (your picture)"
+      "title": "Your picture"
     }
   }
 }

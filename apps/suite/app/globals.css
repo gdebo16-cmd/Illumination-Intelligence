@@ -964,6 +964,38 @@ textarea.input-field {
   background: rgb(255 255 255 / 0.12);
   border-color: var(--prism-accent);
 }
+/* Enlarge: the same pills as the other picture actions, on their own row. */
+.prism-enlarge {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.prism-enlarge-note {
+  flex-basis: 100%;
+  color: #8a8ca8;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+.prism-enlarge button {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #e5e7f0;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.prism-enlarge button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.12);
+  border-color: var(--prism-accent);
+}
+.prism-enlarge button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 /* On a wide screen the picture is the centerpiece and the composer sits under it, like the
    message box in a chat: with the round Generate button inside the prompt box. (On a phone the
    composer stays on top and the page scrolls; see the phone rules further down.) */
@@ -989,6 +1021,8 @@ textarea.input-field {
   .prism-controls > #prism-length-label,
   .prism-controls > .prism-lengths,
   .prism-controls > .prism-note { order: 2; }
+  .prism-controls > .prism-enlarge,
+  .prism-controls > #prism-enlarge-label { order: 3; }
   .prism-controls > .prism-prompt-box { order: 5; }
   .prism-controls > .prism-status { order: 6; }
   .prism-controls > .prism-error { order: 7; }
