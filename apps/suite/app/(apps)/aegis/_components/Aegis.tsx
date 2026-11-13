@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import AppHeader from '@/components/AppHeader';
-import type { Finding, ScanReport, Severity } from '@/lib/aegis/types';
+import { suggestionsForPrompt } from '@/lib/aegis/report';
+import type { Finding, ScanReport, Severity, WrittenSuggestion } from '@/lib/aegis/types';
+import Suggestions from './Suggestions';
 
 // Aegis: enter a repo, press Scan, and read what it found. The scan itself is lib/aegis/scan.ts.
 
@@ -83,6 +85,7 @@ export default function Aegis() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ScanReport | null>(null);
   const [copied, setCopied] = useState(false);
+  const [written, setWritten] = useState<WrittenSuggestion[]>([]);
   const reportRef = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage only exists in the browser
@@ -123,8 +126,13 @@ export default function Aegis() {
     }
   };
 
+  // The agent prompt: the findings, then each suggestion as it's written, then what to report.
+  const prompt = report
+    ? [report.prompt, suggestionsForPrompt(written, report.findings.length + 1), report.promptClosing].filter(Boolean).join('\n\n')
+    : '';
+
   const copyPrompt = async () => {
-    if (report && (await copyText(report.prompt))) {
+    if (report && (await copyText(prompt))) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -211,6 +219,13 @@ export default function Aegis() {
                   : <p>Nothing stood out. Nice work.</p>}
               </Section>
 
+              <Section
+                title="Suggestions"
+                note="Code that does the same job in several places and could live in one. A local model reads the code and writes each one up; they're added to the AI Prompt as they finish."
+              >
+                <Suggestions candidates={report.suggestions} onWritten={setWritten} />
+              </Section>
+
               {report.clean.length > 0 && (
                 <Section title="Came back clean">
                   <ul className="aegis-clean">
@@ -235,7 +250,7 @@ export default function Aegis() {
                   <button type="button" className="aegis-button aegis-copy" onClick={copyPrompt}>
                     {copied ? 'Copied' : 'Copy'}
                   </button>
-                  <pre>{report.prompt}</pre>
+                  <pre>{prompt}</pre>
                 </div>
               </Section>
             </div>

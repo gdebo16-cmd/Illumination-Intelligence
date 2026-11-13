@@ -133,6 +133,7 @@
 .sev-high { --sev: var(--sev-high); }
 .sev-medium { --sev: var(--sev-medium); }
 .sev-low { --sev: var(--sev-low); }
+.sev-idea { --sev: #9fe0c0; }
 .aegis-count.sev-high,
 .aegis-count.sev-medium,
 .aegis-count.sev-low { color: var(--sev); }
@@ -218,6 +219,70 @@
   overflow-wrap: anywhere;
   line-height: 1.5;
 }
+
+/* Suggestions: like findings, with a model picker on top and longer write-ups. */
+.aegis-model {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.85rem;
+}
+.aegis-model select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  background: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+}
+.aegis-rewrite {
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.aegis-rewrite:hover { border-color: var(--aegis-accent); }
+.aegis-suggestion {
+  --sev: #9fe0c0;
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--sev);
+  border-radius: var(--border-radius);
+  line-height: 1.5;
+}
+.aegis-suggestion h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.aegis-suggestion h4 {
+  margin: 0.9rem 0 0.3rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.aegis-suggestion p { margin: 0.5rem 0; }
+.aegis-suggestion ul,
+.aegis-suggestion ol { margin: 0.3rem 0; padding-left: 1.4rem; }
+.aegis-suggestion li + li { margin-top: 0.3rem; }
+.aegis-repeated code { color: var(--aegis-accent); }
+.aegis-sketch {
+  margin: 0.7rem 0;
+  padding: 0.8rem 1rem;
+  overflow: auto;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  background: var(--secondary-color);
+  border-radius: 0.5rem;
+}
+.aegis-by { font-size: 0.8rem; opacity: 0.6; }
+.aegis-suggestion .aegis-status { margin-top: 0.75rem; font-size: 0.9rem; }
 
 @media (max-width: 640px) {
   .aegis { padding-left: 1rem; padding-right: 1rem; }

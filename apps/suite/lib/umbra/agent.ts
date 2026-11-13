@@ -13,7 +13,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
-import { canThink } from '@/config/models';
+import { canThink, thinkSetting } from '@/config/models';
 import { toolsFor } from './tools';
 import type { AgentStep, ToolContext, ToolDef } from './types';
 
@@ -42,18 +42,6 @@ interface OllamaReply {
     thinking?: string;
     tool_calls?: { function: { name: string; arguments: Record<string, unknown> | string } }[];
   };
-}
-
-// "Thinking" models (Qwen 3, Gemma 4, GPT-OSS) reason privately before answering. For a bot that's slow
-// (20-90 s per step) and, in testing, often made them *describe* a tool instead of using it.
-// So unless a bot has "Think before answering" switched on, it uses the quick, decisive mode:
-// thinking off, or as low as the model allows.
-function thinkSetting(model: string, think: boolean): { think?: boolean | 'low' | 'medium' } {
-  // GPT-OSS can't stop thinking; it takes an effort level instead of on/off.
-  if (model.startsWith('gpt-oss')) return { think: think ? 'medium' : 'low' };
-  if (think) return { think: true };
-  if (model.startsWith('qwen3') || model.startsWith('gemma4')) return { think: false };
-  return {};
 }
 
 /**

@@ -46,7 +46,7 @@ interface JobInfo {
   needs?: GpuNeeds;
 }
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
+export const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 
 /** Context window for chat requests. Ollama's default (4096) was silently cutting off long chats. */
 export const OLLAMA_NUM_CTX = Number(process.env.OLLAMA_NUM_CTX) || 16384;

@@ -29,6 +29,8 @@ export interface ImportGraph {
   edges: Edge[];
   importers: Map<string, Edge[]>;
   imports: Map<string, Edge[]>;
+  /** The repo file an import in `from` points to, or null for a package or a file we can't find. */
+  resolve: (from: string, spec: string) => string | null;
 }
 
 // Takes out line and block comments, leaving strings alone (so "@/*" in a tsconfig survives).
@@ -139,7 +141,7 @@ export function buildGraph(all: RepoFile[]): ImportGraph {
     importers.get(e.to)!.push(e);
     imports.get(e.from)!.push(e);
   }
-  return { files, edges, importers, imports };
+  return { files, edges, importers, imports, resolve };
 }
 
 // ---------------------------------------------------------------------------------------------

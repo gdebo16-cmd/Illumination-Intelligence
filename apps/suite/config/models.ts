@@ -29,6 +29,21 @@ export const canSeeImages = (modelId: string) => VISION_MODELS.includes(modelId)
 const THINKING_MODELS: readonly string[] = ['gemma4:12b', 'qwen3.5:9b', 'gpt-oss:20b'];
 export const canThink = (modelId: string) => THINKING_MODELS.includes(modelId);
 
+// "Thinking" models (Qwen 3, Gemma 4, GPT-OSS) reason privately before answering. For a bot (lib/umbra/agent.ts) that's slow
+// (20-90 s per step) and, in testing, often made them *describe* a tool instead of using it.
+// So unless a bot has "Think before answering" switched on, it uses the quick, decisive mode:
+// thinking off, or as low as the model allows.
+export function thinkSetting(model: string, think: boolean): { think?: boolean | 'low' | 'medium' } {
+  // GPT-OSS can't stop thinking; it takes an effort level instead of on/off.
+  if (model.startsWith('gpt-oss')) return { think: think ? 'medium' : 'low' };
+  if (think) return { think: true };
+  if (model.startsWith('qwen3') || model.startsWith('gemma4')) return { think: false };
+  return {};
+}
+
+// The model Aegis asks to write up its suggestions, until you pick another on the page.
+export const AEGIS_DEFAULT_MODEL = 'gemma4:12b';
+
 // Photos in chat: how many one message can carry, and where the browser loads a saved one from.
 export const MAX_PHOTOS = 4;
 export const chatImageUrl = (id: string) => `/api/chat-images/${id}`;
