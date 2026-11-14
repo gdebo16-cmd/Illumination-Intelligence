@@ -14,6 +14,7 @@ import { botMemory, getBot, systemPrompt, type Bot } from './bots';
 import type { AgentStep, ToolDef } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 import { mayHoldDocument } from '@/lib/document-blocks';
+import { forgetChat, teamChatKey } from '@/lib/chat-memory';
 
 const TEAM_LIMITS = { name: 40, purpose: 1000, role: 60, members: 5 };
 
@@ -160,6 +161,7 @@ export function deleteTeam(userId: string, id: string): boolean {
 function removeTeams(ids: string[]) {
   for (const id of ids) {
     db.prepare('DELETE FROM UmbraTeamMessage WHERE team_id = ?').run(id);
+    forgetTeamChat(id);
     db.prepare('DELETE FROM UmbraTeamMember WHERE team_id = ?').run(id);
     db.prepare('DELETE FROM UmbraTask WHERE team_id = ?').run(id);
     db.prepare('DELETE FROM UmbraTeam WHERE id = ?').run(id);
@@ -167,6 +169,12 @@ function removeTeams(ids: string[]) {
 }
 
 // ------------------------------------------------------------------ the team chat
+
+/** Forget what the team chat remembered of itself (its summary and saved exchanges). Facts stay. */
+export function forgetTeamChat(teamId: string): void {
+  forgetChat(teamChatKey(teamId));
+  db.prepare('DELETE FROM memory_extractions WHERE conversation_id = ?').run(teamChatKey(teamId));
+}
 
 type MessageRow = Omit<TeamMessage, 'steps'> & { steps: string | null };
 
@@ -206,11 +214,16 @@ export function addTeamMessage(teamId: string, role: TeamMessage['role'], conten
 
 export function clearTeamMessages(teamId: string): void {
   db.prepare('DELETE FROM UmbraTeamMessage WHERE team_id = ?').run(teamId);
+  forgetTeamChat(teamId);
 }
 
 // ------------------------------------------------------------------ running the team
 
 const toolList = (bot: Bot) => BOT_TOOLS.filter((t) => bot.tools.includes(t.id)).map((t) => t.name.toLowerCase()).join(', ') || 'no tools';
+
+/** How long the leader's instructions are before anything remembered is added (for sizing its history). */
+export const leaderPromptChars = (team: TeamView, userName: string) =>
+  systemPrompt(team.leader, userName).length + leaderBrief(team, userName).length + 2;
 
 /** The leader's extra instructions: who's on the team and how to hand out work. */
 function leaderBrief(team: TeamView, userName: string): string {
@@ -330,6 +343,8 @@ export async function runTeam(options: {
   team: TeamView;
   history: ChatMessage[];
   message: string;
+  /** What the team chat remembers of itself this turn (lib/chat-memory.ts recall), if anything. */
+  remembered?: string;
   priority?: 'high' | 'low';
   onStep: (step: AgentStep) => void;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
@@ -343,7 +358,7 @@ export async function runTeam(options: {
     think: leader.think,
     extraTools: team.crew.length ? [askTeammateTool(userId, userName, team, priority)] : [],
     messages: [
-      { role: 'system', content: `${systemPrompt(leader, userName, memory)}\n\n${leaderBrief(team, userName)}` },
+      { role: 'system', content: [systemPrompt(leader, userName, memory), leaderBrief(team, userName), options.remembered].filter(Boolean).join('\n\n') },
       ...options.history,
       { role: 'user', content: options.message },
     ],

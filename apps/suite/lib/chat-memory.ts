@@ -17,24 +17,25 @@
 // Summaries and embeddings live in SQLite and cost no graphics memory. Embedding runs on the
 // processor; the summary is written by the chat's own model, which is already loaded.
 //
-// Used by Lumen's chats and by each Flicker's own chat. Team chats don't use it yet.
+// Used by Lumen's chats, each Flicker's own chat, and team chats. The Memory page
+// (/umbra/memory) shows each chat's summary and what was last recalled, from here.
 
 import 'server-only';
 import db from '@/lib/db';
 import { thinkSetting } from '@/config/models';
 import { chatKey, PHOTO_CONTEXT_CHARS, photoIds } from '@/lib/chat-images';
-import { bestScore, buildMemoryBlock, embed, EMBED_TAG, fromBlob, hasMemories, toBlob } from '@/lib/memory';
+import { buildMemoryBlock, embed, EMBED_TAG, fromBlob, hasMemories, keyTerms, matchScore, toBlob } from '@/lib/memory';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_URL } from '@/lib/queue';
 
 /** Which chat, and where its messages are kept. */
 export interface ChatRef {
-  /** "lumen:<conversation id>" or "umbra:<bot id>". */
+  /** "lumen:<conversation id>", "umbra:<bot id>" or "umbra-team:<team id>". */
   key: string;
   userId: string;
-  table: 'Message' | 'UmbraMessage';
-  column: 'conversationId' | 'bot_id';
+  table: 'Message' | 'UmbraMessage' | 'UmbraTeamMessage';
+  column: 'conversationId' | 'bot_id' | 'team_id';
   id: string;
-  /** Where recall looks: every Lumen chat of this profile, or only this Flicker's own chat. */
+  /** Where recall looks: every Lumen chat of this profile, or only this chat (a Flicker's or a team's). */
   recallScope: 'all-lumen' | 'this-chat';
 }
 
@@ -43,6 +44,10 @@ export const lumenChat = (userId: string, conversationId: string): ChatRef => ({
 });
 export const umbraChat = (userId: string, botId: string): ChatRef => ({
   key: chatKey.umbra(botId), userId, table: 'UmbraMessage', column: 'bot_id', id: botId, recallScope: 'this-chat',
+});
+export const teamChatKey = (teamId: string) => `umbra-team:${teamId}`;
+export const teamChat = (userId: string, teamId: string): ChatRef => ({
+  key: teamChatKey(teamId), userId, table: 'UmbraTeamMessage', column: 'team_id', id: teamId, recallScope: 'this-chat',
 });
 
 export interface HistoryMessage {
@@ -110,10 +115,12 @@ function saveState(key: string, change: Partial<State>): void {
 type Row = { rid: number; role: string; content: string; images: string | null; createdAt: string };
 
 function messagesAfter(chat: ChatRef, rowid: number, limit = -1): (HistoryMessage & { createdAt: string })[] {
-  // Table and column come from the two fixed ChatRef makers above, never from a request.
+  // Table and column come from the fixed ChatRef makers above, never from a request.
+  // Team chats have no photos.
+  const images = chat.table === 'UmbraTeamMessage' ? 'NULL AS images' : 'images';
   const rows = db
     .prepare(
-      `SELECT rowid AS rid, role, content, images, createdAt FROM ${chat.table}
+      `SELECT rowid AS rid, role, content, ${images}, createdAt FROM ${chat.table}
        WHERE ${chat.column} = ? AND rowid > ? ORDER BY rowid LIMIT ?`,
     )
     .all(chat.id, rowid, limit) as Row[];
@@ -158,7 +165,7 @@ function hasEpisodes(chat: ChatRef): boolean {
   return Boolean(found);
 }
 
-function episodeBlock(chat: ChatRef, queries: Float32Array[], visibleFrom: number): string {
+function episodeBlock(chat: ChatRef, queries: Float32Array[], terms: string[], visibleFrom: number): string {
   type Episode = { chat: string; lastRowId: number; text: string; embedding: Uint8Array; createdAt: string };
   const columns = 'chat, last_row_id AS lastRowId, text, embedding, createdAt';
   const rows = (
@@ -174,7 +181,7 @@ function episodeBlock(chat: ChatRef, queries: Float32Array[], visibleFrom: numbe
   const best = rows
     // Leave out what the model is about to read anyway (the newest messages of this chat).
     .filter((e) => !(e.chat === chat.key && e.lastRowId >= visibleFrom))
-    .map((e) => ({ e, score: bestScore(queries, fromBlob(e.embedding)) }))
+    .map((e) => ({ e, score: matchScore(queries, fromBlob(e.embedding), e.text, terms, EPISODE_MIN_SCORE) }))
     .filter((x) => x.score >= EPISODE_MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .slice(0, EPISODE_COUNT);
@@ -213,6 +220,8 @@ export async function recall(
     recent: HistoryMessage[];
     message: string;
     facts: false | { botId?: string; userName?: string };
+    /** Keep this as the chat's latest recall for the Memory page (default true). */
+    log?: boolean;
   },
 ): Promise<string> {
   const blocks: string[] = [];
@@ -227,6 +236,8 @@ export async function recall(
     .filter((t) => t.trim())
     .join('\n');
   const searches = [...new Set([said, withContext].filter((t) => t.trim()))];
+  // Names, numbers and codes in the new message are also looked for word for word (lib/memory.ts).
+  const terms = keyTerms(options.message);
   const facts = options.facts;
   const searchFacts = Boolean(facts) && hasMemories(db, chat.userId, facts ? facts.botId : undefined);
   const wantEpisodes = hasEpisodes(chat);
@@ -238,16 +249,33 @@ export async function recall(
       console.error('Memory recall error:', (err as Error)?.message ?? err);
     }
   }
-  if (queries && wantEpisodes) blocks.push(episodeBlock(chat, queries, options.recent[0]?.rid ?? Number.MAX_SAFE_INTEGER));
+  if ((queries || terms.length) && wantEpisodes) {
+    blocks.push(episodeBlock(chat, queries ?? [], terms, options.recent[0]?.rid ?? Number.MAX_SAFE_INTEGER));
+  }
   // Even without a search, the facts that are always included still go in.
   if (searchFacts && facts) {
     try {
-      blocks.push(await buildMemoryBlock(db, chat.userId, queries, facts));
+      blocks.push(await buildMemoryBlock(db, chat.userId, queries, { ...facts, terms }));
     } catch (err) {
       console.error('Memory recall error:', (err as Error)?.message ?? err);
     }
   }
-  return blocks.filter(Boolean).join('\n\n');
+  const remembered = blocks.filter(Boolean).join('\n\n');
+  if (options.log !== false) noteRecall(chat.key, remembered);
+  return remembered;
+}
+
+/** Keep what was recalled for the latest message, for the Memory page (helps when tuning). */
+function noteRecall(key: string, text: string): void {
+  const now = new Date().toISOString();
+  try {
+    db.prepare(
+      `INSERT INTO ChatMemory (chat, updatedAt, last_recall, last_recall_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(chat) DO UPDATE SET last_recall = excluded.last_recall, last_recall_at = excluded.last_recall_at`,
+    ).run(key, now, text, now);
+  } catch (err) {
+    console.error('Could not keep the recall for the Memory page:', (err as Error)?.message ?? err);
+  }
 }
 
 // ------------------------------------------------------------------ upkeep (after a reply)
@@ -390,4 +418,71 @@ export function maintainChat(chat: ChatRef, model: string, numCtx: number, budge
   gpuQueue
     .add(() => foldSummary(chat, model, numCtx, budget), 'low', 'ollama', { userId: chat.userId, model })
     .catch((err) => console.error('Chat summary error:', (err as Error)?.message ?? err));
+}
+
+// ------------------------------------------------------------------ the Memory page
+
+export interface ChatMemoryView {
+  key: string;
+  kind: 'lumen' | 'flicker' | 'team';
+  /** The chat's title, or the Flicker's or team's name. */
+  title: string;
+  /** Where to open the chat. */
+  href: string;
+  summary: string;
+  /** How many exchanges are saved for recall. */
+  saved: number;
+  /** What was recalled for its latest message ('' for nothing), and when. */
+  lastRecall: string;
+  lastRecallAt: string | null;
+}
+
+/** The chats this profile owns: key → title and link. Only these can be shown or reset. */
+function ownedChats(userId: string): Map<string, { kind: ChatMemoryView['kind']; title: string; href: string }> {
+  const owned = new Map<string, { kind: ChatMemoryView['kind']; title: string; href: string }>();
+  for (const c of db.prepare('SELECT id, title FROM Conversation WHERE user_id = ?').all(userId) as { id: string; title: string }[]) {
+    owned.set(chatKey.lumen(c.id), { kind: 'lumen', title: c.title, href: '/lumen' });
+  }
+  for (const b of db.prepare('SELECT id, name FROM UmbraBot WHERE user_id = ?').all(userId) as { id: string; name: string }[]) {
+    owned.set(chatKey.umbra(b.id), { kind: 'flicker', title: b.name, href: `/umbra/${b.id}` });
+  }
+  for (const t of db.prepare('SELECT id, name FROM UmbraTeam WHERE user_id = ?').all(userId) as { id: string; name: string }[]) {
+    owned.set(teamChatKey(t.id), { kind: 'team', title: t.name, href: `/umbra/teams/${t.id}` });
+  }
+  return owned;
+}
+
+/** What each of this profile's chats remembers of itself, most recently used first. */
+export function chatMemoryOverview(userId: string): ChatMemoryView[] {
+  const owned = ownedChats(userId);
+  const saved = new Map(
+    (db.prepare('SELECT chat, COUNT(*) AS n FROM ChatEpisode WHERE user_id = ? GROUP BY chat').all(userId) as { chat: string; n: number }[])
+      .map((r) => [r.chat, Number(r.n)]),
+  );
+  type Row = { chat: string; summary: string; updatedAt: string; lastRecall: string | null; lastRecallAt: string | null };
+  const rows = db
+    .prepare('SELECT chat, summary, updatedAt, last_recall AS lastRecall, last_recall_at AS lastRecallAt FROM ChatMemory')
+    .all() as Row[];
+  return rows
+    .filter((r) => owned.has(r.chat))
+    .map((r) => ({
+      key: r.chat,
+      ...owned.get(r.chat)!,
+      summary: r.summary,
+      saved: saved.get(r.chat) ?? 0,
+      lastRecall: r.lastRecall ?? '',
+      lastRecallAt: r.lastRecallAt,
+    }))
+    .sort((a, b) => (b.lastRecallAt ?? '').localeCompare(a.lastRecallAt ?? ''));
+}
+
+/**
+ * From the Memory page: 'summary' starts the chat's summary over (its messages are summarized
+ * again as it grows); 'all' also forgets its saved exchanges. Facts about you stay either way.
+ */
+export function resetChatMemory(userId: string, key: string, what: 'summary' | 'all'): boolean {
+  if (!ownedChats(userId).has(key)) return false;
+  if (what === 'all') forgetChat(key);
+  else saveState(key, { summary: '', summaryUpto: 0 });
+  return true;
 }

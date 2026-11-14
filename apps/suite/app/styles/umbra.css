@@ -771,3 +771,181 @@ main.umbra > .umbra-form { flex-shrink: 0; overflow: visible; }
   opacity: 0.4;
   cursor: default;
   background: transparent; }
+
+/* Memory page (/umbra/memory) */
+.umbra-memory-section {
+  margin: 0 0 2rem;
+}
+.umbra-memory-section h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.umbra-memory-section h2 .umbra-muted {
+  font-weight: 400;
+  font-size: 0.95rem;
+}
+.umbra-memory .umbra-hint {
+  display: block;
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+}
+.umbra-memory input,
+.umbra-memory select {
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.95rem;
+  color: #e5e7f0;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 10px;
+}
+.umbra-memory select option {
+  background: #0c1220;
+}
+.umbra-memory input:focus,
+.umbra-memory select:focus {
+  outline: none;
+  border-color: var(--bot-color);
+}
+.umbra-memory-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+.umbra-memory-add input {
+  flex: 1 1 16rem;
+}
+.umbra-memory-add button,
+.umbra-memory-row-actions button {
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #e5e7f0;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.umbra-memory-add button:disabled,
+.umbra-memory-row-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.umbra-memory-row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.umbra-memory .umbra-notes li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.umbra-memory .umbra-notes .umbra-memory-row-actions button:last-child {
+  color: #ffb4b4;
+  border-color: rgb(255 120 120 / 0.3);
+}
+.umbra-memory .umbra-notes .umbra-memory-row-actions button.is-plain {
+  color: #e5e7f0;
+  border-color: rgb(255 255 255 / 0.18);
+}
+.umbra-memory-meta {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: #8a8ca8;
+}
+.umbra-memory-editing {
+  flex-wrap: wrap;
+}
+.umbra-memory-editing input {
+  flex: 1 1 14rem;
+}
+.umbra-memory-flicker {
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: rgb(255 255 255 / 0.03);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 12px;
+}
+.umbra-memory-flicker[open] {
+  border-color: color-mix(in srgb, var(--bot-color) 40%, transparent);
+}
+.umbra-memory-flicker summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  list-style: none;
+}
+.umbra-memory-flicker summary::-webkit-details-marker {
+  display: none;
+}
+.umbra-memory-flicker[open] summary {
+  margin-bottom: 0.6rem;
+}
+.umbra-memory-flicker-name {
+  flex: 1;
+  font-weight: 600;
+}
+.umbra-memory-flicker a {
+  color: var(--bot-color);
+}
+.umbra-memory-chats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.umbra-memory-chats > li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.85rem;
+  background: rgb(255 255 255 / 0.03);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 12px;
+}
+.umbra-memory-chat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+.umbra-memory-chat-head a {
+  color: #e5e7f0;
+  font-weight: 600;
+  text-decoration: none;
+}
+.umbra-memory-chat-head .umbra-muted {
+  font-size: 0.8rem;
+}
+.umbra-memory-chats summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #aab;
+}
+.umbra-memory-text {
+  margin: 0.4rem 0 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 22rem;
+  overflow-y: auto;
+  background: rgb(0 0 0 / 0.2);
+  border-radius: 8px;
+}
+@media (max-width: 560px) {
+  .umbra-memory .umbra-notes li {
+    flex-wrap: wrap;
+  }
+  .umbra-memory .umbra-notes li > span {
+    flex-basis: 100%;
+  }
+}

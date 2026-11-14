@@ -264,6 +264,7 @@ export default function BotForm({ botId }: { botId?: string }) {
                     ))}
                   </ul>
                 )}
+                <Link href="/umbra/memory" className="umbra-muted umbra-hint">See, edit or add to everything Lumen and your Flickers remember →</Link>
                 {shared.length > 0 && form.tools.includes('notes') && (
                   <details className="umbra-notes-shared">
                     <summary className="umbra-muted">

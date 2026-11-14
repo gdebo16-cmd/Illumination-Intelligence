@@ -207,6 +207,41 @@ function claim(task: Task, now: Date): boolean {
   return result.changes > 0;
 }
 
+// A recurring task reads its last few reports, so it can say what's new instead of starting over.
+const EARLIER_REPORTS = 3;
+const EARLIER_REPORTS_CHARS = 2400;
+
+/** The task's last finished reports, newest first, shortened to fit, as text for the job ('' if none). */
+function earlierReports(taskId: string, before: string): string {
+  const rows = db
+    .prepare(
+      `SELECT report, finishedAt FROM UmbraRun
+       WHERE task_id = ? AND status = 'done' AND report IS NOT NULL AND startedAt < ?
+       ORDER BY startedAt DESC LIMIT ?`,
+    )
+    .all(taskId, before, EARLIER_REPORTS) as { report: string; finishedAt: string | null }[];
+  const parts: string[] = [];
+  let used = 0;
+  rows.forEach((r, i) => {
+    // The newest gets the most room: it's the one to build on.
+    const room = Math.min(i === 0 ? 1200 : 600, EARLIER_REPORTS_CHARS - used);
+    if (room < 200) return;
+    const text = r.report.trim();
+    const clipped = text.length > room ? `${text.slice(0, room).trimEnd()}…` : text;
+    const day = r.finishedAt
+      ? new Date(r.finishedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+      : 'Earlier';
+    parts.push(`[${day}]\n${clipped}`);
+    used += clipped.length;
+  });
+  if (parts.length === 0) return '';
+  return (
+    'Your earlier reports for this task, newest first. Build on them: say what is new or has changed since the last one, ' +
+    'and don’t repeat what hasn’t changed (unless the instructions ask for a full report every time). ' +
+    `If nothing has changed, say so briefly.\n\n${parts.join('\n\n')}`
+  );
+}
+
 /** Run a task now: the bot works on it with its tools, and the report lands in the inbox. */
 async function runTask(userId: string, task: Task): Promise<Run> {
   const bot = getBot(userId, task.botId);
@@ -228,11 +263,14 @@ async function runTask(userId: string, task: Task): Promise<Run> {
       : `This is a task you're doing on your own; ${userName} isn't watching. They'll read your report later in their inbox.`,
     `Task: ${task.title}`,
     `Instructions: ${task.instructions}`,
+    earlierReports(task.id, startedAt),
     'Do the task now, using your tools where they help. Your final message IS the report: a short, clear write-up ' +
       'of what you found or did, with links for anything from the web. Never end with "I’ll try…" or a question; ' +
       'there is no next turn. If a page won’t open, work from the search results’ snippets or other results instead. ' +
       'If something is missing, make a sensible choice and say what you assumed.',
-  ].join('\n\n');
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 
   try {
     const result = team

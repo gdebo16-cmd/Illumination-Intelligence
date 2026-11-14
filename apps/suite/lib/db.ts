@@ -253,6 +253,9 @@ addColumn('UmbraTask', 'team_id', 'TEXT');
 // Flicker's own note; without one, it's about the profile and every assistant with memory sees it.
 addColumn('memories', 'bot_id', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_memories_bot ON memories (bot_id, deleted_at)');
+// What was recalled for each chat's latest message, shown on the Memory page (lib/chat-memory.ts).
+addColumn('ChatMemory', 'last_recall', 'TEXT');
+addColumn('ChatMemory', 'last_recall_at', 'TEXT');
 // Notes Flickers saved before this lived in UmbraNote: move them over once, keeping their dates.
 if (db.prepare('SELECT 1 FROM UmbraNote LIMIT 1').get()) {
   db.exec('BEGIN IMMEDIATE');

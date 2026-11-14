@@ -9,12 +9,13 @@
 import { NextResponse } from 'next/server';
 import { endWork, startWork, workFailed } from '@/lib/umbra/busy';
 import { USERS } from '@/lib/profiles';
-import { addTeamMessage, listTeamMessages, runTeam } from '@/lib/umbra/teams';
+import { addTeamMessage, leaderPromptChars, runTeam } from '@/lib/umbra/teams';
+import { botHistoryBudget, numCtxFor } from '@/lib/umbra/agent';
+import { rememberFromChat } from '@/lib/umbra/remember';
+import { chatContext, fitHistory, maintainChat, recall, teamChat, teamChatKey } from '@/lib/chat-memory';
 import { ownedTeam } from '../../owned';
 
 const MAX_MESSAGE = 4000;
-// How many earlier messages the leader "remembers" in each reply.
-const HISTORY = 30;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const found = await ownedTeam(params);
@@ -28,7 +29,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: `Keep messages under ${MAX_MESSAGE} characters.` }, { status: 400 });
   }
 
-  const history = listTeamMessages(team.id, HISTORY).map((m) => ({ role: m.role, content: m.content }));
+  // What the leader reads, like a Flicker's own chat (lib/chat-memory.ts): a summary of the chat's
+  // older part, past exchanges that match, and the newest messages word for word. (What the
+  // leader knows about you is added in runTeam, when its Memory is on.)
+  const userName = USERS[userId];
+  const leader = team.leader;
+  const chat = teamChat(userId, team.id);
+  const { summary, history: all } = chatContext(chat);
+  const budget = botHistoryBudget(leader.tools, leaderPromptChars(team, userName));
+  const recent = fitHistory(all, Math.max(2000, budget - message.length));
+  const remembered = await recall(chat, { summary, recent, message, facts: false });
+  const history = recent.map((m) => ({ role: m.role, content: m.content }));
   const sent = addTeamMessage(team.id, 'user', message);
 
   const encoder = new TextEncoder();
@@ -52,13 +63,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       try {
         const result = await runTeam({
           userId,
-          userName: USERS[userId],
+          userName,
           team,
           history,
           message,
+          remembered,
           onStep: (step) => send({ type: 'step', step }),
         });
         send({ type: 'reply', message: addTeamMessage(team.id, 'assistant', result.reply, result.steps) });
+        // In the background: keep the exchange for recall, fold old messages into the summary, and
+        // (with the leader's Memory on) pick up facts about you.
+        maintainChat(chat, leader.model, numCtxFor(leader.tools), budget);
+        rememberFromChat(userId, leader, { cursorKey: teamChatKey(team.id), table: 'UmbraTeamMessage', column: 'team_id', id: team.id });
       } catch (err) {
         console.error('Umbra team chat error:', err);
         const text = (err as Error).message ?? '';

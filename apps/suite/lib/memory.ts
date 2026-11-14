@@ -43,7 +43,7 @@ export interface Db {
   exec(sql: string): void;
 }
 
-type Category = 'profile' | 'preference' | 'project' | 'people' | 'other';
+export type Category = 'profile' | 'preference' | 'project' | 'people' | 'other';
 export interface Memory {
   id: number;
   fact: string;
@@ -135,6 +135,58 @@ export const toBlob = (v: Float32Array) => new Uint8Array(v.buffer, v.byteOffset
 // slice() copies into a fresh buffer, which avoids Float32Array alignment errors.
 export const fromBlob = (b: Uint8Array) => new Float32Array(b.slice().buffer);
 
+// ---------------------------------------------------------------- exact words
+// Meaning search is weak on names, numbers and codes: "Mara", "$900", "qwen3.5" or an error
+// message can score low even when they're the whole point. So the words that look like one are
+// also looked for as they are, and a memory that holds one counts as a match.
+
+// Capitalised words that are only capitalised because they start a sentence (or are "I").
+const COMMON_WORDS = new Set(
+  ('i im ive id ill hi hey hello thanks thank please ok okay yes no yeah sure what when where why how who whom whose which ' +
+    'can could would should will shall may might must do does did is are was were be been am the a an and but or so if then ' +
+    'my me mine we our us you your yours it its this that these those there here let lets also just now today tonight ' +
+    'tomorrow yesterday maybe actually well oh any some all every each one two lumen flicker flickers user').split(' '),
+);
+
+/** The words in `text` worth looking for exactly: names, numbers, codes and "quoted bits". At most 8. */
+export function keyTerms(text: string): string[] {
+  const terms = new Set<string>();
+  const quotes = /["“]([^"”]{3,40})["”]/g;
+  for (const [, quoted] of text.matchAll(quotes)) terms.add(quoted.trim().toLowerCase());
+  // The words of a quoted bit are already covered by the whole of it.
+  for (const [word] of text.replace(quotes, ' ').matchAll(/[\p{L}\p{N}](?:[\p{L}\p{N}._'’-]*[\p{L}\p{N}])?/gu)) {
+    const lower = word.toLowerCase().replace(/['’]s$/, '');
+    if (lower.length < 2 || COMMON_WORDS.has(lower.replace(/['’]/g, ''))) continue;
+    const hasDigit = /\p{N}/u.test(word);
+    const looksLikeName = /^\p{Lu}/u.test(word) && lower.length >= 3;
+    const looksLikeCode = /[._-]/.test(word) || /\p{Ll}\p{Lu}/u.test(word); // file.ts, camelCase, ECONN-…
+    if ((hasDigit && lower.length >= 2) || looksLikeName || looksLikeCode) terms.add(lower);
+    if (terms.size >= 8) break;
+  }
+  return [...terms].slice(0, 8);
+}
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** How many of `terms` appear in `text` as whole words (any letter case). */
+export function termHits(text: string, terms: string[]): number {
+  let hits = 0;
+  for (const term of terms) {
+    if (new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(term)}($|[^\\p{L}\\p{N}])`, 'iu').test(text)) hits++;
+  }
+  return hits;
+}
+
+/**
+ * A memory's score: its best meaning match against `queries`. Each exact word it holds adds to
+ * that, and makes sure it scores at least a little over `minScore`, so a memory naming the thing
+ * asked about gets in, and ranks above ones that are only about something similar.
+ */
+export function matchScore(queries: Float32Array[], v: Float32Array, text: string, terms: string[], minScore: number): number {
+  const meaning = queries.length ? bestScore(queries, v) : 0;
+  const hits = terms.length ? termHits(text, terms) : 0;
+  return hits ? Math.max(meaning + 0.15 * hits, minScore + 0.1 * hits) : meaning;
+}
+
 /** The best match between one stored embedding and any of the searches. */
 export const bestScore = (queries: Float32Array[], v: Float32Array) => Math.max(...queries.map((q) => cosine(q, v)));
 
@@ -151,10 +203,10 @@ export function cosine(a: Float32Array, b: Float32Array): number {
 // ---------------------------------------------------------------- extraction
 /** The chat to read for facts. */
 export interface ExtractSource {
-  /** Where extraction keeps how far it has read: a Lumen conversation id, or "umbra:<bot id>". */
+  /** Where extraction keeps how far it has read: a Lumen conversation id, or a chat key ("umbra:<bot id>", "umbra-team:<team id>"). */
   cursorKey: string;
-  table: 'Message' | 'UmbraMessage';
-  column: 'conversationId' | 'bot_id';
+  table: 'Message' | 'UmbraMessage' | 'UmbraTeamMessage';
+  column: 'conversationId' | 'bot_id' | 'team_id';
   id: string;
   /** For a Flicker's chat: which Flicker, so it can keep notes of its own. */
   bot?: { id: string; name: string };
@@ -324,22 +376,54 @@ export function listSharedFacts(db: Db, userId: string): Memory[] {
 
 /** Save a note for one Flicker (its save_note tool). It is embedded the next time memory is searched. */
 export function addBotNote(db: Db, userId: string, botId: string, fact: string): void {
-  db.prepare(`INSERT INTO memories (user_id, bot_id, fact, category, source_conversation_id) VALUES (?, ?, ?, 'other', ?)`).run(
-    userId, botId, fact, `umbra:${botId}`,
-  );
+  addMemory(db, userId, { fact, category: 'other', botId, source: `umbra:${botId}` });
+}
+
+export const CATEGORIES: readonly Category[] = ['profile', 'preference', 'people', 'project', 'other'];
+export const isCategory = (value: unknown): value is Category => CATEGORIES.includes(value as Category);
+export const FACT_MAX_CHARS = 300;
+
+/**
+ * Add a fact: shared, or (with `botId`) one Flicker's own note. Written by hand on the Memory page,
+ * or by a Flicker's save_note tool. It is embedded the next time memory is searched.
+ */
+export function addMemory(
+  db: Db,
+  userId: string,
+  memory: { fact: string; category: Category; botId?: string | null; source?: string },
+): number {
+  const row = db
+    .prepare(
+      `INSERT INTO memories (user_id, bot_id, fact, category, source_conversation_id) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    )
+    .get(userId, memory.botId ?? null, memory.fact, memory.category, memory.source ?? 'memory-page') as { id: number };
+  return row.id;
+}
+
+/** Change a fact's wording or kind (the Memory page). It is embedded again the next time memory is searched. */
+export function editMemory(db: Db, userId: string, id: number, change: { fact: string; category: Category }): boolean {
+  const result = db
+    .prepare(
+      `UPDATE memories SET fact = ?, category = ?, embedding = NULL, embedding_model = NULL, updated_at = datetime('now')
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+    )
+    .run(change.fact, change.category, id, userId) as { changes: number | bigint };
+  return Number(result.changes) > 0;
 }
 
 /**
  * Forget one fact. From a Flicker's page (`botId`) that can be one of its own notes or a shared
- * fact; never another Flicker's note. Soft delete, so it could be brought back by hand.
+ * fact; never another Flicker's note. With `botId` null (the Memory page), any of the profile's.
+ * Soft delete, so it could be brought back by hand.
  */
-export function forgetMemory(db: Db, userId: string, id: number, botId?: string): boolean {
+export function forgetMemory(db: Db, userId: string, id: number, botId?: string | null): boolean {
+  const anyScope = botId === null;
   const result = db
     .prepare(
       `UPDATE memories SET deleted_at = datetime('now')
-       WHERE id = ? AND user_id = ? AND deleted_at IS NULL AND ${scopeSql(botId)}`,
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL AND ${anyScope ? '1' : scopeSql(botId)}`,
     )
-    .run(id, userId, ...scopeArgs(botId)) as { changes: number | bigint };
+    .run(id, userId, ...(anyScope ? [] : scopeArgs(botId))) as { changes: number | bigint };
   return Number(result.changes) > 0;
 }
 
@@ -377,9 +461,9 @@ async function retrieve(
   db: Db,
   userId: string,
   queries: Float32Array[],
-  options: { k?: number; minScore?: number; botId?: string } = {},
+  options: { k?: number; minScore?: number; botId?: string; terms?: string[] } = {},
 ): Promise<Memory[]> {
-  const { k = 8, minScore = 0.35, botId } = options;
+  const { k = 8, minScore = 0.35, botId, terms = [] } = options;
   await refreshEmbeddings(db, userId);
   const rows = db
     .prepare(
@@ -389,7 +473,7 @@ async function retrieve(
     .all(userId, EMBED_TAG, ...scopeArgs(botId)) as (Memory & { embedding: Uint8Array })[];
 
   return rows
-    .map((r) => ({ r, score: bestScore(queries, fromBlob(r.embedding)) }))
+    .map((r) => ({ r, score: matchScore(queries, fromBlob(r.embedding), r.fact, terms, minScore) }))
     .filter((x) => x.score >= minScore)
     .sort((a, b) => b.score - a.score)
     .slice(0, k)
@@ -422,9 +506,9 @@ export async function buildMemoryBlock(
   db: Db,
   userId: string,
   queries: Float32Array[] | null,
-  options: { botId?: string; userName?: string; maxChars?: number } = {},
+  options: { botId?: string; userName?: string; maxChars?: number; terms?: string[] } = {},
 ): Promise<string> {
-  const { botId, maxChars = 2000 } = options; // 2000 characters: roughly 500 tokens
+  const { botId, maxChars = 2000, terms } = options; // 2000 characters: roughly 500 tokens
   const core = db
     .prepare(
       `SELECT id, fact, category, bot_id, updated_at FROM memories
@@ -445,9 +529,9 @@ export async function buildMemoryBlock(
   const coreIds = new Set(core.map((m) => m.id));
 
   let hits: Memory[] = [];
-  if (queries?.length) {
+  if (queries?.length || terms?.length) {
     try {
-      hits = (await retrieve(db, userId, queries, { botId })).filter((m) => !coreIds.has(m.id));
+      hits = (await retrieve(db, userId, queries ?? [], { botId, terms })).filter((m) => !coreIds.has(m.id));
     } catch (err) {
       // The embedding model is missing or busy: carry on with the facts that are always included.
       console.error('Memory search error:', (err as Error)?.message ?? err);
@@ -494,5 +578,5 @@ export async function memoryFor(
       console.error('Memory search error:', (err as Error)?.message ?? err);
     }
   }
-  return buildMemoryBlock(db, userId, queries, options);
+  return buildMemoryBlock(db, userId, queries, { ...options, terms: keyTerms(about) });
 }

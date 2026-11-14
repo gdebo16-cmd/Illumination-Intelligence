@@ -5,7 +5,7 @@ import { useChat } from './ChatContext';
 import ModelSelect from './ModelSelect';
 import { DocumentCard } from '@/components/documents';
 
-// What Lumen puts in the side panel: New chat, Switch Profile, your previous chats, artifacts
+// What Lumen puts in the side panel: New chat, Switch Profile, Memory, your previous chats, artifacts
 // and the model picker. The panel itself (frame, title, ✕, backdrop) comes from components/AppShell.tsx.
 // Picking a chat or a document closes the panel on a phone, so you can see it.
 const ChatSidebar = () => {
@@ -29,6 +29,10 @@ const ChatSidebar = () => {
         <button className='new-chat-button' onClick={() => { startNewChat(); panel.closeOnPhone(); }}>+ New chat</button>
         <button className='switch-profile-button' onClick={() => { fetch('/api/users/select', {method: 'DELETE',}); router.push('/select-user');}}>
           Switch Profile
+        </button>
+        {/* What Lumen (and the Flickers) remember about you, to look over and correct. */}
+        <button className='switch-profile-button sidebar-memory-button' onClick={() => router.push('/umbra/memory')}>
+          What Lumen remembers about you
         </button>
       </div>
       <span className='sidebar-separator'>Previous Chats</span>

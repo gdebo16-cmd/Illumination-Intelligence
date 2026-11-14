@@ -32,12 +32,13 @@ export default function BotGallery() {
       .catch(() => {});
   }, []);
 
-  // Inbox and Artifacts live in the side panel.
+  // Inbox, Artifacts and Memory live in the side panel.
   useUmbraSidebar({
     title: 'Umbra',
     items: [
       { label: 'Inbox', href: '/umbra/inbox', badge: unread },
       { label: 'Artifacts', href: '/umbra/artifacts' },
+      { label: 'Memory', href: '/umbra/memory' },
     ],
   });
 

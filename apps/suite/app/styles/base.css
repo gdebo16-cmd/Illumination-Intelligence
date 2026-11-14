@@ -581,3 +581,7 @@ textarea.input-field {
   cursor: pointer;
   line-height: 0;}
 /* #endregion home icon picker */
+
+/* Lumen sidebar: the Memory button takes the whole row under New chat and Switch Profile. */
+.sidebar-chat-actions .sidebar-memory-button {
+  grid-column: 1 / -1;}

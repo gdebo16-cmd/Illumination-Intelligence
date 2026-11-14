@@ -11,7 +11,7 @@ import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, flameWords, isBotM
 import { checkCodeFolder, editStatuses } from './code';
 import { approvalStatuses } from './prod-control';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
-import { forgetChat } from '@/lib/chat-memory';
+import { forgetChat, teamChatKey } from '@/lib/chat-memory';
 import { deleteBotNotes, forgetMemory, listBotNotes, listSharedFacts, memoryFor, type Memory } from '@/lib/memory';
 import { canThink } from '@/config/models';
 import type { AgentStep } from './types';
@@ -170,6 +170,8 @@ export function deleteBot(userId: string, id: string): boolean {
   db.prepare('DELETE FROM UmbraTeamMember WHERE bot_id = ?').run(id);
   for (const { id: teamId } of db.prepare('SELECT id FROM UmbraTeam WHERE leader_id = ?').all(id) as { id: string }[]) {
     db.prepare('DELETE FROM UmbraTeamMessage WHERE team_id = ?').run(teamId);
+    forgetChat(teamChatKey(teamId));
+    db.prepare('DELETE FROM memory_extractions WHERE conversation_id = ?').run(teamChatKey(teamId));
     db.prepare('DELETE FROM UmbraTeamMember WHERE team_id = ?').run(teamId);
     db.prepare('DELETE FROM UmbraTask WHERE team_id = ?').run(teamId);
     db.prepare('DELETE FROM UmbraTeam WHERE id = ?').run(teamId);
