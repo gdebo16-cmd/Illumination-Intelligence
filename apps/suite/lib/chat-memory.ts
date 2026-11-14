@@ -11,7 +11,8 @@
 //      saved with an embedding (embedNewEpisodes), so "what did we decide about the garden?" finds
 //      the answer even if it was said months ago, or in another Lumen chat.
 //
-// Lumen also adds the facts it knows about the profile (lib/memory.ts); Flickers have their notes.
+// It also adds what's known about the person (lib/memory.ts): Lumen the shared facts, a Flicker
+// with Memory on the shared facts and its own notes.
 //
 // Summaries and embeddings live in SQLite and cost no graphics memory. Embedding runs on the
 // processor; the summary is written by the chat's own model, which is already loaded.
@@ -22,7 +23,7 @@ import 'server-only';
 import db from '@/lib/db';
 import { thinkSetting } from '@/config/models';
 import { chatKey, PHOTO_CONTEXT_CHARS, photoIds } from '@/lib/chat-images';
-import { buildMemoryBlock, cosine, embed, EMBED_TAG, fromBlob, hasMemories, toBlob } from '@/lib/memory';
+import { bestScore, buildMemoryBlock, embed, EMBED_TAG, fromBlob, hasMemories, toBlob } from '@/lib/memory';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_URL } from '@/lib/queue';
 
 /** Which chat, and where its messages are kept. */
@@ -157,7 +158,7 @@ function hasEpisodes(chat: ChatRef): boolean {
   return Boolean(found);
 }
 
-function episodeBlock(chat: ChatRef, query: Float32Array, visibleFrom: number): string {
+function episodeBlock(chat: ChatRef, queries: Float32Array[], visibleFrom: number): string {
   type Episode = { chat: string; lastRowId: number; text: string; embedding: Uint8Array; createdAt: string };
   const columns = 'chat, last_row_id AS lastRowId, text, embedding, createdAt';
   const rows = (
@@ -173,7 +174,7 @@ function episodeBlock(chat: ChatRef, query: Float32Array, visibleFrom: number): 
   const best = rows
     // Leave out what the model is about to read anyway (the newest messages of this chat).
     .filter((e) => !(e.chat === chat.key && e.lastRowId >= visibleFrom))
-    .map((e) => ({ e, score: cosine(query, fromBlob(e.embedding)) }))
+    .map((e) => ({ e, score: bestScore(queries, fromBlob(e.embedding)) }))
     .filter((x) => x.score >= EPISODE_MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .slice(0, EPISODE_COUNT);
@@ -196,15 +197,23 @@ function episodeBlock(chat: ChatRef, query: Float32Array, visibleFrom: number): 
 
 /**
  * What to add to the system prompt for this turn: the chat's summary, past exchanges that match,
- * and (with `facts`, for Lumen) what's known about the profile. '' when there is nothing.
+ * and (with `facts`) what's known about the person: shared facts, plus a Flicker's own notes when
+ * `facts.botId` is given. '' when there is nothing.
  *
- * `recent` is the trimmed history the model will read and `message` the new message. The search
- * uses the last couple of messages too, so a short follow-up ("and the other one?") still works.
+ * `recent` is the trimmed history the model will read and `message` the new message. It searches
+ * twice in one go: with the new message alone (a clear question isn't drowned out by the last
+ * reply), and with the last couple of messages too (so a short follow-up like "and the other
+ * one?" still works). Each memory counts by its better match.
  * A failure here never breaks the chat: it just remembers less this turn.
  */
 export async function recall(
   chat: ChatRef,
-  options: { summary: string; recent: HistoryMessage[]; message: string; facts: boolean },
+  options: {
+    summary: string;
+    recent: HistoryMessage[];
+    message: string;
+    facts: false | { botId?: string; userName?: string };
+  },
 ): Promise<string> {
   const blocks: string[] = [];
   if (options.summary) {
@@ -213,16 +222,27 @@ export async function recall(
     );
   }
 
-  const text = [...options.recent.slice(-2).map((m) => clip(m.content, 300)), clip(options.message, 1000)]
+  const said = clip(options.message, 1000);
+  const withContext = [...options.recent.slice(-2).map((m) => clip(m.content, 300)), said]
     .filter((t) => t.trim())
     .join('\n');
-  const wantFacts = options.facts && hasMemories(db, chat.userId);
+  const searches = [...new Set([said, withContext].filter((t) => t.trim()))];
+  const facts = options.facts;
+  const searchFacts = Boolean(facts) && hasMemories(db, chat.userId, facts ? facts.botId : undefined);
   const wantEpisodes = hasEpisodes(chat);
-  if (text && (wantFacts || wantEpisodes)) {
+  let queries: Float32Array[] | null = null;
+  if (searches.length && (searchFacts || wantEpisodes)) {
     try {
-      const [query] = await embed([text], 'query');
-      if (wantEpisodes) blocks.push(episodeBlock(chat, query, options.recent[0]?.rid ?? Number.MAX_SAFE_INTEGER));
-      if (wantFacts) blocks.push(await buildMemoryBlock(db, chat.userId, query));
+      queries = await embed(searches, 'query');
+    } catch (err) {
+      console.error('Memory recall error:', (err as Error)?.message ?? err);
+    }
+  }
+  if (queries && wantEpisodes) blocks.push(episodeBlock(chat, queries, options.recent[0]?.rid ?? Number.MAX_SAFE_INTEGER));
+  // Even without a search, the facts that are always included still go in.
+  if (searchFacts && facts) {
+    try {
+      blocks.push(await buildMemoryBlock(db, chat.userId, queries, facts));
     } catch (err) {
       console.error('Memory recall error:', (err as Error)?.message ?? err);
     }

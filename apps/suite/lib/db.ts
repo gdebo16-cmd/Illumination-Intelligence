@@ -149,7 +149,8 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_umbra_message_bot ON UmbraMessage (bot_id, createdAt);
 
-  -- Stage 2: things a bot chose to remember with its "save note" tool.
+  -- Stage 2: things a bot chose to remember with its "save note" tool. No longer written: notes
+  -- now live in the memories table with a bot_id (moved over below).
   CREATE TABLE IF NOT EXISTS UmbraNote (
     id TEXT PRIMARY KEY,
     bot_id TEXT NOT NULL,
@@ -247,6 +248,28 @@ db.exec(`
 `);
 // A task or report that belongs to a team (its bot_id is the team's leader).
 addColumn('UmbraTask', 'team_id', 'TEXT');
+
+// Memory shared between Lumen and the Flickers (lib/memory.ts). A fact with a bot_id is one
+// Flicker's own note; without one, it's about the profile and every assistant with memory sees it.
+addColumn('memories', 'bot_id', 'TEXT');
+db.exec('CREATE INDEX IF NOT EXISTS idx_memories_bot ON memories (bot_id, deleted_at)');
+// Notes Flickers saved before this lived in UmbraNote: move them over once, keeping their dates.
+if (db.prepare('SELECT 1 FROM UmbraNote LIMIT 1').get()) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(`
+      INSERT INTO memories (user_id, bot_id, fact, category, source_conversation_id, created_at, updated_at)
+        SELECT b.user_id, n.bot_id, n.content, 'other', 'umbra:' || n.bot_id,
+               COALESCE(datetime(n.createdAt), datetime('now')), COALESCE(datetime(n.createdAt), datetime('now'))
+        FROM UmbraNote n JOIN UmbraBot b ON b.id = n.bot_id;
+      DELETE FROM UmbraNote;
+    `);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
 
 // Prism image editing: was the picture made from words ('create') or by editing one ('edit'),
 // and which Prism picture it was edited from (empty for an uploaded picture).

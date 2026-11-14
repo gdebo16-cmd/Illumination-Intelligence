@@ -99,7 +99,7 @@ export async function POST(req: Request) {
 
     // 7. Add what it remembers: the summary, past exchanges that match, and facts about the profile.
     //    (A memory failure never breaks the chat itself: recall() just returns less.)
-    const remembered = await recall(chat, { summary, recent, message: prompt, facts: true });
+    const remembered = await recall(chat, { summary, recent, message: prompt, facts: {} });
     const systemPrompt = [basePrompt, remembered].filter(Boolean).join('\n\n');
 
     // withPhotos swaps photo ids for the pictures themselves, when this model can see them.
@@ -159,7 +159,11 @@ export async function POST(req: Request) {
     //     It uses the model that just answered (already on the card), with the same context size.
     const memoryModel = extractModelFor(chatModel);
     gpuQueue
-      .add(() => extractMemories(db, userId, activeConversationId, memoryModel, OLLAMA_CHAT_NUM_CTX), 'low', 'ollama', {
+      .add(() => extractMemories(
+        db, userId,
+        { cursorKey: activeConversationId, table: 'Message', column: 'conversationId', id: activeConversationId },
+        memoryModel, OLLAMA_CHAT_NUM_CTX,
+      ), 'low', 'ollama', {
         userId,
         model: memoryModel,
       })

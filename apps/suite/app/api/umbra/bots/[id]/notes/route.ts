@@ -1,5 +1,6 @@
-// GET    /api/umbra/bots/<id>/notes            — what the bot has saved about you
-// DELETE /api/umbra/bots/<id>/notes?note=<id>  — make it forget one note
+// GET    /api/umbra/bots/<id>/notes            — what the bot remembers about you:
+//                                                { flicker: its own notes, shared: facts it shares with Lumen and the other Flickers }
+// DELETE /api/umbra/bots/<id>/notes?note=<id>  — forget one (a shared fact is forgotten everywhere)
 
 import { NextResponse } from 'next/server';
 import { getCurrentUserId, noProfile } from '@/lib/user';
@@ -12,19 +13,19 @@ async function ownedBot(params: Params['params']) {
   if (!userId) return { error: noProfile() };
   const bot = getBot(userId, (await params).id);
   if (!bot) return { error: NextResponse.json({ error: 'Flicker not found.' }, { status: 404 }) };
-  return { bot };
+  return { bot, userId };
 }
 
 export async function GET(_req: Request, { params }: Params) {
   const found = await ownedBot(params);
-  return 'error' in found ? found.error : NextResponse.json(listNotes(found.bot.id));
+  return 'error' in found ? found.error : NextResponse.json(listNotes(found.userId, found.bot.id));
 }
 
 export async function DELETE(req: Request, { params }: Params) {
   const found = await ownedBot(params);
   if ('error' in found) return found.error;
   const noteId = new URL(req.url).searchParams.get('note') ?? '';
-  return deleteNote(found.bot.id, noteId)
+  return deleteNote(found.userId, found.bot.id, noteId)
     ? NextResponse.json({ deleted: true })
     : NextResponse.json({ error: 'Note not found.' }, { status: 404 });
 }

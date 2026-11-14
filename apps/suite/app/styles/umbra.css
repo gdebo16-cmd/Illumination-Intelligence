@@ -489,6 +489,12 @@
 .umbra-notes-empty { 
   margin: 0; 
   font-size: 0.85rem; }
+.umbra-notes-shared { 
+  margin-top: 0.6rem; }
+.umbra-notes-shared summary { 
+  cursor: pointer; 
+  font-size: 0.85rem; 
+  margin-bottom: 0.4rem; }
 .umbra-steps {
   list-style: none;
   margin: 0 0 0.6rem;

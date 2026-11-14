@@ -10,11 +10,11 @@
 // (lib/umbra/code.ts) only sees the one project folder chosen in the bot's settings.
 
 import 'server-only';
-import crypto from 'node:crypto';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import db from '@/lib/db';
 import { gpuQueue } from '@/lib/queue';
+import { addBotNote } from '@/lib/memory';
 import { generateImage, imageNeeds } from '@/lib/prism/comfy';
 import { saveImage } from '@/lib/prism/images';
 import { PRISM_STYLES } from '@/config/prism-styles';
@@ -285,7 +285,7 @@ const saveNote: ToolDef = {
     type: 'function',
     function: {
       name: 'save_note',
-      description: 'Save a short note to remember in all future chats with this user: a preference, a fact about them, an ongoing plan. One fact per note. Your saved notes are listed in your instructions.',
+      description: 'Save a short note to remember in all future chats with this user, when they ask you to remember something: a preference, a fact about them, an ongoing plan. One fact per note.',
       parameters: params({ note: { type: 'string', description: 'The fact to remember, e.g. "Gabe is vegetarian".' } }, ['note']),
     },
   },
@@ -293,9 +293,7 @@ const saveNote: ToolDef = {
   run: async (a, ctx) => {
     const note = str(a.note).slice(0, 500);
     if (!note) throw new Error('The note was empty.');
-    db.prepare('INSERT INTO UmbraNote (id, bot_id, content, createdAt) VALUES (?, ?, ?, ?)').run(
-      crypto.randomUUID(), ctx.botId, note, new Date().toISOString(),
-    );
+    addBotNote(db, ctx.userId, ctx.botId, note);
     return { output: 'Saved.', summary: note };
   },
 };

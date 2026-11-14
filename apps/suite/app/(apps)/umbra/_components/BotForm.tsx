@@ -29,6 +29,7 @@ export default function BotForm({ botId }: { botId?: string }) {
   const editing = Boolean(botId);
   const [form, setForm] = useState(EMPTY);
   const [notes, setNotes] = useState<BotNote[]>([]);
+  const [shared, setShared] = useState<BotNote[]>([]);
   const [loaded, setLoaded] = useState(!editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,8 +49,11 @@ export default function BotForm({ botId }: { botId?: string }) {
       })
       .catch((err: Error) => setError(err.message));
     fetch(`/api/umbra/bots/${botId}/notes`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then(setNotes)
+      .then((res) => (res.ok ? res.json() : { flicker: [], shared: [] }))
+      .then((found: { flicker?: BotNote[]; shared?: BotNote[] }) => {
+        setNotes(found.flicker ?? []);
+        setShared(found.shared ?? []);
+      })
       .catch(() => {});
   }, [botId]);
 
@@ -61,7 +65,9 @@ export default function BotForm({ botId }: { botId?: string }) {
 
   const forget = async (note: BotNote) => {
     const res = await fetch(`/api/umbra/bots/${botId}/notes?note=${encodeURIComponent(note.id)}`, { method: 'DELETE' });
-    if (res.ok) setNotes((list) => list.filter((n) => n.id !== note.id));
+    if (!res.ok) return;
+    setNotes((list) => list.filter((n) => n.id !== note.id));
+    setShared((list) => list.filter((n) => n.id !== note.id));
   };
 
   const save = async (e: React.FormEvent) => {
@@ -244,7 +250,9 @@ export default function BotForm({ botId }: { botId?: string }) {
                 <span className="umbra-label">What {form.name || 'it'} remembers about you</span>
                 {notes.length === 0 ? (
                   <p className="umbra-muted umbra-notes-empty">
-                    Nothing yet. With the Notes tool on, it saves things you tell it to remember.
+                    {form.tools.includes('notes')
+                      ? 'Nothing of its own yet. It picks things up as you chat, and saves anything you ask it to remember.'
+                      : 'Nothing. Turn on Memory above and it remembers things about you between chats.'}
                   </p>
                 ) : (
                   <ul className="umbra-notes">
@@ -255,6 +263,21 @@ export default function BotForm({ botId }: { botId?: string }) {
                       </li>
                     ))}
                   </ul>
+                )}
+                {shared.length > 0 && form.tools.includes('notes') && (
+                  <details className="umbra-notes-shared">
+                    <summary className="umbra-muted">
+                      Shared with Lumen and your other Flickers ({shared.length}). Forgetting one here forgets it everywhere.
+                    </summary>
+                    <ul className="umbra-notes">
+                      {shared.map((note) => (
+                        <li key={note.id}>
+                          <span>{note.content}</span>
+                          <button type="button" onClick={() => forget(note)} aria-label={`Forget everywhere: ${note.content}`}>Forget</button>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 )}
               </section>
             )}

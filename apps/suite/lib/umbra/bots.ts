@@ -1,7 +1,8 @@
 // lib/umbra/bots.ts — Umbra's bots, their chats, and their notes.
 //
 // A bot is a flame avatar + a name + a personality + a purpose + a model + the tools it may use.
-// Each bot has one ongoing chat with the profile that made it, and notes it chose to remember.
+// Each bot has one ongoing chat with the profile that made it. With Memory on, it remembers things
+// about them: its own notes, and the facts it shares with Lumen and the other Flickers (lib/memory.ts).
 
 import 'server-only';
 import crypto from 'node:crypto';
@@ -11,6 +12,7 @@ import { checkCodeFolder, editStatuses } from './code';
 import { approvalStatuses } from './prod-control';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
 import { forgetChat } from '@/lib/chat-memory';
+import { deleteBotNotes, forgetMemory, listBotNotes, listSharedFacts, memoryFor, type Memory } from '@/lib/memory';
 import { canThink } from '@/config/models';
 import type { AgentStep } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
@@ -49,6 +51,7 @@ export interface BotMessage {
 export interface BotNote {
   id: string;
   content: string;
+  /** When it was saved or last changed. */
   createdAt: string;
 }
 
@@ -150,6 +153,8 @@ export function deleteBot(userId: string, id: string): boolean {
   deletePhotos(chatKey.umbra(id));
   forgetChat(chatKey.umbra(id));
   db.prepare('DELETE FROM UmbraNote WHERE bot_id = ?').run(id);
+  deleteBotNotes(db, id); // its own notes; what it learned about you that's shared stays
+  db.prepare('DELETE FROM memory_extractions WHERE conversation_id = ?').run(chatKey.umbra(id));
   db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraCodeEdit WHERE bot_id = ?').run(id);
@@ -243,24 +248,46 @@ export function clearMessages(botId: string): void {
   db.prepare('DELETE FROM UmbraMessage WHERE bot_id = ?').run(botId);
   deletePhotos(chatKey.umbra(botId));
   forgetChat(chatKey.umbra(botId));
+  // Start reading for facts afresh: a cleared chat's new messages can reuse old positions.
+  db.prepare('DELETE FROM memory_extractions WHERE conversation_id = ?').run(chatKey.umbra(botId));
 }
 
 // ------------------------------------------------------------------ notes
 
-export function listNotes(botId: string): BotNote[] {
-  return db
-    .prepare('SELECT id, content, createdAt FROM UmbraNote WHERE bot_id = ? ORDER BY createdAt ASC')
-    .all(botId) as unknown as BotNote[];
+const asNote = (m: Memory): BotNote => ({ id: String(m.id), content: m.fact, createdAt: m.updated_at });
+
+/** What a Flicker remembers: its own notes, and the facts about you it shares with the others. */
+export function listNotes(userId: string, botId: string): { flicker: BotNote[]; shared: BotNote[] } {
+  return { flicker: listBotNotes(db, botId).map(asNote), shared: listSharedFacts(db, userId).map(asNote) };
 }
 
-export function deleteNote(botId: string, noteId: string): boolean {
-  return db.prepare('DELETE FROM UmbraNote WHERE id = ? AND bot_id = ?').run(noteId, botId).changes > 0;
+/** Forget one of a Flicker's notes, or a shared fact (that one is forgotten everywhere). */
+export function deleteNote(userId: string, botId: string, noteId: string): boolean {
+  const id = Number(noteId);
+  return Number.isInteger(id) && forgetMemory(db, userId, id, botId);
+}
+
+/**
+ * What a Flicker should know about the person for this piece of work (`about`: the message, task
+ * or job), to go at the end of its instructions. '' when Memory is off or there's nothing yet.
+ */
+export async function botMemory(userId: string, bot: Bot, userName: string, about: string): Promise<string> {
+  if (!bot.tools.includes('notes')) return '';
+  try {
+    return await memoryFor(db, userId, about, { botId: bot.id, userName });
+  } catch (err) {
+    console.error('Flicker memory error:', (err as Error)?.message ?? err);
+    return '';
+  }
 }
 
 // ------------------------------------------------------------------ instructions
 
-/** The bot's "character sheet": instructions the model reads before every reply. */
-export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): string {
+/**
+ * The bot's "character sheet": instructions the model reads before every reply. `memory` is what
+ * it remembers about the person this time (botMemory, or recall in lib/chat-memory.ts).
+ */
+export function systemPrompt(bot: Bot, userName: string, memory = ''): string {
   const toolNames = BOT_TOOLS.filter((t) => bot.tools.includes(t.id)).map((t) => t.name.toLowerCase());
   const usesWeb = bot.tools.includes('web_search') || bot.tools.includes('read_webpage');
 
@@ -316,10 +343,10 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
         'The restart briefly stops the server you run on. Your work is picked back up afterwards, so then check the result with prod_status and report it plainly. ' +
         'Merging pull requests is separate (refract_merge_pr).',
     bot.tools.includes('notes') &&
-      `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note. Notes are for short facts only: when asked to save or export a write-up as a file, use a document block instead.`,
+      `You remember ${userName} between chats: things they tell you about themselves are picked up on their own after each reply, and what you know is listed below when it matters. ` +
+        `When ${userName} asks you to remember something, save it with save_note. Notes are for short facts only: when asked to save or export a write-up as a file, use a document block instead.`,
     DOCUMENT_SYSTEM_PROMPT,
-    notes.length > 0 &&
-      `Things you've saved about ${userName} (your notes):\n${notes.map((n) => `- ${n.content}`).join('\n')}`,
+    memory,
   ]
     .filter(Boolean)
     .join('\n\n');

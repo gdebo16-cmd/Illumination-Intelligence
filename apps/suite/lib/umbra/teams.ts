@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import db from '@/lib/db';
 import { BOT_TOOLS } from '@/config/umbra';
 import { runAgent, type ChatMessage } from './agent';
-import { getBot, listNotes, systemPrompt, type Bot } from './bots';
+import { botMemory, getBot, systemPrompt, type Bot } from './bots';
 import type { AgentStep, ToolDef } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 import { mayHoldDocument } from '@/lib/document-blocks';
@@ -294,7 +294,7 @@ function askTeammateTool(
         toolIds: bot.tools,
         think: bot.think,
         messages: [
-          { role: 'system', content: `${systemPrompt(bot, userName, listNotes(bot.id))}\n\n${teammateBrief(team, team.leader, role)}` },
+          { role: 'system', content: `${systemPrompt(bot, userName, await botMemory(userId, bot, userName, request))}\n\n${teammateBrief(team, team.leader, role)}` },
           { role: 'user', content: `From ${team.leader.name}: ${request}` },
         ],
         context: { userId, botId: bot.id },
@@ -336,13 +336,14 @@ export async function runTeam(options: {
   const { userId, userName, team } = options;
   const leader = team.leader;
   const priority = options.priority ?? 'high';
+  const memory = await botMemory(userId, leader, userName, options.message);
   return runAgent({
     model: leader.model,
     toolIds: leader.tools,
     think: leader.think,
     extraTools: team.crew.length ? [askTeammateTool(userId, userName, team, priority)] : [],
     messages: [
-      { role: 'system', content: `${systemPrompt(leader, userName, listNotes(leader.id))}\n\n${leaderBrief(team, userName)}` },
+      { role: 'system', content: `${systemPrompt(leader, userName, memory)}\n\n${leaderBrief(team, userName)}` },
       ...options.history,
       { role: 'user', content: options.message },
     ],

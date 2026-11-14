@@ -35,7 +35,10 @@ import { USERS, type UserId } from '@/lib/profiles';
 import type { ToolId } from '@/config/umbra';
 import { botHistoryBudget, numCtxFor, runAgent, type ChatMessage } from './agent';
 import { maintainChat, umbraChat } from '@/lib/chat-memory';
-import { addMessage, getBot, listBots, listNotes, systemPrompt, type Bot, type BotMessage } from './bots';
+import { extractMemories, extractModelFor } from '@/lib/memory';
+import { gpuQueue } from '@/lib/queue';
+import { chatKey } from '@/lib/chat-images';
+import { addMessage, botMemory, getBot, listBots, systemPrompt, type Bot, type BotMessage } from './bots';
 import { endWork, startWork, workFailed } from './busy';
 import type { AgentStep, ToolDef, ToolResult } from './types';
 import { restartResumeNote } from './prod-control';
@@ -338,6 +341,22 @@ export function startRun(options: {
   });
 }
 
+/** In the background, after a reply: pick up facts from the chat (lib/memory.ts). */
+function rememberFromChat(userId: string, bot: Bot, model: string, toolIds: ToolId[]): void {
+  const memoryModel = extractModelFor(model);
+  gpuQueue
+    .add(
+      () =>
+        extractMemories(
+          db, userId,
+          { cursorKey: chatKey.umbra(bot.id), table: 'UmbraMessage', column: 'bot_id', id: bot.id, bot: { id: bot.id, name: bot.name } },
+          memoryModel, numCtxFor(toolIds),
+        ),
+      'low', 'ollama', { userId, model: memoryModel },
+    )
+    .catch((err) => console.error('Flicker memory extraction error:', (err as Error)?.message ?? err));
+}
+
 /** Run (or keep running) the agent loop for a row that's already in the table. */
 function launch(run: {
   runId: string;
@@ -431,6 +450,9 @@ function launch(run: {
         umbraChat(userId, bot.id), run.model, numCtxFor(run.toolIds),
         botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0),
       );
+      // With Memory on, read what you said for things worth remembering, as Lumen does. Only for
+      // your own chat: a job another Flicker handed over isn't you talking.
+      if (run.source === 'chat' && run.toolIds.includes('notes')) rememberFromChat(userId, bot, run.model, run.toolIds);
       db.prepare(
         `UPDATE UmbraChatRun SET status = 'done', steps = ?, reply = ?, message_id = ?, finishedAt = ?, heartbeatAt = ? WHERE id = ?`,
       ).run(JSON.stringify(result.steps), result.reply, message.id, message.createdAt, message.createdAt, runId);
@@ -760,7 +782,8 @@ function delegationTools(userId: string, bot: Bot, userName: string): ToolDef[] 
       }
 
       const content = `Job from ${bot.name}: ${task}`;
-      const prompt = systemPrompt(target, userName, listNotes(target.id)) + workshopPrompt(workshop) + delegatedBrief(bot, userName);
+      const memory = await botMemory(userId, target, userName, task);
+      const prompt = systemPrompt(target, userName, memory) + workshopPrompt(workshop) + delegatedBrief(bot, userName);
       const who = { id: target.id, name: target.name, flame: target.flame };
       const children: AgentStep[] = [];
       let watching = true; // stop updating this step once this tool has handed back its result

@@ -11,7 +11,7 @@ import { USERS, type UserId } from '@/lib/profiles';
 import { nextRun, parseSchedule, type Schedule } from '@/config/umbra-schedule';
 import { runAgent } from './agent';
 import type { AgentStep } from './types';
-import { getBot, listNotes, systemPrompt } from './bots';
+import { botMemory, getBot, systemPrompt } from './bots';
 import { getTeam, listTeamMessages, runTeam, viewTeam } from './teams';
 import { saveDocumentArtifacts } from '@/lib/artifacts';
 
@@ -251,7 +251,7 @@ async function runTask(userId: string, task: Task): Promise<Run> {
           toolIds: bot.tools,
           think: bot.think,
           messages: [
-            { role: 'system', content: systemPrompt(bot, userName, listNotes(bot.id)) },
+            { role: 'system', content: systemPrompt(bot, userName, await botMemory(userId, bot, userName, `${task.title}\n${task.instructions}`)) },
             { role: 'user', content: job },
           ],
           context: { userId, botId: bot.id },

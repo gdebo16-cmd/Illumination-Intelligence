@@ -136,7 +136,7 @@ export const BOT_TOOLS = [
   { id: 'web_search', name: 'Web search', description: 'Searches the web (through SearXNG on your PC).' },
   { id: 'read_webpage', name: 'Read web page', description: 'Opens a link and reads the page.' },
   { id: 'make_image', name: 'Make image', description: 'Paints a picture with Prism.' },
-  { id: 'notes', name: 'Notes', description: 'Remembers things about you between chats.' },
+  { id: 'notes', name: 'Memory', description: 'Remembers things about you between chats on its own, and shares what it learns about you with Lumen and your other Flickers.' },
   { id: 'code', name: 'Code helper', description: 'Reads and searches one project folder, and suggests changes for you to approve.' },
   { id: 'refract', name: 'Refract workshop', description: 'Copies repos into the virtual machine, edits and runs commands there, and can snapshot or roll back that work. The host PC stays untouched.' },
   { id: 'host_ops', name: 'Prod control', description: 'Merges are separate; this pulls main, builds, and restarts the live app after you approve.' },
