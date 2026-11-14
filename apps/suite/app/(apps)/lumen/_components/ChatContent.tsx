@@ -9,12 +9,24 @@ import { canSeeImages } from '@/config/models';
 import { MessagePhotos, PhotoButton, PhotoTray, releasePhotos, usePhotos } from '@/components/PhotoAttach';
 import { ReplyContent, DocumentPanel, documentVersions } from '@/components/documents';
 
-const getAdaptiveLoadingText = (prompt: string): string => {
+// Shown while Lumen works on a prompt that doesn't fit a more specific line. One is picked per message.
+const LIGHT_PHRASES = [
+  'shedding some light',
+  'letting it dawn',
+  'bringing it into focus',
+  'chasing a spark',
+  'warming up the filament',
+  'connecting the bright dots',
+  'waiting for the lightbulb moment',
+  'turning up the glow',
+];
+
+const getAdaptiveLoadingText =(prompt: string): string => {
   const trimmed = prompt.trim().toLowerCase();
   if (!trimmed) return 'looking at your photo';
 
   if (trimmed.startsWith('what') || trimmed.startsWith('how') || trimmed.startsWith('why') || trimmed.startsWith('can you')) {
-    return `figuring out ${prompt.replace(/^(what is|what's|how to|how do i|can you)\s*/i, '')}`;
+    return `shedding light on ${prompt.trim().replace(/^(what is|what's|how to|how do i|can you)\s*/i, '').replace(/[?.!\s]+$/, '')}`;
   }
 
   if (trimmed.startsWith('write') || trimmed.startsWith('draft') || trimmed.startsWith('create')) {
@@ -25,7 +37,7 @@ const getAdaptiveLoadingText = (prompt: string): string => {
     return `building ${prompt.replace(/^(code a|code|build a|build|fix)\s*/i, '')}`;
   }
 
-  return `figuring out "${prompt}"`;
+  return LIGHT_PHRASES[Math.floor(Math.random() * LIGHT_PHRASES.length)];
 };
 
 const Chat = () => {
