@@ -47,7 +47,7 @@ export default function Stage({
             <video
               key={shownVideo.id}
               src={shownVideo.url}
-              poster={shownVideo.poster}
+              poster={shownVideo.poster ?? undefined}
               width={shownVideo.width}
               height={shownVideo.height}
               controls
