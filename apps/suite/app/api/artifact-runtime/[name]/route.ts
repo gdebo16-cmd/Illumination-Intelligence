@@ -13,9 +13,11 @@ const FILES: Record<string, string> = {
   // React 19 ships no browser build, so React artifacts use React 18's (vendor/artifact-runtime/README.md).
   'react.js': 'vendor/artifact-runtime/react.production.min.js',
   'react-dom.js': 'vendor/artifact-runtime/react-dom.production.min.js',
+  // Icons for React artifacts. 0.x is the last line with a browser (UMD) build.
+  'lucide-react.js': 'node_modules/lucide-react/dist/umd/lucide-react.min.js',
 };
 
-// Read each file once; together they are about 7 MB.
+// Read each file once; together they are about 8 MB.
 const cache = new Map<string, Buffer>();
 
 export async function GET(_req: Request, { params }: { params: Promise<{ name: string }> }) {

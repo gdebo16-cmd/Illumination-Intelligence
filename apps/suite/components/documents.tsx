@@ -279,6 +279,8 @@ function reactPage(code: string): string {
 </head><body><div id="root"></div>
 <script src="${RUNTIME}/react.js"></script>
 <script src="${RUNTIME}/react-dom.js"></script>
+<script>window.react = React;</script>
+<script src="${RUNTIME}/lucide-react.js"></script>
 <script src="${RUNTIME}/babel.js"></script>
 <script>${FRAME_SHOW_ERROR}
 window.addEventListener('error', function (e) { showError('The component stopped with an error:', e.error || e.message); });
@@ -287,10 +289,10 @@ try {
     filename: 'artifact.tsx',
     presets: [['env', { modules: 'commonjs' }], 'react', ['typescript', { isTSX: true, allExtensions: true }]],
   }).code;
-  var libraries = { 'react': React, 'react-dom': ReactDOM, 'react-dom/client': ReactDOM };
+  var libraries = { 'react': React, 'react-dom': ReactDOM, 'react-dom/client': ReactDOM, 'lucide-react': window.LucideReact };
   var require = function (name) {
     if (Object.prototype.hasOwnProperty.call(libraries, name)) return libraries[name];
-    throw new Error('"' + name + '" isn\\'t available here. Components can use React (with its hooks) and Tailwind classes.');
+    throw new Error('"' + name + '" isn\\'t available here. Components can use React (with its hooks), lucide-react icons and Tailwind classes.');
   };
   var module = { exports: {} };
   new Function('require', 'module', 'exports', 'React', compiled)(require, module, module.exports, React);
