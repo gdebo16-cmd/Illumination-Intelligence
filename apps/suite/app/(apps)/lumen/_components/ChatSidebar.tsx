@@ -3,10 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useChat } from './ChatContext';
 import ModelSelect from './ModelSelect';
-import { ArtifactIcon } from '@/components/documents';
+import { DocumentCard } from '@/components/documents';
 
-// What Lumen puts in the side panel: New chat, your previous chats, Switch Profile and the
-// model picker. The panel itself (frame, title, ✕, backdrop) comes from components/AppShell.tsx.
+// What Lumen puts in the side panel: New chat, Switch Profile, your previous chats, artifacts
+// and the model picker. The panel itself (frame, title, ✕, backdrop) comes from components/AppShell.tsx.
 // Picking a chat or a document closes the panel on a phone, so you can see it.
 const ChatSidebar = () => {
   const router = useRouter();
@@ -25,7 +25,12 @@ const ChatSidebar = () => {
 
   return (
     <>
-      <button className='new-chat-button' onClick={() => { startNewChat(); panel.closeOnPhone(); }}>+ New chat</button>
+      <div className='sidebar-chat-actions'>
+        <button className='new-chat-button' onClick={() => { startNewChat(); panel.closeOnPhone(); }}>+ New chat</button>
+        <button className='switch-profile-button' onClick={() => { fetch('/api/users/select', {method: 'DELETE',}); router.push('/select-user');}}>
+          Switch Profile
+        </button>
+      </div>
       <span className='sidebar-separator'>Previous Chats</span>
       <div className='chat-list'>
         {conversations.map((c) => (
@@ -55,15 +60,14 @@ const ChatSidebar = () => {
       <div className='chat-list artifact-list'>
         {artifacts?.length === 0 && <p className='artifact-empty'>Documents, web pages, diagrams, apps and code Lumen makes for you show up here.</p>}
         {artifacts?.map((a) => (
-          <div className='chat-row' key={a.id}>
-            <button
-              className={`chat-button artifact-button is-${a.format}`}
-              title={`From: ${a.sourceName}`}
-              onClick={() => { void openArtifact(a); panel.closeOnPhone(); }}
-            >
-              <span className='artifact-icon'><ArtifactIcon format={a.format} size={16} /></span>
-              <span className='artifact-title'>{a.title}</span>
-            </button>
+          <div className='artifact-row' key={a.id}>
+            <DocumentCard
+              title={a.title}
+              format={a.format}
+              language={a.language}
+              size={a.size}
+              onOpen={() => { void openArtifact(a); panel.closeOnPhone(); }}
+            />
             <button
               className='chat-delete'
               aria-label={`Delete artifact: ${a.title}`}
@@ -77,12 +81,6 @@ const ChatSidebar = () => {
           </div>
         ))}
       </div>
-      <span className='sidebar-separator'>
-        Settings
-      </span>
-      <button className='switch-profile-button' onClick={() => { fetch('/api/users/select', {method: 'DELETE',}); router.push('/select-user');}}>
-          Switch Profile
-      </button>
       <span className='sidebar-separator'>
         Model
       </span>

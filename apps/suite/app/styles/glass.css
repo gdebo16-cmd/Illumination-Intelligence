@@ -42,6 +42,8 @@
 .refract-terminal-action,
 .aegis .aegis-button,
 .astra-action,
+.sidebar .sidebar-chat-actions .new-chat-button,
+.sidebar .sidebar-chat-actions .switch-profile-button,
 /* Small tiles */
 .astra-glyph-slot,
 .refract-remote-key,
@@ -89,7 +91,21 @@
 .prism-sidebar .prism-shape,
 .prism-thumb,
 .prism-sidebar .prism-thumb,
-.aegis .aegis-recent button { border-radius: var(--glass-radius-small); }
+.aegis .aegis-recent button,
+.sidebar .sidebar-chat-actions .new-chat-button,
+.sidebar .sidebar-chat-actions .switch-profile-button { border-radius: var(--glass-radius-small); }
+
+/* Keep the glass fill on hover, including phones where .sidebar button:hover is cleared. */
+.sidebar .sidebar-chat-actions .new-chat-button:hover,
+.sidebar .sidebar-chat-actions .switch-profile-button:hover {
+  background: var(--glass-sheen), color-mix(in srgb, var(--glass-tint) 16%, rgb(255 255 255 / 0.08));
+}
+@media (hover: none) {
+  .sidebar .sidebar-chat-actions .new-chat-button:hover,
+  .sidebar .sidebar-chat-actions .switch-profile-button:hover {
+    background: var(--glass-sheen), var(--glass-fill);
+  }
+}
 
 /* Main action buttons: a stronger tint of the accent. Umbra's follows the Flicker's own color. */
 .aegis .aegis-button,

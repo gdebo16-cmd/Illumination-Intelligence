@@ -142,8 +142,10 @@ const CloseIcon = () => (
 // ---------------------------------------------------------------- reply with artifact cards
 interface DocumentCardProps {
   title: string;
-  /** The artifact's text, used to show its size on the card. */
-  content: string;
+  /** The artifact's text, used to show its size on the card when size isn't given. */
+  content?: string;
+  /** Known size in bytes, e.g. from a saved artifact list. */
+  size?: number;
   format?: ArtifactFormat;
   language?: string;
   /** Which version this is, when it was revised in the chat. */
@@ -153,8 +155,9 @@ interface DocumentCardProps {
   onOpen: () => void;
 }
 
-export const DocumentCard = ({ title, content, format = 'markdown', language, active, onOpen }: DocumentCardProps) => {
-  const meta = formatCardMeta(format, language, contentByteSize(content));
+export const DocumentCard = ({ title, content, size, format = 'markdown', language, active, onOpen }: DocumentCardProps) => {
+  const bytes = size ?? (content != null ? contentByteSize(content) : undefined);
+  const meta = formatCardMeta(format, language, bytes);
   return (
     <button type="button" className={`document-card is-${format}${active ? ' is-active' : ''}`} onClick={onOpen} aria-pressed={active}>
       <ArtifactThumb format={format} />

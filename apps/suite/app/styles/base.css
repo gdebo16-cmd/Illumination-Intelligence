@@ -157,11 +157,26 @@ header > .model-select-container {
   text-align: left;
   color: #e5e7f0;
   background: transparent;}
+.sidebar-chat-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 0.5rem;
+  width: 100%;}
+.sidebar-chat-actions .new-chat-button,
+.sidebar-chat-actions .switch-profile-button {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+  color: #e5e7f0;}
 .sidebar::-webkit-scrollbar,
 .chat-list::-webkit-scrollbar {
   display: none;}
 /* Everything in the sidebar keeps its size except the chat list, which scrolls inside
-   its own box. That keeps New chat, Previous Chats, Settings and Model on screen together. */
+   its own box. That keeps New chat, Switch Profile, Previous Chats and Model on screen together. */
 .sidebar > * {
   flex-shrink: 0;}
 .sidebar > .chat-list {
