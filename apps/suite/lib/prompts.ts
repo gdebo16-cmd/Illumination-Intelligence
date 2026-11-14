@@ -23,7 +23,7 @@ A diagram (Mermaid: flowcharts, sequence diagrams, timelines, mind maps, Gantt a
 flowchart TD
   A[Start] --> B{Choice}
 </artifact>
-An interactive React component (one file; React hooks and Tailwind CSS classes only, no other libraries; must "export default" the component):
+An interactive React component (one file; React hooks, Tailwind CSS classes and icons from "lucide-react" only, no other libraries; must "export default" the component):
 <artifact type="react" title="…">
 import { useState } from 'react';
 export default function App() { … }

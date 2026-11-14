@@ -13,6 +13,8 @@ const FILES: Record<string, string> = {
   // React 19 ships no browser build, so React artifacts use React 18's (vendor/artifact-runtime/README.md).
   'react.js': 'vendor/artifact-runtime/react.production.min.js',
   'react-dom.js': 'vendor/artifact-runtime/react-dom.production.min.js',
+  // Icons for components that import "lucide-react" (lucide-react has no browser build; see the README).
+  'lucide.js': 'vendor/artifact-runtime/lucide.min.js',
 };
 
 // Read each file once; together they are about 7 MB.
