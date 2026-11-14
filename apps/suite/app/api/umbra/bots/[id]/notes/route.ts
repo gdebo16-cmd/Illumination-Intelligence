@@ -2,14 +2,14 @@
 // DELETE /api/umbra/bots/<id>/notes?note=<id>  — make it forget one note
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { deleteNote, getBot, listNotes } from '@/lib/umbra/bots';
 
 type Params = { params: Promise<{ id: string }> };
 
 async function ownedBot(params: Params['params']) {
   const userId = await getCurrentUserId();
-  if (!userId) return { error: NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 }) };
+  if (!userId) return { error: noProfile() };
   const bot = getBot(userId, (await params).id);
   if (!bot) return { error: NextResponse.json({ error: 'Flicker not found.' }, { status: 404 }) };
   return { bot };

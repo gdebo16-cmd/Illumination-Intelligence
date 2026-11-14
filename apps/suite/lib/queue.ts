@@ -30,13 +30,11 @@ import { GPU_WORKERS, LOCAL_WORKER, type GpuWorker } from '../config/gpu-workers
 import { checkWorkers, forgetStatus, forgetWorker, type WorkerState } from './gpu/health.ts';
 import { noWorkerMessage, rankWorkers, type GpuNeeds } from './gpu/router.ts';
 
-export type Engine = 'ollama' | 'comfy';
+type Engine = 'ollama' | 'comfy';
 export type Priority = 'high' | 'low';
-export type { GpuWorker } from '../config/gpu-workers.ts';
-export type { GpuNeeds } from './gpu/router.ts';
 
 /** Optional details about a job. */
-export interface JobInfo {
+interface JobInfo {
   /** Who it's for (for taking turns, and the "in line" notice). */
   userId?: string;
   /** Which Ollama model it will load. */
@@ -48,7 +46,7 @@ export interface JobInfo {
   needs?: GpuNeeds;
 }
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
+export const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 
 /** Context window for chat requests. Ollama's default (4096) was silently cutting off long chats. */
 export const OLLAMA_NUM_CTX = Number(process.env.OLLAMA_NUM_CTX) || 16384;
@@ -79,7 +77,7 @@ type Job = {
   reject: (reason: unknown) => void;
 };
 
-export interface QueueStatus {
+interface QueueStatus {
   /** The user has a live request that hasn't started yet. */
   waiting: boolean;
   /** Their place in line (1 = next up). 0 when not waiting. */

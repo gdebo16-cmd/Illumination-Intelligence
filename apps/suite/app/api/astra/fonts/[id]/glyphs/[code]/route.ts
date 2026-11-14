@@ -5,13 +5,11 @@
 //     Sending neither erases that character.
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { cleanGlyph, saveGlyph } from '@/lib/astra/fonts';
 import { isCharacter } from '@/config/astra';
 
 type Params = { params: Promise<{ id: string; code: string }> };
-const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
-
 export async function PUT(req: Request, { params }: Params) {
   const userId = await getCurrentUserId();
   if (!userId) return noProfile();

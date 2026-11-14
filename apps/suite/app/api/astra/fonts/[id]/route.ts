@@ -2,11 +2,10 @@
 // DELETE /api/astra/fonts/<id> — delete it
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { cleanName, cleanPenWidth, deleteFont, updateFont } from '@/lib/astra/fonts';
 
 type Params = { params: Promise<{ id: string }> };
-const noProfile = () => NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
 const notFound = () => NextResponse.json({ error: 'Font not found.' }, { status: 404 });
 
 export async function PATCH(req: Request, { params }: Params) {

@@ -1,12 +1,12 @@
 // POST /api/refract/snapshots - take a snapshot of the Refract VM. Body: { name }
 
 import { NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/user";
+import { getCurrentUserId, noProfile } from "@/lib/user";
 import { cleanSnapshotName, getVmStatus, takeSnapshot } from "@/lib/refract/vbox";
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: "Please select a user profile first." }, { status: 401 });
+  if (!userId) return noProfile();
   const body = await req.json().catch(() => ({}));
   const name = cleanSnapshotName(body.name);
   if (!name) return NextResponse.json({ error: "Please give the snapshot a name." }, { status: 400 });

@@ -13,7 +13,8 @@ const nextConfig: NextConfig = {
   images: { localPatterns: [{ pathname: '/**' }] },
   cacheComponents: true,
   // Refract's SSH terminal (lib/refract/terminal.ts) loads these from node_modules at run time.
-  serverExternalPackages: ['ssh2', 'ws'],
+  // Aegis (lib/aegis/suggest.ts) reads code with TypeScript's parser at run time.
+  serverExternalPackages: ['ssh2', 'ws', 'typescript'],
   partialPrefetching: true,
   turbopack: {
     rules: {

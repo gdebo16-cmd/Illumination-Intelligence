@@ -2,7 +2,7 @@
 // Stop tries a clean ACPI shutdown first and powers off hard only if the guest doesn't finish in time.
 
 import { connection, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/user";
+import { getCurrentUserId, noProfile } from "@/lib/user";
 import { cleanPowerAction } from "@/lib/refract/power";
 import { getVmStatus, PowerStateError, powerVm, VmBusyError } from "@/lib/refract/vbox";
 
@@ -17,9 +17,7 @@ const FAILED: Record<string, string> = {
 export async function POST(req: Request) {
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) {
-    return NextResponse.json({ error: "Please select a user profile first." }, { status: 401, headers: NO_STORE });
-  }
+  if (!userId) return noProfile(NO_STORE);
   const body = await req.json().catch(() => ({}));
   const action = cleanPowerAction(body?.action);
   if (!action) return NextResponse.json({ error: "That isn't a power action." }, { status: 400, headers: NO_STORE });

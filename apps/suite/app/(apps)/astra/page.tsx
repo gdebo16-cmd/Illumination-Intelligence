@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Astra from './components/astra';
+import Astra from './_components/Astra';
 
 export const metadata: Metadata = { title: 'Astra' };
 

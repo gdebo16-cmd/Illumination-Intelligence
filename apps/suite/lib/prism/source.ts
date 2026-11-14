@@ -6,7 +6,7 @@
 //   1. turn it upright (phones store "rotate me" as a note instead of rotating the pixels),
 //   2. put any see-through parts on solid black (ComfyUI can't handle transparency),
 //   3. resize it smoothly to about 1 megapixel, in steps of 16 pixels (what the model needs).
-// Videos use the same steps with a smaller size (see lib/prism/video.ts).
+// Videos use the same steps with a smaller size (see lib/prism/video-workflow.ts).
 
 import 'server-only';
 import sharp, { type Metadata } from 'sharp';

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-// The slide-out side panel, shared by every app that wants one (Lumen and Prism so far).
+// The slide-out side panel, shared by every app that wants one (Lumen, Prism, Astra, Refract).
 //
 // This is only the frame: the panel, its title, the ✕ button, and the dimmed backdrop that
 // closes it on a phone. Each app puts its own things inside it, between the tags:
@@ -11,10 +11,9 @@ import type { ReactNode } from 'react';
 //     ...buttons, lists, pickers...
 //   </Sidebar>
 //
-// The app also keeps track of whether it's open (see hooks/use-toggle.tsx) and adds the class
-// "sidebar-open" to its "site-container" so the page shifts over on a wide screen.
-// The ☰ button that opens it is components/SidebarToggle.tsx. The look is in app/globals.css
-// under "Sidebar Styles".
+// Apps don't use it directly: components/AppShell.tsx puts it in the page, with the ☰ button
+// (components/SidebarToggle.tsx), and hooks/use-sidebar.ts decides when it's open. The look is in
+// app/styles/base.css under "Sidebar Styles".
 export default function Sidebar({ open, onClose, title, className = '', children }: {
   open: boolean;
   onClose: () => void;

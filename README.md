@@ -7,12 +7,13 @@ Working apps:
 - **Lumen**: local chat through Ollama. With a model that can see images, an add-photo button appears in the message box.
 - **Prism**: image studio. Makes pictures with ComfyUI (FLUX.2 Klein 4B), with art styles and shapes, and can enlarge them (Fast 4×, Photo 4×, or Enhance to 4K / 8K). ComfyUI must be running (`run_nvidia_gpu.bat`). Which model files go where is in [docs/prism-upscale.md](docs/prism-upscale.md).
 - **Umbra**: agent bots. Create bots with a flame avatar, a personality, a purpose and a local model, then chat with them. (Stage 1 of 4: tools, background tasks and teams come next.)
+- **Aegis**: repo scanner. Enter a folder on this PC (`C:\code\my-app`), a git link, or `owner/repo`, and press **Scan**. It lists over-engineering, redundant layers and messy organization (duplicate files, unused folders, stylesheets that override themselves, pasted code, import loops, stale doc paths, unused exports …), most important first, with the evidence and a fix for each. **Suggestions** lists code that does the same job in several files and could live in one (pages that build the same frame, the same steps with different names): the scan finds them and a local model (you pick which, through Ollama) reads the code and writes each one up, with what's shared, how each copy differs, a plan and a sketch. Without Ollama you get the scan's plainer version. Then come **Learning opportunities** (the idea behind each kind of problem) and an **AI Prompt** with a Copy button to hand to a coding agent; written suggestions are added to it as they finish. Folders are read in place and never changed; a link is copied into `data/aegis/clones/` for the scan, then deleted (needs git). The scan itself runs on the code's structure, not AI, and takes about a second; only the suggestion write-ups use a model. Code: `lib/aegis/` (`scan.ts` runs the checks in `checks.ts` and `imports.ts`; `suggest.ts` finds suggestions and `advise.ts` has a model write them; `report.ts` writes the lessons and the prompt).
 
 Artifacts (Lumen and Umbra): documents (Markdown), web pages (HTML), images (SVG), diagrams (Mermaid), interactive React components and code files a reply makes are saved as artifacts. Models write them as `<document title="…">` or `<artifact type="html|svg|mermaid|react|code" title="…">` blocks (a whole document, page, SVG or ```mermaid diagram in a fenced code block counts too). Web pages, diagrams and components run in a sandboxed frame that can't reach the app; their libraries (Mermaid, Babel, Tailwind, and React 18 from `vendor/artifact-runtime`) are served by the app itself, so they work without internet. `.md`, `.html`, `.svg` and `.mmd` files a Flicker writes in Refract are saved too. Lumen lists them in the sidebar under **Artifacts**. Umbra lists them at `/umbra/artifacts` (the **Artifacts** button on the Flickers page), and each Flicker or team chat has its own Artifacts button. Writing a document again with the same title in the same chat updates it. Artifacts stay when you clear or delete a chat; delete one from its list. Code: `lib/artifacts.ts`, `components/documents.tsx`, `app/api/artifacts/`.
 
 Photos in chat (Lumen and a Flicker's chat in Umbra): the add-photo button only shows for models listed in `VISION_MODELS` in `apps/suite/config/models.ts`. Add a model's id there when you install one that can see images.
 
-Astra, Eclipse and Halo are "coming soon" pages until they're built.
+Eclipse and Halo are "coming soon" pages until they're built.
 
 Lumen, Prism and Umbra share one graphics card; `lib/queue.ts` unloads one engine's model before the other runs.
 
@@ -55,7 +56,7 @@ apps/suite/                    the Next.js app
     select-user/               profile picker
     (apps)/                    every product; layout.tsx requires a profile
       lumen/                   page.tsx, layout.tsx (chat state), _components/
-      prism/ umbra/ astra/ eclipse/ halo/
+      prism/ umbra/ astra/ aegis/ refract/ eclipse/ halo/
     api/
       lumen/                   chat, conversations
       artifacts/               the Markdown documents Lumen and Umbra wrote (list, open, delete)

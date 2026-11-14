@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import db from '@/lib/db';
-import type { ToolDef, ToolResult } from './tools';
+import type { CodeEditView, ToolDef, ToolResult } from './types';
 
 const READ_CHAR_LIMIT = 16_000; // characters of one file handed to the model at a time
 const FILE_BYTE_LIMIT = 2_000_000; // bigger files are skipped
@@ -227,15 +227,6 @@ const searchCode: ToolDef = {
 };
 
 // ------------------------------------------------------------------ suggesting changes
-
-/** A suggested change, as the chat shows it. */
-export interface CodeEditView {
-  id: string;
-  path: string;
-  diff: string;
-  status: 'pending' | 'applied' | 'rejected' | 'failed';
-  note?: string;
-}
 
 interface EditRow {
   id: string;

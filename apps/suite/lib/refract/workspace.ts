@@ -14,8 +14,9 @@ import {
   sftpReaddir,
   SSH_MESSAGES,
 } from "./ssh";
+import { runGitRemote, authFailureMessage } from "./github-auth";
 
-export const WORK_ROOT = "/home/refract/work";
+const WORK_ROOT = "/home/refract/work";
 const SNAP_DIR = "/home/refract/work/.snapshots";
 
 const READ_CHAR_LIMIT = 16_000;
@@ -80,7 +81,7 @@ export function workPath(slug: string, rel: unknown = "."): string {
   return joined;
 }
 
-export function shownPath(slug: string, full: string): string {
+function shownPath(slug: string, full: string): string {
   const root = `${WORK_ROOT}/${slug}`;
   if (full === root) return ".";
   if (full.startsWith(`${root}/`)) return full.slice(root.length + 1);
@@ -135,7 +136,7 @@ function stripUserinfo(url: string): string {
   }
 }
 
-/** Only public http(s) git URLs. Credentials in the URL are stripped from anything we report. */
+/** Only http(s) git URLs. Any login details in the URL are dropped: GitHub logins come from GITHUB_TOKEN. */
 export function parseRepoUrl(raw: unknown): { url: string; defaultSlug: string; safeUrl: string } {
   const given = typeof raw === "string" ? raw.trim() : "";
   let url: URL;
@@ -155,8 +156,8 @@ export function parseRepoUrl(raw: unknown): { url: string; defaultSlug: string; 
   const safe = new URL(url.toString());
   safe.username = "";
   safe.password = "";
-  // Reconstruct without leaking userinfo; keep the original (with creds) only for git itself, on the VM.
-  return { url: given, defaultSlug, safeUrl: safe.toString() };
+  // Never hand userinfo to git (it would be saved in .git/config) or to anyone reading the output.
+  return { url: safe.toString(), defaultSlug, safeUrl: safe.toString() };
 }
 
 export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
@@ -193,21 +194,23 @@ export async function cloneRepo(rawUrl: unknown, rawSlug?: unknown): Promise<{ n
   if (exists.stdout.trim() === "0") {
     throw new Error(`A workspace named "${name}" is already there. Pick a different name, or restore a snapshot into it.`);
   }
-  // GIT_TERMINAL_PROMPT=0 so a private repo fails clearly instead of hanging on a password.
-  const cmd =
-    `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true git clone --depth 1 -- ${shQuote(url)} ${shQuote(dest)}`;
-  const result = await execInVm(cmd, { timeoutMs: 180_000, maxBytes: 16_000 });
-  if (result.timedOut) {
+  // Private GitHub repos log in with GITHUB_TOKEN through a one-off credential helper (see
+  // lib/refract/github-auth.ts), the same way push does: the token never reaches the command
+  // line, the origin remote or .git/config. GIT_TERMINAL_PROMPT=0 so nothing hangs on a prompt.
+  const run = await runGitRemote(`clone --depth 1 -- ${shQuote(url)} ${shQuote(dest)}`, url, {
+    timeoutMs: 180_000,
+    maxBytes: 16_000,
+  });
+  if (run.timedOut) {
     await execInVm(`rm -rf -- ${shQuote(dest)}`).catch(() => {});
     throw new Error("Copying the repo took too long and was stopped.");
   }
-  if (result.code !== 0) {
+  if (run.code !== 0) {
     await execInVm(`rm -rf -- ${shQuote(dest)}`).catch(() => {});
-    const err = (result.stderr || result.stdout).trim().replace(url, safeUrl);
-    throw new Error(err || `Couldn't copy ${safeUrl} into the virtual machine.`);
+    const auth = authFailureMessage(run, url, "That repo");
+    throw new Error(auth || run.output || `Couldn't copy ${safeUrl} into the virtual machine.`);
   }
-  const output = (result.stdout + "\n" + result.stderr).trim().replaceAll(url, safeUrl);
-  return { name, safeUrl, output };
+  return { name, safeUrl, output: run.output };
 }
 
 export async function listFolder(slug: string, rel?: unknown): Promise<{ path: string; entries: string[]; total: number }> {

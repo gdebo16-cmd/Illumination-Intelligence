@@ -7,7 +7,7 @@
 // its turn and Lumen's chat model is moved out of the way first.
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { generateImage, imageNeeds, type ImageRequest } from '@/lib/prism/comfy';
 import { friendlyImageError } from '@/lib/prism/imageJobs';
 import { gpuQueue } from '@/lib/queue';
@@ -31,7 +31,7 @@ function characterPrompt(char: string, style: string): string {
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
-  if (!userId) return bad('Please select a user profile first.', 401);
+  if (!userId) return noProfile();
   const body = await req.json().catch(() => ({}));
   const char = typeof body.char === 'string' ? body.char : '';
   if (!isCharacter(char)) return bad('That character isn’t in the font.');

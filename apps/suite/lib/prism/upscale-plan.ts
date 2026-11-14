@@ -98,7 +98,7 @@ const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
 const multipleOf = (n: number, step: number) => Math.max(step, Math.round(n / step) * step);
 
 /** Fit a picture so its long edge is `longEdge`. The shape stays. Both sides come out even. */
-export function fitLongEdge(width: number, height: number, longEdge: number): { width: number; height: number } {
+function fitLongEdge(width: number, height: number, longEdge: number): { width: number; height: number } {
   const edge = even(longEdge);
   if (width === height) return { width: edge, height: edge };
   const scale = edge / Math.max(width, height);
@@ -200,7 +200,7 @@ export function upscaleBlockReason(
 }
 
 /** The buttons under a picture, in the order they're shown. */
-export const ENLARGE_CHOICES: readonly EnlargeChoice[] = [
+const ENLARGE_CHOICES: readonly EnlargeChoice[] = [
   {
     target: 'fast-4x',
     fastModel: 'realesrgan',

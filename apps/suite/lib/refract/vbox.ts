@@ -82,7 +82,7 @@ function parseSnapshotList(stdout: string): VmSnapshot[] {
 }
 
 /** The VM's snapshots, in the order VirtualBox lists them (parent, then children). */
-export async function listSnapshots(): Promise<VmSnapshot[]> {
+async function listSnapshots(): Promise<VmSnapshot[]> {
   try {
     const { stdout } = await vbox(["snapshot", VM_NAME, "list", "--machinereadable"]);
     return parseSnapshotList(stdout);
@@ -160,7 +160,8 @@ export type RestoreResult = {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-async function readVmState(): Promise<string> {
+/** The VM's VirtualBox state (running, poweroff, saved...). One quick showvminfo call. */
+export async function readVmState(): Promise<string> {
   const { stdout } = await vbox(["showvminfo", VM_NAME, "--machinereadable"]);
   return parseMachineReadable(stdout).VMState || "unknown";
 }

@@ -13,9 +13,9 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
-import { canThink } from '@/config/models';
-import { toolsFor, type ToolContext, type ToolDef } from './tools';
-import type { CodeEditView } from './code';
+import { canThink, thinkSetting } from '@/config/models';
+import { toolsFor } from './tools';
+import type { AgentStep, ToolContext, ToolDef } from './types';
 
 /** 'high' for live chat; 'low' for background tasks, so they never make a chat wait. */
 type Priority = 'high' | 'low';
@@ -24,27 +24,6 @@ const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const MAX_ROUNDS = 6;
 // Working on code takes more looking around (list, search, read, read again…) before answering.
 const MAX_ROUNDS_CODE = 14;
-
-/** One tool use, as shown in the chat. */
-export interface AgentStep {
-  id: string;
-  tool: string;
-  label: string;
-  status: 'running' | 'done' | 'error';
-  summary?: string;
-  links?: { title: string; url: string }[];
-  image?: { url: string; prompt: string };
-  /** Code helper: a suggested file change. */
-  edit?: CodeEditView;
-  /** Teams: the teammate who did this step's work, */
-  bot?: { id: string; name: string; flame: string };
-  /** …the tools that teammate used, */
-  children?: AgentStep[];
-  /** …and the full answer it gave the leader. */
-  detail?: string;
-  /** A "Thinking" step (tool: 'thinking'): what the bot reasoned before acting or answering. */
-  thought?: string;
-}
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -63,18 +42,6 @@ interface OllamaReply {
     thinking?: string;
     tool_calls?: { function: { name: string; arguments: Record<string, unknown> | string } }[];
   };
-}
-
-// "Thinking" models (Qwen 3, Gemma 4, GPT-OSS) reason privately before answering. For a bot that's slow
-// (20-90 s per step) and, in testing, often made them *describe* a tool instead of using it.
-// So unless a bot has "Think before answering" switched on, it uses the quick, decisive mode:
-// thinking off, or as low as the model allows.
-function thinkSetting(model: string, think: boolean): { think?: boolean | 'low' | 'medium' } {
-  // GPT-OSS can't stop thinking; it takes an effort level instead of on/off.
-  if (model.startsWith('gpt-oss')) return { think: think ? 'medium' : 'low' };
-  if (think) return { think: true };
-  if (model.startsWith('qwen3') || model.startsWith('gemma4')) return { think: false };
-  return {};
 }
 
 /**
@@ -174,16 +141,34 @@ export async function runAgent(options: {
   think?: boolean;
   /** Called whenever a step starts or finishes, so the chat can show it live. */
   onStep: (step: AgentStep) => void;
+  /** Picking a run back up after a restart (lib/umbra/runs.ts): the round to go on from… */
+  startRound?: number;
+  /** …and the steps it had already finished. */
+  initialSteps?: AgentStep[];
+  /**
+   * Called each time the conversation grows (the model asked for tools; a tool finished), with
+   * everything needed to go on from here if the server stops. `round` is the round in progress.
+   */
+  onCheckpoint?: (checkpoint: { messages: ChatMessage[]; round: number }) => void;
 }): Promise<{ reply: string; steps: AgentStep[] }> {
   const tools = toolsFor(options.toolIds);
   for (const tool of options.extraTools ?? []) tools.set(tool.schema.function.name, tool);
   const schemas = [...tools.values()].map((t) => t.schema);
   const messages = [...options.messages];
-  const steps: AgentStep[] = [];
-  const maxRounds = options.toolIds.includes('code') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
+  const steps: AgentStep[] = [...(options.initialSteps ?? [])];
+  const maxRounds = options.toolIds.includes('code') || options.toolIds.includes('refract') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
   const thinks = Boolean(options.think) && canThink(options.model);
 
-  for (let round = 0; round <= maxRounds; round++) {
+  const checkpoint = (round: number) => {
+    try {
+      options.onCheckpoint?.({ messages, round });
+    } catch (err) {
+      console.error('[umbra-agent] checkpoint failed', (err as Error)?.message);
+    }
+  };
+  const firstRound = Math.max(0, Math.min(maxRounds, Math.floor(options.startRound ?? 0)));
+
+  for (let round = firstRound; round <= maxRounds; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
     const lastRound = round === maxRounds;
 
@@ -249,6 +234,7 @@ export async function runAgent(options: {
       tool_calls: parsed.map((p) => ({ function: { name: p.name, arguments: p.args } })),
       ...(thinking ? { thinking } : {}),
     });
+    checkpoint(round);
 
     for (const call of parsed) {
       const def = tools.get(call.name);
@@ -278,6 +264,7 @@ export async function runAgent(options: {
           links: result.links,
           image: result.image,
           edit: result.edit,
+          approval: result.approval,
           bot: result.bot,
           children: result.children,
           detail: result.detail,
@@ -292,6 +279,7 @@ export async function runAgent(options: {
       steps.push(step);
       options.onStep({ ...step });
       messages.push({ role: 'tool', tool_name: call.name, content: output });
+      checkpoint(round);
     }
   }
   return { reply: '…', steps }; // not reached: the last round always returns

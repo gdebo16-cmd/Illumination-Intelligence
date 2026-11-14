@@ -2,7 +2,7 @@
 // POST /api/umbra/bots/<id>/tasks — add one: { title, instructions, schedule }
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { getBot } from '@/lib/umbra/bots';
 import { createTask, listTasks, validateTask } from '@/lib/umbra/tasks';
 
@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 async function ownedBot(params: Params['params']) {
   const userId = await getCurrentUserId();
-  if (!userId) return { error: NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 }) };
+  if (!userId) return { error: noProfile() };
   const bot = getBot(userId, (await params).id);
   if (!bot) return { error: NextResponse.json({ error: 'Flicker not found.' }, { status: 404 }) };
   return { userId, bot };

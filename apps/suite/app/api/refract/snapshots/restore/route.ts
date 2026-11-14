@@ -2,7 +2,7 @@
 // Powers the VM off first if needed (its current state is discarded) and starts it again if it was running.
 
 import { connection, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/user";
+import { getCurrentUserId, noProfile } from "@/lib/user";
 import {
   cleanSnapshotId,
   getVmStatus,
@@ -16,9 +16,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function POST(req: Request) {
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) {
-    return NextResponse.json({ error: "Please select a user profile first." }, { status: 401, headers: NO_STORE });
-  }
+  if (!userId) return noProfile(NO_STORE);
   const body = await req.json().catch(() => ({}));
   const id = cleanSnapshotId(body?.uuid);
   if (!id) return NextResponse.json({ error: "That isn't a snapshot." }, { status: 400, headers: NO_STORE });

@@ -48,7 +48,7 @@ const ENHANCE = {
 };
 
 /** Nodes an Enhance job needs. Older ComfyUI builds don't have them; Fast 4× doesn't use them. */
-export const SEEDVR_NODES = ['SeedVR2Preprocess', 'SeedVR2Conditioning', 'SeedVR2PostProcessing'] as const;
+const SEEDVR_NODES = ['SeedVR2Preprocess', 'SeedVR2Conditioning', 'SeedVR2PostProcessing'] as const;
 
 const sameShape = (aw: number, ah: number, bw: number, bh: number) =>
   Math.abs(aw / ah - bw / bh) / (aw / ah) < 0.01;
@@ -137,7 +137,7 @@ async function firstInstalled(url: string, loader: string, names: readonly strin
  * SeedVR2's three nodes, missing ones listed. An empty list means this ComfyUI can Enhance.
  * Throws when ComfyUI doesn't answer (the queue can try another machine).
  */
-export async function missingSeedVR2Nodes(url: string): Promise<string[]> {
+async function missingSeedVR2Nodes(url: string): Promise<string[]> {
   const missing: string[] = [];
   await Promise.all(SEEDVR_NODES.map(async (name) => {
     const res = await fetch(`${url}/object_info/${name}`, { signal: AbortSignal.timeout(5_000) });

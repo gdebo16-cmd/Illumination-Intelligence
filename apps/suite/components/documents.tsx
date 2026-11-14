@@ -52,7 +52,7 @@ export interface OpenDocument {
 }
 
 /** The download name for an artifact: a Refract file keeps its own name. */
-export const artifactFileName = (a: Pick<ArtifactSummary, 'kind' | 'title'>): string | undefined =>
+const artifactFileName = (a: Pick<ArtifactSummary, 'kind' | 'title'>): string | undefined =>
   a.kind === 'file' ? a.title.split('/').pop() : undefined;
 
 /** Every version of each artifact in a chat's replies, by title, oldest first. */

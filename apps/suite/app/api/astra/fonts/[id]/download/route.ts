@@ -1,7 +1,7 @@
 // GET /api/astra/fonts/<id>/download — the font as a .ttf file you can install (lib/astra/font-file.ts)
 
 import { NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { getFont } from '@/lib/astra/fonts';
 import { buildFontFile } from '@/lib/astra/font-file';
 
@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const userId = await getCurrentUserId();
-  if (!userId) return NextResponse.json({ error: 'Please select a user profile first.' }, { status: 401 });
+  if (!userId) return noProfile();
   const font = getFont(userId, (await params).id);
   if (!font) return NextResponse.json({ error: 'Font not found.' }, { status: 404 });
   const file = buildFontFile(font.name, font.glyphs, font.penWidth);

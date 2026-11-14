@@ -8,10 +8,10 @@
 //   From a picture on your device (form):    fields prompt, length, and the file in "image"
 
 import { connection, NextResponse } from 'next/server';
-import { getCurrentUserId } from '@/lib/user';
+import { getCurrentUserId, noProfile } from '@/lib/user';
 import { readImageFile } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
-import { VIDEO_PIXELS, VIDEO_STEP, findLength } from '@/lib/prism/video';
+import { VIDEO_PIXELS, VIDEO_STEP, findLength } from '@/lib/prism/video-workflow';
 import { lengthChoices, listVideos, startVideo } from '@/lib/prism/videos';
 
 const MAX_PROMPT = 2000;
@@ -22,13 +22,13 @@ export async function GET() {
   // Run on every request, never a saved copy from build time.
   await connection();
   const userId = await getCurrentUserId();
-  if (!userId) return bad('Please select a user profile first.', 401);
+  if (!userId) return noProfile();
   return NextResponse.json({ videos: listVideos(userId), lengths: lengthChoices() });
 }
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
-  if (!userId) return bad('Please select a user profile first.', 401);
+  if (!userId) return noProfile();
 
   // Read what they sent: JSON, or a form with a picture file.
   const fields: Record<string, unknown> = {};

@@ -1,0 +1,568 @@
+/* Shared foundations: page variables, header, sidebar, chat messages, sign-in, Markdown, the app launcher. */
+
+:root {
+  --sidebar-w: 280px;
+  /* Room for the phone's status bar (clock, battery). --status-gap adds a little more below it,
+     because when the app is saved to the iPhone home screen, iOS blurs a strip just under the
+     status bar too, and the logo should sit clear of that blur. */
+  --status-gap: 0px;
+  --safe-top: calc(env(safe-area-inset-top) + var(--status-gap));
+  --header-h: calc(clamp(56px, 8dvh, 88px) + var(--safe-top));
+  --banner-gap: 4px;}
+/* Home-screen app on a phone with a status bar (the min() is 0 on screens without one) */
+@media (display-mode: standalone) {
+  :root { --status-gap: min(env(safe-area-inset-top), 14px); }}
+/* Same spacing inside the native iPhone app (NativeShell adds .cap-native). */
+:root.cap-native { --status-gap: min(env(safe-area-inset-top), 14px); }
+
+/* #region Global CSS Styles */
+*, *::before, *::after {
+  box-sizing: border-box;}
+html {
+  height: var(--app-height, 100dvh);
+  -webkit-text-size-adjust: 100%;    }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: var(--app-height, 100dvh);
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;                
+  -webkit-tap-highlight-color: transparent; }
+main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: var(--app-height, 100dvh);
+  /* The space beside the side panel when it's open (the whole width when it isn't). */
+  width: 100%;
+  overflow: hidden;}
+/* #endregion */
+/* #region Header Styles */
+/* The header floats over the page: it keeps its height for the buttons but paints nothing and
+   overlaps the page (negative margin), so the page's gradient runs up under the status bar. Its
+   empty space lets taps through; only its real buttons and logo catch them. */
+header {
+  position: relative;
+  z-index: 60;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--safe-top) max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
+  height: var(--header-h);
+  background: none !important;
+  box-shadow: none !important;
+  margin-bottom: calc(-1 * var(--header-h));
+  pointer-events: none;
+}
+header > :not(.header-spacer) { pointer-events: auto; }
+.site-container {
+  display: flex;
+  height: var(--app-height, 100dvh);
+  width: 100dvw;
+  /* Soft accent blobs over the app's fade, so the glass has color to blur (see glass.css). */
+  background:
+    radial-gradient(38% 45% at 10% 90%, color-mix(in srgb, var(--app-accent) 22%, transparent), transparent 70%),
+    radial-gradient(32% 40% at 88% 18%, color-mix(in srgb, var(--app-second) 18%, transparent), transparent 70%),
+    radial-gradient(30% 35% at 55% 55%, color-mix(in srgb, var(--app-accent) 11%, transparent), transparent 70%),
+    radial-gradient(35% 40% at 80% 95%, color-mix(in srgb, var(--app-highlight) 10%, transparent), transparent 70%),
+    linear-gradient(to bottom, var(--app-bg), var(--grad-color-1));
+  color: var(--text-color);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;}
+.content-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: var(--app-height, 100dvh);
+  min-width: 0;
+  transition: margin-left 0.2s ease;}
+header > button,
+header > .model-select-container {
+  position: relative;
+  z-index: 1;}
+/* #endregion */
+/* #region Sidebar Styles */
+.sidebar {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--sidebar-w);
+  max-width: 85vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: var(--accent-color);
+  border-right: 1px solid var(--border-color);
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+  z-index: 50;
+  box-shadow: var(--box-shadow);}
+.sidebar.open { 
+  transform: translateX(0); }
+.sidebar-top { 
+  display: flex; 
+  align-items: center; 
+  justify-content: 
+  space-between; 
+  margin-bottom: 0.25rem; }
+.sidebar-title { 
+  color: #aab; 
+  font-size: 0.85rem; 
+  letter-spacing: 0.05em; 
+  text-transform: uppercase; }
+.sidebar button {
+  width: 100%; padding: 0.6rem 0.75rem; text-align: left;
+  color: #e5e7f0; background: transparent;
+  border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.sidebar button:hover { 
+  background: rgb(255 255 255 / 0.06); }
+.sidebar button[aria-current="true"],
+.chat-row.is-current { 
+  background: color-mix(in srgb, var(--app-accent) 15%, transparent); 
+  border-color: color-mix(in srgb, var(--app-accent) 35%, transparent); }
+.sidebar .sidebar-close { 
+  width: auto; 
+  padding: 0.3rem 0.6rem; }
+.sidebar-backdrop { 
+  position: fixed; 
+  inset: 0; 
+  background: 
+  rgb(0 0 0 / 0.5); 
+  z-index: 40; }
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  color: var(--text-color);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 60;}
+.new-chat-button {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  color: #e5e7f0;
+  background: transparent;}
+.sidebar::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar {
+  display: none;}
+/* Everything in the sidebar keeps its size except the chat list, which scrolls inside
+   its own box. That keeps New chat, Previous Chats, Settings and Model on screen together. */
+.sidebar > * {
+  flex-shrink: 0;}
+.sidebar > .chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 0 1 auto;
+  height: 40dvh;
+  min-height: 3rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;}
+.chat-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;}
+.chat-row:hover {
+  background: rgb(255 255 255 / 0.06);}
+.sidebar .chat-button {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  color: #e5e7f0;
+  border: none;
+  background: transparent;}
+/* The row carries the hover and current-chat highlight, not the button inside it */
+.sidebar .chat-button:hover,
+.sidebar .chat-button[aria-current="true"] {
+  background: transparent;}
+.sidebar .chat-delete {
+  flex-shrink: 0;
+  width: auto;
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  color: #aab;
+  border: none;
+  background: transparent;}
+.sidebar .chat-delete:hover {
+  color: #ffb4b4;
+  background: rgb(255 80 80 / 0.15);}
+.switch-profile-button {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  color: #e5e7f0;
+  background: transparent;}
+.model-select-container {
+  width: 100%;
+  text-align: left;
+  color: #e5e7f0;
+  background: transparent;}
+.model-select-input {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  color: #e5e7f0;
+  border-radius: 0.5rem;
+  background-color: #1e293b;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;}
+.sidebar-separator {
+  font-size: 0.85rem;
+  border-bottom: 1px solid #71717a;
+  padding-bottom: 0.5rem;
+  width: 100%;
+  text-align: left;
+  color: #aab;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;}
+.model-select-input:focus {
+  outline: none;}
+/* #endregion model select */
+/* #region messages */
+.messages-container {
+  scrollbar-width: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column; 
+  gap: 2.5rem;
+  max-width: 70rem;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;}
+.messages-empty {
+  text-align: center;
+  color: #71717a; 
+  margin-top: 5rem; }
+.messages-empty-subtitle {
+  font-size: 0.875rem; 
+  margin-top: 0.5rem; }
+.message-item {
+  display: flex;
+  width: 100%;}
+.message-item.user {
+  justify-content: flex-end;}
+.message-item.assistant {
+  justify-content: flex-start;}
+.message-content {
+  max-width: 70%;
+  padding:1rem; 
+  font-size: 1rem; 
+  font-weight: 600; 
+  line-height: 1.625; 
+  white-space: pre-wrap;}
+.message-content.user {
+  color: var(--chat-user); 
+  border-bottom: 1px solid var(--border-color); 
+  border-top: 1px solid var(--border-color); }
+.message-content.assistant {
+  color: var(--chat-assistant); 
+  border-bottom: 1px solid var(--border-color); 
+  border-top: 1px solid var(--border-color); }
+.loading-content {
+  color: var(--load); 
+  padding: 1rem; 
+  font-weight: 500; 
+  font-size: 1rem; 
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.input-container {
+  padding: 1rem; 
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  flex-shrink: 0;
+  max-width: 100dvw;
+  background: transparent;}
+.input-form {
+  max-width: 100vw;
+  margin-left: auto;
+  margin-right: auto;
+  display: flex;
+  background: transparent;
+}
+.input-field {
+  flex: 1;
+  backdrop-filter: blur(8px); 
+  background: radial-gradient(circle at top center, var(--primary-color) 0%, var(--secondary-color) 100%); 
+  border: 1px solid var(--load); 
+  border-radius: 0.75rem; 
+  padding: 1rem; 
+  font-size: 1rem; 
+  color: var(--text-color); 
+  transition: all 0.2s ease;
+  box-shadow: var(--box-shadow);}
+.input-field:focus {
+    outline: none;
+    border: 1px solid var(--load);
+    box-shadow: var(--box-shadow);
+    background: radial-gradient(circle at top center, var(--load) 0%, var(--primary-color) 100%); }
+.input-field::placeholder {
+  color: var(--placeholder); }
+/* Lumen's message box is a textarea so Enter can add a new line. */
+textarea.input-field {
+  display: block;
+  resize: none;
+  font-family: inherit;
+  line-height: normal;
+  overflow-y: auto;
+  scrollbar-width: none;}
+.send-button {
+  background: radial-gradient(circle at center, var(--load) 0%, var(--primary-color) 100%); 
+  color: var(--text-color); 
+  padding: 0.75rem 1.5rem; 
+  border-radius: 0.75rem; 
+  font-size: 0.875rem; 
+  font-weight: 500; 
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--box-shadow);
+  transition: all 0.2s ease;}
+.send-button:hover {
+    background: radial-gradient(circle at center, var(--load) 0%, var(--primary-color) 100%); 
+    transform: scale(1.05);
+    border: 1px solid var(--load);
+    box-shadow: var(--box-shadow);}
+.send-button:disabled {
+  opacity: 0.5; 
+  cursor: not-allowed;}
+/* #endregion base data */
+/* #region signin */
+.signin-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: var(--app-height, 100dvh);
+  width: 100dvw;}
+.title-signin {
+  font-size: 5rem;
+  font-weight: 600;
+  color: #f4f4f5;
+  border-bottom: 1px solid #71717a;
+  padding-bottom: 1rem;}
+.sub-signin {
+  font-size: 2rem;
+  color: #71717a;
+  padding-bottom: 1rem;}
+.user-container {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  width:40%;
+  height: 20%;}
+.user-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #71717a;
+  background-color: #1e293b;
+  color: #e9e9f5;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;}
+.user-buttons:hover {
+  background-color: #2e2e5b;
+  transform: scale(1.05);}
+.user-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  background-color: #5050a1;} 
+/* #endregion signin */
+/* #region markdown */
+.markdown > :first-child { margin-top: 0; }
+.markdown p { margin: 0.6em 0; line-height: 1.6; }
+.markdown code:not(pre code) { padding: 0.1em 0.35em; border-radius: 4px; background: rgb(255 255 255 / 0.1); font-size: 0.9em; }
+.markdown-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  margin: 0.6em 0;
+}
+.markdown table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+.markdown th,
+.markdown td {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  padding: 0.4rem 0.7rem;
+}
+
+.code-block { margin: 0.8em 0; border: 1px solid rgb(255 255 255 / 0.12); border-radius: 10px; overflow: hidden; background: #0d1117; }
+.code-block-header { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.75rem; background: rgb(255 255 255 / 0.06); font-size: 0.78rem; color: #9aa; }
+.code-block-copy { background: transparent; color: inherit; border: 1px solid rgb(255 255 255 / 0.2); border-radius: 6px; padding: 0.15rem 0.6rem; cursor: pointer; }
+.code-block-pre { margin: 0; padding: 0.9rem; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+
+/* #endregion markdown */
+/* #region app launcher */
+.header-spacer { 
+  flex: 1; }
+.app-launcher { 
+  position: relative; 
+  z-index: 70; }
+.app-launcher-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--text-color);
+  background: var(--edge-color);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;}
+.app-launcher-button:hover,
+.app-launcher-button[aria-expanded="true"] { 
+  background: rgb(255 255 255 / 0.12); }
+.app-launcher-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  padding: 10px;
+  background: var(--accent-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  box-shadow: var(--box-shadow);
+  max-width: calc(100vw - 1.5rem);}
+.app-launcher-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  color: var(--text-color);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 10px;}
+.app-launcher-tile:hover { 
+  background: var(--secondary-color); }
+.app-launcher-tile[aria-current="page"] { 
+  background: var(--secondary-color); 
+  border-color: var(--border-color); }
+.app-launcher-icon {
+  display: block;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;}
+.app-launcher-name { 
+  font-size: 0.8rem; }
+.app-launcher-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.6rem;
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: var(--text-color);
+  background: var(--secondary-color);}
+.app-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 84px);
+  gap: 6px;}
+/* The clickable middle of the header banner (symbol + name). Opens that app's first page. */
+.banner-link {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: var(--safe-top);
+  height: calc(100% - var(--safe-top));
+  aspect-ratio: 3 / 1;
+  max-width: 60%;
+  border-radius: 8px;}
+.banner-link:focus-visible {
+  outline: 2px solid var(--text-color);
+  outline-offset: -4px;}
+/* #endregion app launcher */
+/* #region home icon picker */
+.home-icon-option img { 
+  width: 40px; 
+  height: 40px; 
+  border-radius: 22.5%; 
+  display: block; }
+.home-icon-option[aria-checked="true"] { 
+  border-color: var(--border-color); }
+.home-icon-picker-hint { 
+  margin: 8px 0 0; 
+  font-size: 0.7rem; 
+  color: var(--text-color); }
+.coming-soon {
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-color);
+  text-align: center;}
+.coming-soon-icon {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;}
+.coming-soon h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  letter-spacing: 0.04em; }
+.coming-soon p { 
+  margin: 0; }
+.home-icon-picker {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);}
+.home-icon-picker-title { 
+  font-size: 0.75rem; 
+  color: var(--text-color); 
+  text-transform: uppercase; 
+  letter-spacing: 0.05em; 
+  margin-bottom: 8px; }
+.home-icon-picker-options { 
+  display: flex; 
+  justify-content: space-between; 
+  gap: 6px; }
+.home-icon-option {
+  padding: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 24%;
+  cursor: pointer;
+  line-height: 0;}
+/* #endregion home icon picker */

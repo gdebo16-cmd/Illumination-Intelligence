@@ -13,7 +13,9 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
-import { gpuQueue, type GpuNeeds, type GpuWorker } from '@/lib/queue';
+import { gpuQueue } from '@/lib/queue';
+import type { GpuWorker } from '@/config/gpu-workers';
+import type { GpuNeeds } from '@/lib/gpu/router';
 import { ranOutOfMemory } from './comfy';
 
 // One row per picture being made. Finished pictures still go in PrismImage, as always; this table

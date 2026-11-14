@@ -1,0 +1,165 @@
+/* The landing page's app cards. */
+
+/* #region landing */
+.landing {
+  padding: var(--header-h) 1.25rem 2rem;
+  color: var(--text-color);
+  text-align: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  max-height: 100vh;
+  
+}
+
+.landing-title {
+  margin: 0 0 1rem;
+  border-bottom: 1px solid rgb(78, 78, 119);
+  padding-bottom: 1rem;
+}
+.landing-lead {
+  margin: 0 0 1rem;
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding: 0;
+  margin: 1rem 0;
+  width: 100%;
+  height: 100%;
+  list-style: none;
+  text-align: center;
+  text-decoration: none;
+    text-decoration: none;
+  
+}
+
+.landing-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  height: 100%;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.03);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgb(78, 78, 119);
+  border-radius: 1rem;
+  padding: 1rem;
+
+}
+
+.landing-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.landing-card p {
+  margin: 0;
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  opacity: 0.75;
+}
+
+.landing-card-soon {
+  font-size: 0.8rem;
+  opacity: 0.55;
+}
+
+.landing-card.is-soon {
+  opacity: 0.85;
+}
+
+.landing-card-icon {
+  width: 3rem;
+  height: 3rem;
+  object-fit: contain;
+
+}
+
+.landing-card-item a {
+  text-decoration: none;
+  color: inherit;
+  
+}
+
+.landing-card-title {
+  border-bottom: 1px solid rgb(78, 78, 119);
+  padding-bottom: 0.5rem;
+}
+
+.landing-card[data-app="lumen"] { --landing-accent: #c9cedb; }
+.landing-card[data-app="umbra"] { --landing-accent: #9b6bff; }
+.landing-card[data-app="prism"] { --landing-accent: #b07cff; }
+.landing-card[data-app="eclipse"] { --landing-accent: #e0484f; }
+.landing-card[data-app="halo"] { --landing-accent: #f2c14e; }
+.landing-card[data-app="aegis"] { --landing-accent: #3fd8ff; }
+.landing-card[data-app="refract"] { --landing-accent: #30c9a5; }
+.landing-card[data-app="astra"] { --landing-accent: #4cd08a; }
+
+/* Each card: glass (glass.css) with its app's color on the edge, glow and name. */
+.landing-card[data-app] {
+  border-color: color-mix(in srgb, var(--landing-accent) 25%, transparent);
+  box-shadow: var(--glass-highlight), 0 8px 24px rgb(0 0 0 / 0.3), 0 0 8px color-mix(in srgb, var(--landing-accent) 15%, transparent);
+}
+.landing-card[data-app] h2 { color: var(--landing-accent); }
+
+/* Prism: rainbow edge, glow, name and underline. */
+.landing-card[data-app="prism"] {
+  position: relative;
+  border-color: transparent;
+  box-shadow: var(--glass-highlight), var(--prism-glow);
+}
+.landing-card[data-app="prism"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: var(--prism-rainbow);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+/* The title stays full width so its underline spans the card; the side padding squeezes the
+   gradient's box down to about the word's width, so the whole rainbow lands on the letters. */
+.landing-card[data-app="prism"] h2 {
+  padding-inline: calc(50% - 1.6em);
+  background: var(--prism-rainbow) content-box no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  border-image: var(--prism-rainbow) 1;
+}
+
+
+/* #region landing */
+
+
+@media (hover: hover) {
+  .landing-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--landing-accent, rgb(255 255 255 / 0.35));
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.35);
+  }
+}
+
+.landing-card:focus-visible {
+  outline: 2px solid var(--landing-accent, #fff);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-card {
+    transition: none;
+  }
+}
+/* #endregion */
+
+
+/* #endregion landing */

@@ -25,7 +25,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ name: s
   try {
     let body = cache.get(name);
     if (!body) {
-      body = await fs.readFile(path.join(process.cwd(), file));
+      // The files are read from disk at run time; tell the bundler not to trace (copy) the project for this.
+      body = await fs.readFile(path.join(/* turbopackIgnore: true */ process.cwd(), file));
       cache.set(name, body);
     }
     return new Response(new Uint8Array(body), {

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // React 18's minified browser builds for artifacts, copied unchanged (vendor/artifact-runtime/README.md).
+    "vendor/artifact-runtime/**",
   ]),
 ]);
 
