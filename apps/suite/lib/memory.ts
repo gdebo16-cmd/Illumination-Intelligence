@@ -1,6 +1,10 @@
-// lib/memory.ts - extraction, storage, retrieval for per-user memory.
-// Written for node:sqlite (DatabaseSync). Server-side only. Untested: adjust names to your project.
+// lib/memory.ts - extraction, storage, retrieval for per-user memory (the facts Lumen keeps).
+// Written for node:sqlite (DatabaseSync). Server-side only.
+// What a chat itself remembers (its running summary, and recall of past exchanges) is in
+// lib/chat-memory.ts, which uses the embedding helpers here.
 import 'server-only';
+import { thinkSetting } from '@/config/models';
+import { OLLAMA_KEEP_ALIVE } from '@/lib/queue';
 
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 // The model that reads a chat for things worth remembering. Normally it's the model the chat just
@@ -9,6 +13,17 @@ const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const FIXED_EXTRACT_MODEL = process.env.MEMORY_EXTRACT_MODEL?.trim() || null;
 export const extractModelFor = (chatModel: string) => FIXED_EXTRACT_MODEL ?? chatModel;
 const EMBED_MODEL = process.env.MEMORY_EMBED_MODEL ?? 'nomic-embed-text';
+// The embedding model is tiny, so it runs on the processor and leaves the graphics card to the
+// chat model. Set MEMORY_EMBED_GPU=1 in .env to put it on the card instead.
+const EMBED_ON_GPU = process.env.MEMORY_EMBED_GPU === '1';
+// Nomic's models expect to be told whether a text is something stored or a question about it;
+// without that, matches are noticeably worse.
+const USES_TASK_PREFIX = /nomic/i.test(EMBED_MODEL);
+/**
+ * Saved next to each embedding: the model, and how the text was prepared. Embeddings made another
+ * way can't be compared with new ones, so memories are embedded again when this changes.
+ */
+export const EMBED_TAG = USES_TASK_PREFIX ? `${EMBED_MODEL}+task-prefix` : EMBED_MODEL;
 
 // Minimal shape of node:sqlite's DatabaseSync, so this file needs no extra types.
 interface Statement {
@@ -26,6 +41,8 @@ export interface Memory {
   id: number;
   fact: string;
   category: Category;
+  /** When it was saved or last changed (SQLite's "YYYY-MM-DD HH:MM:SS", UTC). */
+  updated_at: string;
 }
 type Op =
   | { action: 'add'; fact: string; category: Category }
@@ -73,11 +90,17 @@ const OPS_SCHEMA = {
 };
 
 // ---------------------------------------------------------------- ollama + vector helpers
-async function embed(texts: string[]): Promise<Float32Array[]> {
+/** `kind`: 'document' for text being stored, 'query' for text used to search what's stored. */
+export async function embed(texts: string[], kind: 'query' | 'document'): Promise<Float32Array[]> {
+  const prefix = USES_TASK_PREFIX ? (kind === 'query' ? 'search_query: ' : 'search_document: ') : '';
   const res = await fetch(`${OLLAMA}/api/embed`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: EMBED_MODEL, input: texts }),
+    body: JSON.stringify({
+      model: EMBED_MODEL,
+      input: texts.map((t) => prefix + t),
+      ...(EMBED_ON_GPU ? {} : { options: { num_gpu: 0 } }),
+    }),
   });
   if (!res.ok) throw new Error(`embed failed: ${res.status}`);
   const data = (await res.json()) as { embeddings: number[][] };
@@ -85,11 +108,11 @@ async function embed(texts: string[]): Promise<Float32Array[]> {
 }
 
 // node:sqlite takes Uint8Array for BLOBs and returns Uint8Array.
-const toBlob = (v: Float32Array) => new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+export const toBlob = (v: Float32Array) => new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
 // slice() copies into a fresh buffer, which avoids Float32Array alignment errors.
-const fromBlob = (b: Uint8Array) => new Float32Array(b.slice().buffer);
+export const fromBlob = (b: Uint8Array) => new Float32Array(b.slice().buffer);
 
-function cosine(a: Float32Array, b: Float32Array): number {
+export function cosine(a: Float32Array, b: Float32Array): number {
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
@@ -127,7 +150,9 @@ export async function extractMemories(
   const transcript = msgs.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
 
   // Show the model only memories related to this chat, so it can update instead of duplicate.
-  const related = await retrieve(db, userId, transcript.slice(0, 2000), 15, 0.3);
+  const related = hasMemories(db, userId)
+    ? await retrieve(db, userId, (await embed([transcript.slice(0, 2000)], 'query'))[0], 15, 0.3)
+    : [];
   const existing = related.map((m) => `[${m.id}] (${m.category}) ${m.fact}`).join('\n') || '(none)';
 
   const res = await fetch(`${OLLAMA}/api/chat`, {
@@ -138,6 +163,8 @@ export async function extractMemories(
       stream: false,
       format: OPS_SCHEMA, // structured output keeps the JSON valid
       options: { temperature: 0, num_ctx: numCtx },
+      keep_alive: OLLAMA_KEEP_ALIVE, // the same as the chat's, so this doesn't shorten it
+      ...thinkSetting(model, false), // sorting facts needs no long reasoning
       messages: [
         { role: 'system', content: EXTRACTION_SYSTEM },
         { role: 'user', content: `EXISTING MEMORIES:\n${existing}\n\nNEW CONVERSATION:\n${transcript}` },
@@ -178,7 +205,7 @@ async function applyOps(
   if (valid.length === 0) return;
 
   const texts = valid.filter((o): o is Extract<Op, { fact: string }> => 'fact' in o).map((o) => o.fact);
-  const vectors = texts.length ? await embed(texts) : [];
+  const vectors = texts.length ? await embed(texts, 'document') : [];
   let vi = 0;
 
   const add = db.prepare(
@@ -196,9 +223,9 @@ async function applyOps(
   try {
     for (const o of valid) {
       if (o.action === 'add') {
-        add.run(userId, o.fact, o.category ?? 'other', conversationId, toBlob(vectors[vi++]), EMBED_MODEL);
+        add.run(userId, o.fact, o.category ?? 'other', conversationId, toBlob(vectors[vi++]), EMBED_TAG);
       } else if (o.action === 'update') {
-        update.run(o.fact, o.category ?? 'other', toBlob(vectors[vi++]), EMBED_MODEL, o.id, userId);
+        update.run(o.fact, o.category ?? 'other', toBlob(vectors[vi++]), EMBED_TAG, o.id, userId);
       } else {
         del.run(o.id, userId);
       }
@@ -211,53 +238,103 @@ async function applyOps(
 }
 
 // ---------------------------------------------------------------- retrieval
+/** Does this profile have anything saved? (Saves embedding a question when there's nothing to find.) */
+export function hasMemories(db: Db, userId: string): boolean {
+  return Boolean(db.prepare('SELECT 1 FROM memories WHERE user_id = ? AND deleted_at IS NULL LIMIT 1').get(userId));
+}
+
+/** Embed again any memory whose embedding was made another way (see EMBED_TAG). A one-time catch-up. */
+async function refreshEmbeddings(db: Db, userId: string): Promise<void> {
+  const stale = db
+    .prepare(
+      `SELECT id, fact FROM memories
+       WHERE user_id = ? AND deleted_at IS NULL AND (embedding IS NULL OR embedding_model IS NOT ?) LIMIT 64`,
+    )
+    .all(userId, EMBED_TAG) as { id: number; fact: string }[];
+  if (stale.length === 0) return;
+  const vectors = await embed(stale.map((m) => m.fact), 'document');
+  const save = db.prepare('UPDATE memories SET embedding = ?, embedding_model = ? WHERE id = ?');
+  stale.forEach((m, i) => save.run(toBlob(vectors[i]), EMBED_TAG, m.id));
+}
+
+/** The saved facts closest in meaning to `query` (an embedding made with embed(…, 'query')). */
 async function retrieve(
   db: Db,
   userId: string,
-  query: string,
+  query: Float32Array,
   k = 8,
   minScore = 0.35,
 ): Promise<Memory[]> {
+  await refreshEmbeddings(db, userId);
   const rows = db
     .prepare(
-      'SELECT id, fact, category, embedding FROM memories WHERE user_id = ? AND deleted_at IS NULL AND embedding IS NOT NULL',
+      `SELECT id, fact, category, updated_at, embedding FROM memories
+       WHERE user_id = ? AND deleted_at IS NULL AND embedding_model = ?`,
     )
-    .all(userId) as (Memory & { embedding: Uint8Array })[];
-  if (rows.length === 0) return [];
+    .all(userId, EMBED_TAG) as (Memory & { embedding: Uint8Array })[];
 
-  const [q] = await embed([query]);
   return rows
-    .map((r) => ({ r, score: cosine(q, fromBlob(r.embedding)) }))
+    .map((r) => ({ r, score: cosine(query, fromBlob(r.embedding)) }))
     .filter((x) => x.score >= minScore)
     .sort((a, b) => b.score - a.score)
     .slice(0, k)
-    .map(({ r }) => ({ id: r.id, fact: r.fact, category: r.category }));
+    .map(({ r }) => ({ id: r.id, fact: r.fact, category: r.category, updated_at: r.updated_at }));
 }
 
 // ---------------------------------------------------------------- injection
-// Call before each chat turn, then add the result to your system prompt.
+// How many "who they are / how they like answers" facts are always included, whatever was asked.
+const ALWAYS_INCLUDED = 6;
+
+/** "2026-03-14 09:12:00" -> "Mar 2026", so the model can tell an old fact from a fresh one. */
+function monthOf(sqliteTime: string): string {
+  const date = new Date(`${sqliteTime.replace(' ', 'T')}Z`);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+/**
+ * The facts to show the model this turn, as text for the system prompt ('' when there are none).
+ * `query` is the embedding of what's being talked about (lib/chat-memory.ts builds it from the
+ * last few messages, so "what about the other one?" still finds the right facts).
+ *
+ * Two kinds go in: the profile's core facts and answer preferences (always, so the assistant never
+ * forgets who it is talking to), then whatever matches this turn.
+ */
 export async function buildMemoryBlock(
   db: Db,
   userId: string,
-  userMessage: string,
-  maxChars = 2500, // roughly 600 tokens
+  query: Float32Array,
+  maxChars = 2000, // roughly 500 tokens
 ): Promise<string> {
-  const hits = await retrieve(db, userId, userMessage);
+  const core = db
+    .prepare(
+      `SELECT id, fact, category, updated_at FROM memories
+       WHERE user_id = ? AND deleted_at IS NULL AND category IN ('profile', 'preference')
+       ORDER BY updated_at DESC LIMIT ?`,
+    )
+    .all(userId, ALWAYS_INCLUDED) as unknown as Memory[];
+  const coreIds = new Set(core.map((m) => m.id));
+  const hits = (await retrieve(db, userId, query)).filter((m) => !coreIds.has(m.id));
+
   const lines: string[] = [];
+  const usedIds: number[] = [];
   let used = 0;
-  for (const m of hits) {
-    const line = `- ${m.fact}`;
+  // Matches first when room is short: they are what this message is about.
+  for (const m of [...hits, ...core]) {
+    const when = monthOf(m.updated_at);
+    const line = `- ${m.fact}${when ? ` (noted ${when})` : ''}`;
     if (used + line.length > maxChars) break;
     lines.push(line);
     used += line.length;
+    if (!coreIds.has(m.id)) usedIds.push(m.id);
   }
   if (lines.length === 0) return '';
 
-  const usedIds = hits.slice(0, lines.length).map((m) => m.id);
-  db.prepare(
-    `UPDATE memories SET use_count = use_count + 1, last_used_at = datetime('now')
-     WHERE id IN (${usedIds.map(() => '?').join(',')})`,
-  ).run(...usedIds);
+  if (usedIds.length) {
+    db.prepare(
+      `UPDATE memories SET use_count = use_count + 1, last_used_at = datetime('now')
+       WHERE id IN (${usedIds.map(() => '?').join(',')})`,
+    ).run(...usedIds);
+  }
 
   return `Things you know about the user (use only when relevant; don't mention that you have notes):\n${lines.join('\n')}`;
 }

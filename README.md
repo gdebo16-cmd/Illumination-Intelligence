@@ -13,6 +13,24 @@ Artifacts (Lumen and Umbra): documents (Markdown), web pages (HTML), images (SVG
 
 Photos in chat (Lumen and a Flicker's chat in Umbra): the add-photo button only shows for models listed in `VISION_MODELS` in `apps/suite/config/models.ts`. Add a model's id there when you install one that can see images.
 
+Memory (Lumen and each Flicker's own chat): the model only reads a small window, so the graphics card holds less, and three things keep the thread. The newest messages go in word for word. Older ones are folded into a running summary of the chat, a batch at a time, by the chat's own model after it replies. And every exchange is saved with an embedding, so when the talk comes back to something old, the matching exchanges are looked up and shown to the model with their dates (Lumen looks through all of a profile's chats; a Flicker through its own). Lumen also keeps facts about each profile and always includes the core ones; Flickers have their notes. Deleting or clearing a chat removes its summary and saved exchanges. Team chats don't use this yet. Code: `lib/chat-memory.ts` (summary and recall), `lib/memory.ts` (facts and embeddings). It needs the embedding model once: `ollama pull nomic-embed-text`.
+
+Graphics memory: settings for `apps/suite/.env`, all optional.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `OLLAMA_CHAT_NUM_CTX` | `8192` | Context window for conversation (Lumen, and Flickers without web, code or Refract tools). Smaller uses less graphics memory; the summary and recall cover what no longer fits. |
+| `OLLAMA_NUM_CTX` | `16384` | Context window for Flickers that read web pages, files or command output, and for Aegis. |
+| `MEMORY_EMBED_GPU` | off | The embedding model runs on the processor. Set to `1` to put it on the card. |
+| `OLLAMA_KEEP_ALIVE_APP` | `10m` | How long a chat model stays on the card after its last message. |
+
+Two settings on Ollama itself roughly halve what the context window costs, with no visible change in answers. Set them once in PowerShell, then quit Ollama from the tray and start it again:
+
+```powershell
+setx OLLAMA_FLASH_ATTENTION 1
+setx OLLAMA_KV_CACHE_TYPE q8_0
+```
+
 Eclipse and Halo are "coming soon" pages until they're built.
 
 Lumen, Prism and Umbra share one graphics card; `lib/queue.ts` unloads one engine's model before the other runs.
@@ -66,7 +84,7 @@ apps/suite/                    the Next.js app
     apps.ts                    the list of apps the launcher shows
     models.ts                  Ollama models per page type
   hooks/                       shared React hooks
-  lib/                         server code: db, users, memory, prompts, GPU queue
+  lib/                         server code: db, users, memory, chat-memory, prompts, GPU queue
   public/brand/                the locked Artemis banners
   data/                        SQLite databases (not in git)
 services/                      backends that aren't part of the Next app

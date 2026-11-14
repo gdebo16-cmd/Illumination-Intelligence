@@ -48,8 +48,20 @@ interface JobInfo {
 
 export const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 
-/** Context window for chat requests. Ollama's default (4096) was silently cutting off long chats. */
+/**
+ * Context window for work that reads a lot (Flickers with web, code or Refract tools; Aegis).
+ * Ollama's default (4096) was silently cutting off long chats.
+ */
 export const OLLAMA_NUM_CTX = Number(process.env.OLLAMA_NUM_CTX) || 16384;
+
+/**
+ * Context window for plain conversation (Lumen, and Flickers without reading tools). The window
+ * is the one part of memory that costs graphics memory, and it grows with every token it holds,
+ * so it stays small: older messages are kept as a running summary and looked up when they matter
+ * (lib/chat-memory.ts) instead of all being held on the card. Set OLLAMA_CHAT_NUM_CTX in
+ * apps/suite/.env to change it; it is never larger than OLLAMA_NUM_CTX.
+ */
+export const OLLAMA_CHAT_NUM_CTX = Math.min(Number(process.env.OLLAMA_CHAT_NUM_CTX) || 8192, OLLAMA_NUM_CTX);
 
 /**
  * How long Ollama keeps a chat model on the card after Lumen or Umbra last used it, so the next

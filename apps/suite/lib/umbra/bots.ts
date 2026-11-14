@@ -10,6 +10,7 @@ import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_TOOL_IDS, flameWords, isBotM
 import { checkCodeFolder, editStatuses } from './code';
 import { approvalStatuses } from './prod-control';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
+import { forgetChat } from '@/lib/chat-memory';
 import { canThink } from '@/config/models';
 import type { AgentStep } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
@@ -147,6 +148,7 @@ export function deleteBot(userId: string, id: string): boolean {
   if (!getBot(userId, id)) return false;
   db.prepare('DELETE FROM UmbraMessage WHERE bot_id = ?').run(id);
   deletePhotos(chatKey.umbra(id));
+  forgetChat(chatKey.umbra(id));
   db.prepare('DELETE FROM UmbraNote WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraTask WHERE bot_id = ?').run(id);
   db.prepare('DELETE FROM UmbraRun WHERE bot_id = ?').run(id);
@@ -240,6 +242,7 @@ export function addMessage(
 export function clearMessages(botId: string): void {
   db.prepare('DELETE FROM UmbraMessage WHERE bot_id = ?').run(botId);
   deletePhotos(chatKey.umbra(botId));
+  forgetChat(chatKey.umbra(botId));
 }
 
 // ------------------------------------------------------------------ notes

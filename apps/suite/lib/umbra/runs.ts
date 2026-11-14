@@ -33,7 +33,8 @@ import crypto from 'node:crypto';
 import db from '@/lib/db';
 import { USERS, type UserId } from '@/lib/profiles';
 import type { ToolId } from '@/config/umbra';
-import { runAgent, type ChatMessage } from './agent';
+import { botHistoryBudget, numCtxFor, runAgent, type ChatMessage } from './agent';
+import { maintainChat, umbraChat } from '@/lib/chat-memory';
 import { addMessage, getBot, listBots, listNotes, systemPrompt, type Bot, type BotMessage } from './bots';
 import { endWork, startWork, workFailed } from './busy';
 import type { AgentStep, ToolDef, ToolResult } from './types';
@@ -424,6 +425,12 @@ function launch(run: {
         onCheckpoint: checkpoint,
       });
       const message = addMessage(bot.id, 'assistant', result.reply, result.steps);
+      // In the background: save this exchange for recall, and fold old messages into the chat's
+      // summary once it has grown (lib/chat-memory.ts).
+      maintainChat(
+        umbraChat(userId, bot.id), run.model, numCtxFor(run.toolIds),
+        botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0),
+      );
       db.prepare(
         `UPDATE UmbraChatRun SET status = 'done', steps = ?, reply = ?, message_id = ?, finishedAt = ?, heartbeatAt = ? WHERE id = ?`,
       ).run(JSON.stringify(result.steps), result.reply, message.id, message.createdAt, message.createdAt, runId);

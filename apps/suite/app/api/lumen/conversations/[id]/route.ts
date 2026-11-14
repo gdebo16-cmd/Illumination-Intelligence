@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getCurrentUserId, noProfile } from '@/lib/user';
 import { chatKey, deletePhotos, photoIds } from '@/lib/chat-images';
+import { forgetChat } from '@/lib/chat-memory';
 
 // Returns one chat's messages, only if it belongs to the signed-in profile.
 export async function GET(
@@ -38,7 +39,8 @@ export async function GET(
 }
 
 // Deletes one chat and its messages, only if it belongs to the signed-in profile.
-// Memories learned from the chat are kept: they belong to the profile, not the chat.
+// Facts learned from the chat are kept: they belong to the profile, not the chat. The chat's own
+// summary and saved exchanges go with it, so nothing said in a deleted chat is recalled later.
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -57,6 +59,7 @@ export async function DELETE(
 
     db.prepare('DELETE FROM Message WHERE conversationId = ?').run(id);
     deletePhotos(chatKey.lumen(id));
+    forgetChat(chatKey.lumen(id));
     db.prepare('DELETE FROM memory_extractions WHERE conversation_id = ?').run(id);
     db.prepare('DELETE FROM Conversation WHERE id = ?').run(id);
 

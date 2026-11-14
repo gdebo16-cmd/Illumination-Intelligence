@@ -1,36 +1,20 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import db from '@/lib/db';
-import { buildMemoryBlock, extractMemories, extractModelFor } from '@/lib/memory';
+import { extractMemories, extractModelFor } from '@/lib/memory';
+import { chatContext, fitHistory, historyBudget, lumenChat, maintainChat, recall } from '@/lib/chat-memory';
 import { getCurrentUserId, noProfile } from '@/lib/user';
-import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
+import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_CHAT_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 import { canSeeImages } from '@/config/models';
 import { saveDocumentArtifacts } from '@/lib/artifacts';
 import { mayHoldDocument } from '@/lib/document-blocks';
 import {
-  chatKey, photoIds, PhotoError, PHOTO_CONTEXT_CHARS, preparePhotos, savePhotos, uploadedPhotos, withPhotos,
+  chatKey, PhotoError, PHOTO_CONTEXT_CHARS, preparePhotos, savePhotos, uploadedPhotos, withPhotos,
 } from '@/lib/chat-images';
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const DEFAULT_MODEL = 'qwen3-coder:30b';
-
-// Roughly how much past chat fits in the context window next to the system prompt and the reply.
-// (About 3 characters per token, keeping a quarter of the window free for the answer.)
-const HISTORY_CHAR_BUDGET = Math.floor(OLLAMA_NUM_CTX * 3 * 0.75);
-
-/** Keep the newest messages that fit in the budget, so Ollama never has to cut off the start. */
-function recentHistory<T extends { content: string; images?: string[] }>(history: T[], budget: number): T[] {
-  // A photo takes up room too.
-  const size = (m: T) => m.content.length + (m.images?.length ?? 0) * PHOTO_CONTEXT_CHARS;
-  let used = 0;
-  let start = history.length;
-  while (start > 0 && used + size(history[start - 1]) <= budget) {
-    used += size(history[start - 1]);
-    start--;
-  }
-  return history.slice(start);
-}
 
 export async function POST(req: Request) {
   try {
@@ -94,14 +78,10 @@ export async function POST(req: Request) {
       db.prepare(`UPDATE Conversation SET updatedAt = ? WHERE id = ?`).run(now, activeConversationId);
     }
 
-    // 4. Load previous messages (before saving the new one)
-    const history = (
-      db
-        .prepare(
-          `SELECT role, content, images FROM Message WHERE conversationId = ? ORDER BY createdAt ASC, rowid ASC`,
-        )
-        .all(activeConversationId) as { role: string; content: string; images: string | null }[]
-    ).map((m) => ({ role: m.role, content: m.content, images: photoIds(m.images) }));
+    // 4. Load what the model will read of this chat (before saving the new message): the summary
+    //    of its older part, and the messages since. See lib/chat-memory.ts.
+    const chat = lumenChat(userId, activeConversationId);
+    const { summary, history } = chatContext(chat);
 
     // 5. Save the new user message, and its photos
     const images = savePhotos(userId, chatKey.lumen(activeConversationId), photos);
@@ -110,36 +90,23 @@ export async function POST(req: Request) {
     );
     insertMsg.run(crypto.randomUUID(), activeConversationId, 'user', prompt, now, images.length ? JSON.stringify(images) : null);
 
-    // 6. Retrieve relevant long-term memories (async: must be awaited).
-    //    A memory failure must never break the chat itself.
-    let memoryBlock = '';
-    try {
-      if (prompt.trim()) memoryBlock = await buildMemoryBlock(db, userId, prompt);
-    } catch (memoryError) {
-      console.error('Memory retrieval error:', memoryError);
-    }
+    // 6. Keep the newest messages that fit in the window, word for word.
+    // Models don't know today's date on their own, and remembered things come with dates.
+    const today = `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
+    const basePrompt = [BASE_SYSTEM_PROMPT, today, DOCUMENT_SYSTEM_PROMPT].join('\n\n');
+    const budget = historyBudget(OLLAMA_CHAT_NUM_CTX, basePrompt.length);
+    const recent = fitHistory(history, Math.max(2000, budget - prompt.length - images.length * PHOTO_CONTEXT_CHARS));
 
-    // 7. Build the messages for Ollama's chat endpoint
-    const systemPrompt = [BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT, memoryBlock]
-      .filter(Boolean)
-      .join('\n\n');
+    // 7. Add what it remembers: the summary, past exchanges that match, and facts about the profile.
+    //    (A memory failure never breaks the chat itself: recall() just returns less.)
+    const remembered = await recall(chat, { summary, recent, message: prompt, facts: true });
+    const systemPrompt = [basePrompt, remembered].filter(Boolean).join('\n\n');
 
-    const budget = Math.max(
-      2000,
-      HISTORY_CHAR_BUDGET - systemPrompt.length - prompt.length - images.length * PHOTO_CONTEXT_CHARS,
-    );
     // withPhotos swaps photo ids for the pictures themselves, when this model can see them.
     const messages = [
       { role: 'system', content: systemPrompt },
       ...withPhotos(
-        [
-          ...recentHistory(history, budget).map((m) => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content,
-            images: m.images,
-          })),
-          { role: 'user', content: prompt, images },
-        ],
+        [...recent.map((m) => ({ role: m.role, content: m.content, images: m.images })), { role: 'user', content: prompt, images }],
         canSee,
       ),
     ];
@@ -155,7 +122,7 @@ export async function POST(req: Request) {
             model: chatModel,
             messages,
             stream: false,
-            options: { num_ctx: OLLAMA_NUM_CTX },
+            options: { num_ctx: OLLAMA_CHAT_NUM_CTX },
             keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
           }),
         });
@@ -192,11 +159,14 @@ export async function POST(req: Request) {
     //     It uses the model that just answered (already on the card), with the same context size.
     const memoryModel = extractModelFor(chatModel);
     gpuQueue
-      .add(() => extractMemories(db, userId, activeConversationId, memoryModel, OLLAMA_NUM_CTX), 'low', 'ollama', {
+      .add(() => extractMemories(db, userId, activeConversationId, memoryModel, OLLAMA_CHAT_NUM_CTX), 'low', 'ollama', {
         userId,
         model: memoryModel,
       })
       .catch((memoryError) => console.error('Memory extraction error:', memoryError));
+    // 10b. Also in the background: save this exchange for recall, and fold old messages into the
+    //      chat's summary once it has grown.
+    maintainChat(chat, chatModel, OLLAMA_CHAT_NUM_CTX, budget);
 
     // 11. Return the response to the frontend
     return NextResponse.json({ conversationId: activeConversationId, reply, images, artifacts });

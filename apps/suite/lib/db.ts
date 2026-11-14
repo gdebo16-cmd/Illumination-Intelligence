@@ -78,6 +78,35 @@ db.exec(`
   );
 `);
 
+// What each chat remembers of itself (lib/chat-memory.ts). `chat` is the same key photos use:
+// "lumen:<conversation id>" or "umbra:<bot id>". Both tables are emptied for a chat when it is
+// deleted or cleared.
+db.exec(`
+  -- The running summary of messages too old to send to the model, and how far each job has read
+  -- (by message rowid).
+  CREATE TABLE IF NOT EXISTS ChatMemory (
+    chat          TEXT PRIMARY KEY,
+    summary       TEXT    NOT NULL DEFAULT '',
+    summary_upto  INTEGER NOT NULL DEFAULT 0,  -- messages up to this rowid are in the summary
+    episodes_upto INTEGER NOT NULL DEFAULT 0,  -- messages up to this rowid are in ChatEpisode
+    updatedAt     TEXT    NOT NULL
+  );
+
+  -- One row per exchange (what was asked, what was answered), with an embedding, so an old
+  -- exchange can be found again when the talk comes back to it.
+  CREATE TABLE IF NOT EXISTS ChatEpisode (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         TEXT    NOT NULL,
+    chat            TEXT    NOT NULL,
+    last_row_id     INTEGER NOT NULL,          -- rowid of the exchange's last message
+    text            TEXT    NOT NULL,
+    embedding       BLOB    NOT NULL,          -- Float32 bytes
+    embedding_model TEXT    NOT NULL,
+    createdAt       TEXT    NOT NULL           -- when the exchange happened
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_episode_user ON ChatEpisode (user_id, chat);
+`);
+
 // Prism: one row per picture. The picture itself is saved as data/prism/images/<id>.png.
 // The prompt, style, seed and size are kept so a picture can be made again exactly.
 db.exec(`

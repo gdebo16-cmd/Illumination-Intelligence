@@ -15,15 +15,14 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId, noProfile } from '@/lib/user';
 import { USERS } from '@/lib/profiles';
-import { addMessage, getBot, listMessages, listNotes, systemPrompt } from '@/lib/umbra/bots';
-import type { ChatMessage } from '@/lib/umbra/agent';
+import { addMessage, getBot, listNotes, systemPrompt } from '@/lib/umbra/bots';
+import { botHistoryBudget, type ChatMessage } from '@/lib/umbra/agent';
+import { chatContext, fitHistory, recall, umbraChat } from '@/lib/chat-memory';
 import { activeRun, RunBusyError, startRun, workshopPrompt } from '@/lib/umbra/runs';
 import { canSeeImages } from '@/config/models';
 import { chatKey, PhotoError, preparePhotos, savePhotos, uploadedPhotos, withPhotos } from '@/lib/chat-images';
 
 const MAX_MESSAGE = 4000;
-// How many earlier messages the bot "remembers" in each reply.
-const HISTORY = 40;
 
 /** A GitHub repo the user picked in the Flicker chat dropdown. */
 function readSelectedRepo(raw: unknown): { name: string; url: string } | null {
@@ -113,16 +112,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  // 3. What the model reads: the bot's character sheet (with its notes), recent chat, the new message.
-  const history = listMessages(bot.id, HISTORY);
+  // 3. What the model reads: the bot's character sheet (with its notes), what it remembers of this
+  // chat (a summary of the older part, and past exchanges that match; lib/chat-memory.ts), the
+  // newest messages word for word, and the new message.
+  const chat = umbraChat(userId, bot.id);
+  const { summary, history } = chatContext(chat);
   const sent = addMessage(bot.id, 'user', message, undefined, savePhotos(userId, chatKey.umbra(bot.id), photos));
   // withPhotos swaps photo ids for the pictures themselves, when this bot's model can see them.
   const repo = bot.tools.includes('refract') ? readSelectedRepo(body.repo) : null;
-  const prompt = systemPrompt(bot, USERS[userId], listNotes(bot.id)) + workshopPrompt(repo ?? undefined);
+  const sheet = systemPrompt(bot, USERS[userId], listNotes(bot.id)) + workshopPrompt(repo ?? undefined);
+  const recent = fitHistory(history, Math.max(2000, botHistoryBudget(bot.tools, sheet.length) - message.length));
+  const remembered = await recall(chat, { summary, recent, message, facts: false });
+  const prompt = remembered ? `${sheet}\n\n${remembered}` : sheet;
   const messages: ChatMessage[] = [
     { role: 'system', content: prompt },
     ...withPhotos<ChatMessage>(
-      [...history.map((m) => ({ role: m.role, content: m.content, images: m.images })), { role: 'user', content: message, images: sent.images }],
+      [...recent.map((m) => ({ role: m.role, content: m.content, images: m.images })), { role: 'user', content: message, images: sent.images }],
       canSee,
     ),
   ];

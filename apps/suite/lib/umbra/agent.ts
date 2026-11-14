@@ -11,8 +11,9 @@
 
 import 'server-only';
 import crypto from 'node:crypto';
-import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
+import { gpuQueue, OLLAMA_CHAT_NUM_CTX, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
+import { historyBudget } from '@/lib/chat-memory';
 import { canThink, thinkSetting } from '@/config/models';
 import { toolsFor } from './tools';
 import type { AgentStep, ToolContext, ToolDef } from './types';
@@ -24,6 +25,20 @@ const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const MAX_ROUNDS = 6;
 // Working on code takes more looking around (list, search, read, read again…) before answering.
 const MAX_ROUNDS_CODE = 14;
+
+// Tools whose results are long (web pages, files, command output) need the large context window.
+// A Flicker without them only talks, so it gets the small one and uses less graphics memory.
+const READING_TOOLS: ToolId[] = ['web_search', 'read_webpage', 'code', 'refract'];
+/** The context window a bot with these tools runs in. */
+export const numCtxFor = (toolIds: ToolId[]) =>
+  toolIds.some((id) => READING_TOOLS.includes(id)) ? OLLAMA_NUM_CTX : OLLAMA_CHAT_NUM_CTX;
+
+/**
+ * How many characters of earlier chat a bot with these tools reads, next to a character sheet
+ * `promptChars` long. A bot with tools keeps half its room free for what the tools bring back.
+ */
+export const botHistoryBudget = (toolIds: ToolId[], promptChars: number) =>
+  historyBudget(numCtxFor(toolIds), promptChars, toolIds.length ? 0.5 : 1);
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -53,6 +68,7 @@ async function askModel(
   model: string,
   messages: ChatMessage[],
   tools: unknown[],
+  numCtx: number,
   priority: Priority,
   userId: string,
   onThinking?: (thinking: string) => void,
@@ -65,7 +81,7 @@ async function askModel(
         model,
         messages,
         stream: think,
-        options: { num_ctx: OLLAMA_NUM_CTX },
+        options: { num_ctx: numCtx },
         keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
         ...thinkSetting(model, think),
         ...(tools.length ? { tools } : {}),
@@ -158,6 +174,7 @@ export async function runAgent(options: {
   const steps: AgentStep[] = [...(options.initialSteps ?? [])];
   const maxRounds = options.toolIds.includes('code') || options.toolIds.includes('refract') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
   const thinks = Boolean(options.think) && canThink(options.model);
+  const numCtx = numCtxFor(options.toolIds);
 
   const checkpoint = (round: number) => {
     try {
@@ -190,7 +207,7 @@ export async function runAgent(options: {
     };
 
     const reply = await askModel(
-      options.model, messages, lastRound ? [] : schemas, options.priority ?? 'high', options.context.userId,
+      options.model, messages, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
       thinks ? showThinking : undefined,
     );
     let calls = reply.message?.tool_calls ?? [];
