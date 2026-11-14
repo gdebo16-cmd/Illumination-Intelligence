@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
-import { DocumentPanel, ReplyContent, documentVersions, type OpenDocument } from '@/components/documents';
+import { DocumentIcon, DocumentPanel, ReplyContent, documentVersions, type OpenDocument } from '@/components/documents';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
@@ -223,7 +223,7 @@ export default function BotChat({ botId }: { botId: string }) {
         <Link href={`/umbra/${bot.id}/tasks`} className="umbra-chat-action">Tasks</Link>
         <Link href={`/umbra/${bot.id}/edit`} className="umbra-chat-action">Edit</Link>
         <Link href={`/umbra/artifacts?source=${bot.id}`} className="umbra-chat-action umbra-chat-artifacts" aria-label="Artifacts" title="Artifacts">
-          <span className="umbra-chat-artifacts-icon" aria-hidden>📄</span>
+          <span className="umbra-chat-artifacts-icon"><DocumentIcon size={17} /></span>
           <span className="umbra-chat-artifacts-label">Artifacts</span>
         </Link>
         <button type="button" className="umbra-chat-action" onClick={clearChat} disabled={messages.length === 0}>Clear</button>

@@ -60,12 +60,48 @@ export function documentVersions(replies: string[]): Map<string, string[]> {
 }
 
 // ---------------------------------------------------------------- icons
-const DocIcon = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-    <path d="M14 3v5h5M9 13h6M9 17h4" />
+/** The document symbol for small places: a page with a folded corner and a few lines. */
+export const DocumentIcon = ({ size = 18 }: { size?: number }) => (
+  <svg className="document-icon" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.5z" />
+    <path d="M14.5 3v4.5H19" />
+    <path d="M8.5 12.5h7M8.5 16h5" />
   </svg>
 );
+
+type ThumbLine = { kind: 'heading' | 'text' | 'item' | 'rule'; width: number };
+
+/** A few lines that sketch the document's shape: headings, paragraphs, list items. */
+function sketch(content: string): ThumbLine[] {
+  const lines: ThumbLine[] = [];
+  const width = (text: string, min: number) => Math.max(min, Math.min(100, Math.round(text.length * 1.8)));
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (!line || /^```|^~~~|^\|?[\s:-]+\|[\s|:-]*$/.test(line)) continue;
+    if (/^#{1,6}\s/.test(line)) lines.push({ kind: 'heading', width: width(line, 35) * 0.75 });
+    else if (/^([-*+]|\d+\.)\s/.test(line)) lines.push({ kind: 'item', width: width(line, 30) * 0.85 });
+    else if (/^(-{3,}|\*{3,})$/.test(line)) lines.push({ kind: 'rule', width: 100 });
+    else {
+      // A long paragraph wraps onto a second line.
+      if (line.length > 50) lines.push({ kind: 'text', width: 100 });
+      lines.push({ kind: 'text', width: width(line.slice(50), 25) });
+    }
+    if (lines.length >= 7) break;
+  }
+  return lines.slice(0, 7);
+}
+
+/** A small page that shows the document's shape, like a thumbnail. */
+export const DocumentThumb = ({ content }: { content: string }) => (
+  <span className="document-thumb" aria-hidden="true">
+    <span className="document-thumb-page">
+      {sketch(content).map((l, i) => (
+        <span key={i} className={`document-thumb-line is-${l.kind}`} style={{ width: `${l.width}%` }} />
+      ))}
+    </span>
+  </span>
+);
+
 const Chevron = ({ dir }: { dir: 'left' | 'right' | 'down' }) => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d={dir === 'left' ? 'M15 6l-6 6 6 6' : dir === 'right' ? 'M9 6l6 6-6 6' : 'M6 9l6 6 6-6'} />
@@ -80,16 +116,18 @@ const CloseIcon = () => (
 // ---------------------------------------------------------------- reply with document cards
 interface DocumentCardProps {
   title: string;
-  /** Under the title: "Document · Markdown", or "Version 2" for a revision. */
+  /** The document's text, sketched on the card's little page. */
+  content: string;
+  /** Under the title: "Document · MD", or "Version 2 · MD" for a revision. */
   subtitle?: string;
   /** This document is the one open in the panel. */
   active?: boolean;
   onOpen: () => void;
 }
 
-export const DocumentCard = ({ title, subtitle = 'Document · Markdown', active, onOpen }: DocumentCardProps) => (
+export const DocumentCard = ({ title, content, subtitle = 'Document · MD', active, onOpen }: DocumentCardProps) => (
   <button type="button" className={`document-card ${active ? 'is-active' : ''}`} onClick={onOpen} aria-pressed={active}>
-    <span className="document-card-icon"><DocIcon /></span>
+    <DocumentThumb content={content} />
     <span className="document-card-text">
       <span className="document-card-title">{title}</span>
       <span className="document-card-subtitle">{subtitle}</span>
@@ -117,7 +155,8 @@ export const ReplyContent = ({ content, onOpen, versions, open }: ReplyContentPr
         <DocumentCard
           key={i}
           title={seg.title}
-          subtitle={list.length > 1 && at >= 0 ? `Version ${at + 1} · Markdown` : undefined}
+          content={seg.content}
+          subtitle={list.length > 1 && at >= 0 ? `Version ${at + 1} · MD` : undefined}
           active={open?.title === seg.title && open.content === seg.content}
           onOpen={() => onOpen({ title: seg.title, content: seg.content, versions: list })}
         />

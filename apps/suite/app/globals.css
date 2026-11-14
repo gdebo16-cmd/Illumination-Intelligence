@@ -463,14 +463,34 @@ textarea.input-field {
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
 .document-card:hover { background: rgb(255 255 255 / 0.07); border-color: rgb(255 255 255 / 0.2); }
 .document-card:active { transform: scale(0.99); }
-.document-card.is-active { border-color: color-mix(in srgb, var(--doc-accent) 70%, transparent); background: color-mix(in srgb, var(--doc-accent) 10%, transparent); }
-.document-card-icon {
-  display: grid; place-items: center; flex-shrink: 0;
-  width: 2.75rem; height: 2.75rem;
-  color: var(--doc-accent);
-  background: color-mix(in srgb, var(--doc-accent) 14%, rgb(255 255 255 / 0.03));
-  border: 1px solid color-mix(in srgb, var(--doc-accent) 28%, transparent);
-  border-radius: 10px; }
+.document-card.is-active { border-color: rgb(255 255 255 / 0.32); background: rgb(255 255 255 / 0.08); }
+/* The card's little page: off-white paper, a folded corner, and grey bars sketching the text. */
+.document-thumb {
+  display: flex; align-items: flex-end; justify-content: center; flex-shrink: 0;
+  width: 3.5rem; height: 3.5rem; padding-top: 0.45rem; overflow: hidden;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.1); border-radius: 10px; }
+.document-thumb-page {
+  position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  width: 2.6rem; height: 100%; padding: 0.4rem 0.35rem 0;
+  background: #f4f2ee;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: translateY(2px);
+  transition: transform 0.18s ease;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); }
+.document-thumb-page::after {
+  content: ''; position: absolute; top: 0; right: 0;
+  width: 9px; height: 9px;
+  background: linear-gradient(225deg, transparent 50%, #d9d5cc 50%); }
+.document-card:hover .document-thumb-page,
+.document-card.is-active .document-thumb-page { transform: translateY(0); }
+.document-thumb-line { display: block; flex-shrink: 0; height: 2px; border-radius: 1px; background: #c9c5bd; }
+.document-thumb-line.is-heading { height: 3px; margin-bottom: 1px; background: #55534e; }
+.document-thumb-line.is-item { margin-left: 4px; }
+.document-thumb-line.is-rule { height: 1px; background: #dedad2; }
+.document-icon { display: block; flex-shrink: 0; }
 .document-card-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .document-card-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .document-card-subtitle { font-size: 0.78rem; color: var(--doc-muted); }
@@ -4159,8 +4179,9 @@ main.refract {
   align-items: center;
   gap: 0.5rem; }
 .artifact-icon {
+  display: inline-flex;
   flex-shrink: 0;
-  font-size: 0.9rem; }
+  color: #aab; }
 .artifact-title {
   min-width: 0;
   overflow: hidden;
@@ -4183,7 +4204,10 @@ main.refract {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  font-size: 1.4rem; }
+  color: #d5d7ea;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 10px; }
 .umbra-artifact .umbra-report-title {
   overflow-wrap: anywhere; }
 .umbra-artifact-actions {
@@ -4191,12 +4215,13 @@ main.refract {
   padding: 0 1rem 0.75rem 3.75rem; }
 /* In a chat's top bar the Artifacts button is a word on wide screens and just its icon on phones. */
 .umbra-chat-artifacts-icon { display: none; }
+.umbra-chat-artifacts { display: inline-flex; align-items: center; }
 .umbra-chat-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis; }
 @media (max-width: 768px) {
   .umbra-artifact-actions { padding-left: 1rem; }
-  .umbra-chat-artifacts-icon { display: inline; }
+  .umbra-chat-artifacts-icon { display: inline-flex; }
   .umbra-chat-artifacts-label { display: none; } }
 /* #endregion artifacts */

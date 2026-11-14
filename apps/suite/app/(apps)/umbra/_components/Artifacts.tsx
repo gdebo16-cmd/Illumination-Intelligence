@@ -6,7 +6,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { flameColor } from '@/config/umbra';
-import { DocumentPanel, useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
+import { DocumentIcon, DocumentPanel, useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
 import Flame from './Flame';
 import type { Bot, Team } from './types';
 
@@ -79,7 +79,7 @@ export default function Artifacts({ source }: { source?: string }) {
                 style={flame ? ({ '--bot-color': flameColor(flame) } as React.CSSProperties) : undefined}
               >
                 <button type="button" className="umbra-report-head" onClick={() => show(a)}>
-                  {flame ? <Flame flame={flame} size={40} still /> : <span className="umbra-artifact-icon" aria-hidden>📄</span>}
+                  {flame ? <Flame flame={flame} size={40} still /> : <span className="umbra-artifact-icon"><DocumentIcon size={20} /></span>}
                   <span className="umbra-report-who">
                     <span className="umbra-report-title">{a.title}</span>
                     <span className="umbra-report-meta">
