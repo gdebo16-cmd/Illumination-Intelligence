@@ -7,6 +7,7 @@ import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
 import { canSeeImages } from '@/config/models';
 import { saveDocumentArtifacts } from '@/lib/artifacts';
+import { mayHoldDocument } from '@/lib/document-blocks';
 import {
   chatKey, photoIds, PhotoError, PHOTO_CONTEXT_CHARS, preparePhotos, savePhotos, uploadedPhotos, withPhotos,
 } from '@/lib/chat-images';
@@ -178,7 +179,7 @@ export async function POST(req: Request) {
 
     // 9b. Keep any document in the reply in Lumen's artifacts (the sidebar's Artifacts list).
     let artifacts = 0;
-    if (reply.includes('<document')) {
+    if (mayHoldDocument(reply)) {
       const chat = db.prepare('SELECT title FROM Conversation WHERE id = ?').get(activeConversationId) as { title: string } | undefined;
       artifacts = saveDocumentArtifacts(
         { userId, app: 'lumen', sourceKind: 'chat', sourceId: activeConversationId, sourceName: chat?.title ?? 'Chat' },

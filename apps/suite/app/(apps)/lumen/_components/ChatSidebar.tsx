@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useChat } from './ChatContext';
 import ModelSelect from './ModelSelect';
+import { ArtifactIcon } from '@/components/documents';
 
 // What Lumen puts in the side panel: New chat, your previous chats, Switch Profile and the
 // model picker. The panel itself (frame, title, ✕, backdrop) comes from components/AppShell.tsx.
@@ -49,10 +50,10 @@ const ChatSidebar = () => {
           </div>
         ))}
       </div>
-      {/* Documents Lumen wrote, from every chat. Deleting one leaves its chat as it is. */}
+      {/* Documents, web pages, images, diagrams, components and code Lumen made, from every chat. Deleting one leaves its chat as it is. */}
       <span className='sidebar-separator'>Artifacts</span>
       <div className='chat-list artifact-list'>
-        {artifacts?.length === 0 && <p className='artifact-empty'>Documents Lumen writes for you show up here.</p>}
+        {artifacts?.length === 0 && <p className='artifact-empty'>Documents, web pages, diagrams, apps and code Lumen makes for you show up here.</p>}
         {artifacts?.map((a) => (
           <div className='chat-row' key={a.id}>
             <button
@@ -60,7 +61,7 @@ const ChatSidebar = () => {
               title={`From: ${a.sourceName}`}
               onClick={() => { void openArtifact(a); panel.closeOnPhone(); }}
             >
-              <span className='artifact-icon' aria-hidden>📄</span>
+              <span className='artifact-icon'><ArtifactIcon format={a.format} size={16} /></span>
               <span className='artifact-title'>{a.title}</span>
             </button>
             <button

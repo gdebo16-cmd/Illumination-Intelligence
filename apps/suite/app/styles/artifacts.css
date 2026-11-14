@@ -1,4 +1,213 @@
-/* Artifacts lists: Lumen's sidebar and Umbra's Artifacts page (components/documents.tsx). */
+/* Artifacts: the cards in a chat, the panel beside it, Lumen's sidebar list and Umbra's
+   Artifacts page (components/documents.tsx). */
+
+/* #region documents: cards in the chat and the panel beside it (components/documents.tsx) */
+:root {
+  --doc-panel-w: clamp(420px, 46vw, 780px);
+  --doc-surface: #121318;
+  --doc-raised: #1a1c23;
+  --doc-line: rgb(255 255 255 / 0.09);
+  --doc-text: #e8e8ee;
+  --doc-muted: #9a9cab;
+  --doc-accent: var(--bot-color, #8f93ff);
+}
+.document-card {
+  display: flex; align-items: center; gap: 0.85rem;
+  width: 100%; max-width: 440px; margin: 0.75rem 0; padding: 0.7rem 0.8rem;
+  font: inherit; text-align: left; color: var(--doc-text);
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.12); border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+.document-card:hover { background: rgb(255 255 255 / 0.07); border-color: rgb(255 255 255 / 0.2); }
+.document-card:active { transform: scale(0.99); }
+.document-card.is-active { border-color: rgb(255 255 255 / 0.32); background: rgb(255 255 255 / 0.08); }
+/* The card's little page: off-white paper, a folded corner, and grey bars sketching the text. */
+.document-thumb {
+  display: flex; align-items: flex-end; justify-content: center; flex-shrink: 0;
+  width: 3.5rem; height: 3.5rem; padding-top: 0.45rem; overflow: hidden;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.1); border-radius: 10px; }
+.document-thumb-page {
+  position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  width: 2.6rem; height: 100%; padding: 0.4rem 0.35rem 0;
+  background: #f4f2ee;
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: translateY(2px);
+  transition: transform 0.18s ease;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); }
+.document-thumb-page::after {
+  content: ''; position: absolute; top: 0; right: 0;
+  width: 9px; height: 9px;
+  background: linear-gradient(225deg, transparent 50%, #d9d5cc 50%); }
+.document-card:hover .document-thumb-page,
+.document-card.is-active .document-thumb-page { transform: translateY(0); }
+.document-thumb-line { display: block; flex-shrink: 0; height: 2px; border-radius: 1px; background: #c9c5bd; }
+.document-thumb-line.is-heading { height: 3px; margin-bottom: 1px; background: #55534e; }
+.document-thumb-line.is-item { margin-left: 4px; }
+.document-thumb-line.is-rule { height: 1px; background: #dedad2; }
+.document-icon { display: block; flex-shrink: 0; }
+/* Web page: a little browser window, tinted with the page's own first color. */
+.document-thumb.is-html { align-items: flex-end; }
+.thumb-window {
+  --thumb-accent: #7c83ff;
+  display: flex; flex-direction: column; gap: 3px;
+  width: 2.9rem; height: 100%;
+  padding-bottom: 4px; overflow: hidden;
+  background: #fbfbfd;
+  border-radius: 4px 4px 0 0;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: translateY(2px);
+  transition: transform 0.18s ease; }
+.thumb-window-bar { display: flex; gap: 2px; align-items: center; height: 6px; padding: 0 3px; background: #e4e4ea; }
+.thumb-window-bar i { width: 3px; height: 3px; border-radius: 50%; background: #b5b5c0; }
+.thumb-window-bar i:first-child { background: #ff6b6b; }
+.thumb-window-hero { height: 9px; margin: 1px 4px 0; border-radius: 2px; background: var(--thumb-accent); }
+.thumb-window-line { height: 2px; margin: 0 4px; width: 80%; border-radius: 1px; background: #c9c9d4; }
+.thumb-window-line.is-short { width: 55%; }
+.thumb-window-tiles { display: flex; gap: 3px; margin: 1px 4px 0; }
+.thumb-window-tiles i { flex: 1; height: 7px; border-radius: 2px; background: color-mix(in srgb, var(--thumb-accent) 22%, #eceef4); }
+.document-card:hover .thumb-window,
+.document-card.is-active .thumb-window { transform: translateY(0); }
+/* Image: the SVG itself, on a light checkerboard so transparent parts read as transparent. */
+.document-thumb.is-svg {
+  align-items: center; padding: 0.35rem;
+  background-color: #f4f4f6;
+  background-image: conic-gradient(#e6e6ea 25%, transparent 0 50%, #e6e6ea 0 75%, transparent 0);
+  background-size: 10px 10px; }
+.document-thumb.is-svg img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Diagram: boxes and arrows on white. */
+.document-thumb.is-mermaid { align-items: center; padding: 0.2rem; background: #fbfbfd; }
+.document-thumb.is-mermaid svg { display: block; }
+/* React component: a little app with a side bar, a switch and a button. */
+.document-thumb.is-react { align-items: flex-end; }
+.thumb-app {
+  display: flex; width: 2.9rem; height: 100%; overflow: hidden;
+  background: #fbfbfd; border-radius: 4px 4px 0 0;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: translateY(2px); transition: transform 0.18s ease; }
+.thumb-app-side { width: 8px; background: #1f2433; }
+.thumb-app-main { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+.thumb-app-head { height: 4px; width: 70%; border-radius: 2px; background: #3b4256; }
+.thumb-app-row { display: flex; align-items: center; gap: 3px; }
+.thumb-app-row i { display: block; height: 2px; flex: 1; border-radius: 1px; background: #c9c9d4; }
+.thumb-app-row i.thumb-app-switch { flex: none; width: 9px; height: 5px; border-radius: 3px; background: #22c55e; }
+.thumb-app-row i.thumb-app-button { flex: none; width: 16px; height: 6px; border-radius: 2px; background: #0ea5e9; }
+.document-card:hover .thumb-app,
+.document-card.is-active .thumb-app { transform: translateY(0); }
+/* Code: a dark editor with colored, indented lines. */
+.document-thumb.is-code { align-items: stretch; padding: 0; background: #0f1117; }
+.thumb-code { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 0.5rem 0.45rem; }
+.thumb-code-line { display: block; height: 2px; border-radius: 1px; background: #8b93a7; }
+.thumb-code-line.c0 { background: #c792ea; }
+.thumb-code-line.c1 { background: #82aaff; }
+.thumb-code-line.c2 { background: #c3e88d; }
+.thumb-code-line.c3 { background: #8b93a7; }
+.document-card-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.document-card-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-card-subtitle { font-size: 0.78rem; color: var(--doc-muted); }
+
+.document-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 70;
+  width: var(--doc-panel-w);
+  display: flex; flex-direction: column;
+  color: var(--doc-text);
+  background: var(--doc-surface);
+  border-left: 1px solid var(--doc-line);
+  box-shadow: -18px 0 40px rgb(0 0 0 / 0.35);
+  animation: doc-panel-in 0.22s ease-out; }
+@keyframes doc-panel-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+.document-panel-header {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.7rem;
+  border-bottom: 1px solid var(--doc-line); }
+.document-panel-icon { display: grid; place-items: center; flex-shrink: 0; color: var(--doc-muted); }
+.document-panel-heading { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.document-panel-title { margin: 0; font-size: 1rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-panel-meta { font-size: 0.78rem; color: var(--doc-muted); }
+.document-icon-button {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 2.1rem; height: 2.1rem; padding: 0;
+  color: var(--doc-text); background: transparent;
+  border: none; border-radius: 8px; cursor: pointer; }
+.document-icon-button:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.document-icon-button:disabled { opacity: 0.3; cursor: default; }
+.document-versions { display: flex; gap: 0.1rem; }
+.document-panel-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--doc-line); }
+.document-toggle { display: inline-flex; padding: 3px; background: rgb(255 255 255 / 0.05); border: 1px solid var(--doc-line); border-radius: 10px; }
+.document-toggle button {
+  padding: 0.3rem 0.8rem; font: inherit; font-size: 0.82rem;
+  color: var(--doc-muted); background: transparent;
+  border: none; border-radius: 7px; cursor: pointer; }
+.document-toggle button[aria-selected="true"] { color: var(--doc-text); background: var(--doc-raised); box-shadow: 0 1px 2px rgb(0 0 0 / 0.4); }
+.document-panel-actions { display: flex; align-items: center; gap: 0.4rem; }
+.document-action {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.35rem 0.75rem; font: inherit; font-size: 0.82rem;
+  color: var(--doc-text); background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.16); border-radius: 8px; cursor: pointer; }
+.document-action:hover { background: rgb(255 255 255 / 0.07); }
+.document-menu { position: relative; }
+.document-menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 2;
+  min-width: 11rem; padding: 0.3rem;
+  display: flex; flex-direction: column;
+  background: var(--doc-raised);
+  border: 1px solid rgb(255 255 255 / 0.12); border-radius: 10px;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.45); }
+.document-menu-list button {
+  padding: 0.5rem 0.65rem; font: inherit; font-size: 0.85rem; text-align: left;
+  color: var(--doc-text); background: transparent;
+  border: none; border-radius: 7px; cursor: pointer; }
+.document-menu-list button:hover { background: rgb(255 255 255 / 0.08); }
+.document-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); }
+.document-page { max-width: 46rem; margin: 0 auto; padding: 2rem 2.25rem 3rem; font-size: 1rem; line-height: 1.7; }
+.document-page .markdown h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 1rem; }
+.document-page .markdown h2 { font-size: 1.3rem; margin: 2rem 0 0.6rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--doc-line); }
+.document-page .markdown h3 { font-size: 1.08rem; margin: 1.5rem 0 0.4rem; }
+.document-page .markdown p { line-height: 1.7; }
+.document-page .markdown li { margin: 0.25rem 0; }
+.document-page .markdown hr { border: none; border-top: 1px solid var(--doc-line); margin: 1.75rem 0; }
+.document-page .markdown blockquote { margin: 1rem 0; padding: 0.2rem 1rem; color: var(--doc-muted); border-left: 3px solid color-mix(in srgb, var(--doc-accent) 60%, transparent); }
+.document-panel-language { font-size: 0.82rem; color: var(--doc-muted); padding: 0.3rem 0.2rem; }
+/* A web page runs in a sandboxed frame that fills the panel. */
+.document-panel.is-html .document-panel-body,
+.document-panel.is-svg .document-panel-body,
+.document-panel.is-mermaid .document-panel-body,
+.document-panel.is-react .document-panel-body { display: flex; flex-direction: column; }
+.document-frame { flex: 1; width: 100%; min-height: 0; border: none; background: #fff; }
+.document-image {
+  flex: 1; display: grid; place-items: center; padding: 1.5rem;
+  background-color: #f4f4f6;
+  background-image: conic-gradient(#e9e9ed 25%, transparent 0 50%, #e9e9ed 0 75%, transparent 0);
+  background-size: 20px 20px; }
+.document-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.document-code { min-height: 100%; background: #0d1117; }
+/* In the panel the code fills the space: no chat-style frame, label or second Copy button. */
+.document-code .code-block { margin: 0; border: none; border-radius: 0; }
+.document-code .code-block-header { display: none; }
+.document-code .code-block-pre { padding: 1.1rem 1.25rem 3rem; font-size: 0.84rem; line-height: 1.6; }
+.document-source {
+  margin: 0; padding: 1.25rem 1.5rem 3rem;
+  font: 0.85rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #d6d8e4; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Wide screens: the panel sits beside the chat, which narrows to make room. */
+@media (min-width: 1024px) {
+  body:has(.document-panel) .site-container { width: calc(100dvw - var(--doc-panel-w)); }
+  body:has(.document-panel) .content-area { flex: 1; }
+  body:has(.document-panel) .content-area main { width: 100%; } }
+/* Phones and small tablets: the panel takes the whole screen. */
+@media (max-width: 1023px) {
+  .document-panel { width: 100vw; border-left: none; box-shadow: none; animation-name: doc-panel-up; }
+  .document-page { padding: 1.25rem 1.1rem 2.5rem; }
+  .document-page .markdown h1 { font-size: 1.45rem; } }
+@keyframes doc-panel-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* #endregion documents */
 
 /* #region artifacts — Lumen's sidebar list and Umbra's Artifacts page (components/documents.tsx) */
 .sidebar > .artifact-list {
@@ -10,8 +219,9 @@
   align-items: center;
   gap: 0.5rem; }
 .artifact-icon {
+  display: inline-flex;
   flex-shrink: 0;
-  font-size: 0.9rem; }
+  color: #aab; }
 .artifact-title {
   min-width: 0;
   overflow: hidden;
@@ -29,7 +239,10 @@
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  font-size: 1.4rem; }
+  color: #d5d7ea;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 10px; }
 .umbra-artifact .umbra-report-title {
   overflow-wrap: anywhere; }
 .umbra-artifact-actions {
@@ -42,3 +255,14 @@
 @media (max-width: 768px) {
   .umbra-artifact-actions { padding-left: 1rem; } }
 /* #endregion artifacts */
+
+/* Print / PDF: just the document, dark on white. */
+@media print {
+  html, body { overflow: visible !important; height: auto !important; background: #fff !important; }
+  body * { visibility: hidden; }
+  .document-page, .document-page * { visibility: visible; }
+  .document-panel { position: absolute; inset: 0 auto auto 0; width: 100%; height: auto; background: #fff; border: none; box-shadow: none; animation: none; }
+  .document-panel-body { overflow: visible; }
+  .document-page { position: absolute; left: 0; top: 0; max-width: none; padding: 0; color: #111; }
+  .document-page .markdown h2, .document-page .markdown hr { border-color: #ccc; }
+  .document-page .markdown code:not(pre code) { background: #f0f0f0; } }

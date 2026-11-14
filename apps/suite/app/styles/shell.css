@@ -63,8 +63,6 @@
   .input-field { padding: 0.8rem 0.9rem; font-size: 16px; min-width: 0; }
   .send-button { padding: 0 1.1rem; min-height: 44px; }
   .model-select-input { font-size: 16px; }
-  .document-panel { width: 100vw; border-left: none; }
-  .document-panel-header { flex-wrap: wrap; }
   .signin-container {
     justify-content: center;
     gap: 0.5rem;
@@ -99,14 +97,6 @@
   .input-container { padding-top: 0.25rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
   .signin-container { justify-content: flex-start; overflow-y: auto; }
   .user-buttons { min-height: 120px; }}
-@media print { 
-  body * { 
-    visibility: hidden; } 
-  .document-panel, .document-panel * { 
-    visibility: visible; } 
-  .document-panel { 
-    position: static; 
-    width: auto;} }
 @media (hover: none) {
   .user-buttons:hover { background-color: #1e293b; transform: none; }
   .sidebar button:hover,

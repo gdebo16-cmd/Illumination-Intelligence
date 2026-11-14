@@ -13,6 +13,7 @@ import { runAgent, type ChatMessage } from './agent';
 import { getBot, listNotes, systemPrompt, type Bot } from './bots';
 import type { AgentStep, ToolDef } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
+import { mayHoldDocument } from '@/lib/document-blocks';
 
 const TEAM_LIMITS = { name: 40, purpose: 1000, role: 60, members: 5 };
 
@@ -190,7 +191,7 @@ export function addTeamMessage(teamId: string, role: TeamMessage['role'], conten
   );
   db.prepare('UPDATE UmbraTeam SET updatedAt = ? WHERE id = ?').run(message.createdAt, teamId);
   // A document the team wrote goes to Umbra's artifacts too.
-  if (role === 'assistant' && content.includes('<document')) {
+  if (role === 'assistant' && mayHoldDocument(content)) {
     const owner = db.prepare('SELECT user_id, name FROM UmbraTeam WHERE id = ?').get(teamId) as { user_id: string; name: string } | undefined;
     if (owner) {
       saveDocumentArtifacts(

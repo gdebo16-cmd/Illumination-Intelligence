@@ -19,8 +19,8 @@ import {
   restoreWorkspaceSnapshot,
 } from "@/lib/refract/workspace";
 import db from "@/lib/db";
-import { saveArtifact } from "@/lib/artifacts";
-import { isMarkdownPath } from "@/lib/document-blocks";
+import { saveArtifact, type ArtifactType } from "@/lib/artifacts";
+import { formatForPath } from "@/lib/document-blocks";
 import {
   commitWork,
   pushWork,
@@ -234,8 +234,9 @@ const write: ToolDef = {
     const find = typeof a.find === "string" ? a.find.replace(/\r\n/g, "\n") : "";
     const replace = typeof a.replace === "string" ? a.replace.replace(/\r\n/g, "\n") : "";
     const result = await writeWorkFile(workspace, a.path, replace, find || undefined);
-    // A Markdown file the Flicker wrote shows up in Umbra's artifacts, as it is now.
-    if (isMarkdownPath(result.path)) keepMarkdownFile(ctx.userId, ctx.botId, `${workspace}/${result.path}`, result.text);
+    // A Markdown, HTML, SVG or Mermaid file the Flicker wrote shows up in Umbra's artifacts, as it is now.
+    const type = formatForPath(result.path);
+    if (type) keepFile(ctx.userId, ctx.botId, `${workspace}/${result.path}`, result.text, type);
     return {
       output: `${result.message} Path: ${workspace}/${result.path}. This is only inside the virtual machine.`,
       summary: result.created ? `Created ${result.path}` : `Updated ${result.path}`,
@@ -243,14 +244,14 @@ const write: ToolDef = {
   },
 };
 
-/** Save a .md file from Refract as an artifact of the Flicker that wrote it. Never breaks the tool. */
-function keepMarkdownFile(userId: string, botId: string, path: string, text: string): void {
+/** Save a file from Refract as an artifact of the Flicker that wrote it. Never breaks the tool. */
+function keepFile(userId: string, botId: string, path: string, text: string, type: ArtifactType): void {
   try {
     const bot = db.prepare("SELECT name FROM UmbraBot WHERE id = ? AND user_id = ?").get(botId, userId) as { name: string } | undefined;
     if (!bot) return;
-    saveArtifact({ userId, app: "umbra", sourceKind: "bot", sourceId: botId, sourceName: bot.name }, "file", path, text.replace(/\r\n/g, "\n"));
+    saveArtifact({ userId, app: "umbra", sourceKind: "bot", sourceId: botId, sourceName: bot.name }, "file", path, text.replace(/\r\n/g, "\n"), type);
   } catch (err) {
-    console.error("Saving a Markdown file as an artifact failed:", err);
+    console.error("Saving a Refract file as an artifact failed:", err);
   }
 }
 

@@ -334,5 +334,9 @@ db.exec(`
   -- One-time jobs that have run, e.g. 'lumen-backfill' (see backfillOnce in lib/artifacts.ts).
   CREATE TABLE IF NOT EXISTS ArtifactMeta (key TEXT PRIMARY KEY);
 `);
+// What an artifact is: markdown (a document), html (a web page), svg (an image) or code, and the
+// code's language. Artifacts saved before these existed are all Markdown.
+addColumn('Artifact', 'format', "TEXT NOT NULL DEFAULT 'markdown'");
+addColumn('Artifact', 'language', "TEXT NOT NULL DEFAULT ''");
 
 export default db;

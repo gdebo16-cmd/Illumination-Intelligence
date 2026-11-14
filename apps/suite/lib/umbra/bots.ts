@@ -14,6 +14,7 @@ import { canThink } from '@/config/models';
 import type { AgentStep } from './types';
 import { renameArtifactSource, saveDocumentArtifacts } from '@/lib/artifacts';
 import { DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
+import { mayHoldDocument } from '@/lib/document-blocks';
 
 export interface Bot {
   id: string;
@@ -223,7 +224,7 @@ export function addMessage(
   );
   db.prepare('UPDATE UmbraBot SET updatedAt = ? WHERE id = ?').run(message.createdAt, botId);
   // A document the Flicker wrote goes to Umbra's artifacts too.
-  if (role === 'assistant' && content.includes('<document')) {
+  if (role === 'assistant' && mayHoldDocument(content)) {
     const owner = db.prepare('SELECT user_id, name FROM UmbraBot WHERE id = ?').get(botId) as { user_id: string; name: string } | undefined;
     if (owner) {
       saveDocumentArtifacts(
@@ -273,7 +274,7 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
       ? `You have tools: ${toolNames.join(', ')}. Use them whenever they would make your answer more accurate or useful, ` +
         'instead of guessing. You can use several tools in a row before answering. ' +
         'Never invent tool results; if a tool fails, tell the user plainly.'
-      : 'You have no tools: you cannot browse the web, see files, or take actions. If asked, say so honestly instead of pretending.',
+      : 'You have no tools: you cannot browse the web, read files, or take actions. If asked, say so honestly instead of pretending. (You can still write documents and .md files with a document block, as described below.)',
     toolNames.length > 0 &&
       `You keep working even if ${userName} leaves the chat or closes the app: your tools keep running on the server and your reply is saved here for when they come back. ` +
         'So carry a job through to the end instead of stopping to check in, unless you truly need their decision.',
@@ -312,7 +313,7 @@ export function systemPrompt(bot: Bot, userName: string, notes: BotNote[]): stri
         'The restart briefly stops the server you run on. Your work is picked back up afterwards, so then check the result with prod_status and report it plainly. ' +
         'Merging pull requests is separate (refract_merge_pr).',
     bot.tools.includes('notes') &&
-      `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note.`,
+      `When ${userName} tells you something worth remembering long-term (preferences, facts about them, plans), save it with save_note. Notes are for short facts only: when asked to save or export a write-up as a file, use a document block instead.`,
     DOCUMENT_SYSTEM_PROMPT,
     notes.length > 0 &&
       `Things you've saved about ${userName} (your notes):\n${notes.map((n) => `- ${n.content}`).join('\n')}`,

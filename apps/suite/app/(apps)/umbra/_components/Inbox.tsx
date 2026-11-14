@@ -87,7 +87,7 @@ export default function Inbox() {
                   {run.status === 'running' ? (
                     <p className="umbra-thinking">{run.botName} is still working on this…</p>
                   ) : (
-                    <ReplyContent content={run.report ?? ''} onOpen={setOpenDoc} />
+                    <ReplyContent content={run.report ?? ''} onOpen={setOpenDoc} open={openDoc} />
                   )}
                   <div className="umbra-report-actions">
                     {run.teamId && run.teamName !== 'A deleted team' ? (
