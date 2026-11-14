@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useChat, type Message } from './ChatContext';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
 import { canSeeImages } from '@/config/models';
 import { MessagePhotos, PhotoButton, PhotoTray, releasePhotos, usePhotos } from '@/components/PhotoAttach';
-import { ReplyContent, DocumentPanel } from '@/components/documents';
+import { ReplyContent, DocumentPanel, documentVersions } from '@/components/documents';
 
 const getAdaptiveLoadingText = (prompt: string): string => {
   const trimmed = prompt.trim().toLowerCase();
@@ -43,6 +43,8 @@ const Chat = () => {
   } = useChat();
 
   const [input, setInput] = useState('');
+  // Every version of each document in this chat, so a revised one can be stepped through.
+  const versions = useMemo(() => documentVersions(messages.filter((m) => m.role === 'assistant').map((m) => m.content)), [messages]);
   const [activeQuery, setActiveQuery] = useState('');
   const [loading, setLoading] = useState(false);
   // Photos can only be added while the chosen model can see images.
@@ -173,7 +175,7 @@ const Chat = () => {
             <div className={`message-content ${msg.role === 'user' ? 'user' : 'assistant'}`}>
               {/* A reply's documents show as cards that open in the side panel. */}
               {msg.role === 'assistant'
-                ? <ReplyContent content={msg.content} onOpen={setOpenDoc} />
+                ? <ReplyContent content={msg.content} onOpen={setOpenDoc} versions={versions} open={openDoc} />
                 : (
                   <>
                     <MessagePhotos images={msg.images} withText={Boolean(msg.content.trim())} />

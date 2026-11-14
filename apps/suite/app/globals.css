@@ -443,16 +443,118 @@ textarea.input-field {
 .code-block-copy { background: transparent; color: inherit; border: 1px solid rgb(255 255 255 / 0.2); border-radius: 6px; padding: 0.15rem 0.6rem; cursor: pointer; }
 .code-block-pre { margin: 0; padding: 0.9rem; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
 
-.document-card { display: flex; align-items: center; gap: 0.6rem; width: 100%; max-width: 420px; margin: 0.6rem 0; padding: 0.7rem 0.9rem; text-align: left; color: inherit; background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.14); border-radius: 10px; cursor: pointer; }
-.document-card-title { flex: 1; font-weight: 600; }
-.document-card-action { font-size: 0.8rem; opacity: 0.7; }
+/* #region documents: cards in the chat and the panel beside it (components/documents.tsx) */
+:root {
+  --doc-panel-w: clamp(420px, 46vw, 780px);
+  --doc-surface: #121318;
+  --doc-raised: #1a1c23;
+  --doc-line: rgb(255 255 255 / 0.09);
+  --doc-text: #e8e8ee;
+  --doc-muted: #9a9cab;
+  --doc-accent: var(--bot-color, #8f93ff);
+}
+.document-card {
+  display: flex; align-items: center; gap: 0.85rem;
+  width: 100%; max-width: 440px; margin: 0.75rem 0; padding: 0.7rem 0.8rem;
+  font: inherit; text-align: left; color: var(--doc-text);
+  background: rgb(255 255 255 / 0.04);
+  border: 1px solid rgb(255 255 255 / 0.12); border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+.document-card:hover { background: rgb(255 255 255 / 0.07); border-color: rgb(255 255 255 / 0.2); }
+.document-card:active { transform: scale(0.99); }
+.document-card.is-active { border-color: color-mix(in srgb, var(--doc-accent) 70%, transparent); background: color-mix(in srgb, var(--doc-accent) 10%, transparent); }
+.document-card-icon {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 2.75rem; height: 2.75rem;
+  color: var(--doc-accent);
+  background: color-mix(in srgb, var(--doc-accent) 14%, rgb(255 255 255 / 0.03));
+  border: 1px solid color-mix(in srgb, var(--doc-accent) 28%, transparent);
+  border-radius: 10px; }
+.document-card-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.document-card-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-card-subtitle { font-size: 0.78rem; color: var(--doc-muted); }
 
-.document-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); display: flex; flex-direction: column; background: #0c1220; border-left: 1px solid rgb(255 255 255 / 0.1); z-index: 70; }
-.document-panel-header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; padding-top: calc(0.75rem + env(safe-area-inset-top)); border-bottom: 1px solid rgb(255 255 255 / 0.1); }
-.document-panel-title { margin: 0; font-size: 1rem; }
-.document-panel-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-.document-panel-actions button { color: inherit; background: transparent; border: 1px solid rgb(255 255 255 / 0.2); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; }
-.document-panel-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.document-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 70;
+  width: var(--doc-panel-w);
+  display: flex; flex-direction: column;
+  color: var(--doc-text);
+  background: var(--doc-surface);
+  border-left: 1px solid var(--doc-line);
+  box-shadow: -18px 0 40px rgb(0 0 0 / 0.35);
+  animation: doc-panel-in 0.22s ease-out; }
+@keyframes doc-panel-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+.document-panel-header {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: calc(0.7rem + env(safe-area-inset-top)) 0.9rem 0.7rem;
+  border-bottom: 1px solid var(--doc-line); }
+.document-panel-heading { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.document-panel-title { margin: 0; font-size: 1rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-panel-meta { font-size: 0.78rem; color: var(--doc-muted); }
+.document-icon-button {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 2.1rem; height: 2.1rem; padding: 0;
+  color: var(--doc-text); background: transparent;
+  border: none; border-radius: 8px; cursor: pointer; }
+.document-icon-button:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.document-icon-button:disabled { opacity: 0.3; cursor: default; }
+.document-versions { display: flex; gap: 0.1rem; }
+.document-panel-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--doc-line); }
+.document-toggle { display: inline-flex; padding: 3px; background: rgb(255 255 255 / 0.05); border: 1px solid var(--doc-line); border-radius: 10px; }
+.document-toggle button {
+  padding: 0.3rem 0.8rem; font: inherit; font-size: 0.82rem;
+  color: var(--doc-muted); background: transparent;
+  border: none; border-radius: 7px; cursor: pointer; }
+.document-toggle button[aria-selected="true"] { color: var(--doc-text); background: var(--doc-raised); box-shadow: 0 1px 2px rgb(0 0 0 / 0.4); }
+.document-panel-actions { display: flex; align-items: center; gap: 0.4rem; }
+.document-action {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.35rem 0.75rem; font: inherit; font-size: 0.82rem;
+  color: var(--doc-text); background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.16); border-radius: 8px; cursor: pointer; }
+.document-action:hover { background: rgb(255 255 255 / 0.07); }
+.document-menu { position: relative; }
+.document-menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 2;
+  min-width: 11rem; padding: 0.3rem;
+  display: flex; flex-direction: column;
+  background: var(--doc-raised);
+  border: 1px solid rgb(255 255 255 / 0.12); border-radius: 10px;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.45); }
+.document-menu-list button {
+  padding: 0.5rem 0.65rem; font: inherit; font-size: 0.85rem; text-align: left;
+  color: var(--doc-text); background: transparent;
+  border: none; border-radius: 7px; cursor: pointer; }
+.document-menu-list button:hover { background: rgb(255 255 255 / 0.08); }
+.document-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); }
+.document-page { max-width: 46rem; margin: 0 auto; padding: 2rem 2.25rem 3rem; font-size: 1rem; line-height: 1.7; }
+.document-page .markdown h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 1rem; }
+.document-page .markdown h2 { font-size: 1.3rem; margin: 2rem 0 0.6rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--doc-line); }
+.document-page .markdown h3 { font-size: 1.08rem; margin: 1.5rem 0 0.4rem; }
+.document-page .markdown p { line-height: 1.7; }
+.document-page .markdown li { margin: 0.25rem 0; }
+.document-page .markdown hr { border: none; border-top: 1px solid var(--doc-line); margin: 1.75rem 0; }
+.document-page .markdown blockquote { margin: 1rem 0; padding: 0.2rem 1rem; color: var(--doc-muted); border-left: 3px solid color-mix(in srgb, var(--doc-accent) 60%, transparent); }
+.document-source {
+  margin: 0; padding: 1.25rem 1.5rem 3rem;
+  font: 0.85rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #d6d8e4; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Wide screens: the panel sits beside the chat, which narrows to make room. */
+@media (min-width: 1024px) {
+  body:has(.document-panel) .site-container { width: calc(100dvw - var(--doc-panel-w)); }
+  body:has(.document-panel) .content-area { flex: 1; }
+  body:has(.document-panel) .content-area main { width: 100%; } }
+/* Phones and small tablets: the panel takes the whole screen. */
+@media (max-width: 1023px) {
+  .document-panel { width: 100vw; border-left: none; box-shadow: none; animation-name: doc-panel-up; }
+  .document-page { padding: 1.25rem 1.1rem 2.5rem; }
+  .document-page .markdown h1 { font-size: 1.45rem; } }
+@keyframes doc-panel-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* #endregion documents */
 /* #endregion markdown */
 /* #region app launcher */
 .header-spacer { 
@@ -2015,8 +2117,6 @@ textarea.input-field {
   .input-field { padding: 0.8rem 0.9rem; font-size: 16px; min-width: 0; }
   .send-button { padding: 0 1.1rem; min-height: 44px; }
   .model-select-input { font-size: 16px; }
-  .document-panel { width: 100vw; border-left: none; }
-  .document-panel-header { flex-wrap: wrap; }
   .signin-container {
     justify-content: center;
     gap: 0.5rem;
@@ -2051,14 +2151,15 @@ textarea.input-field {
   .input-container { padding-top: 0.25rem; padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
   .signin-container { justify-content: flex-start; overflow-y: auto; }
   .user-buttons { min-height: 120px; }}
-@media print { 
-  body * { 
-    visibility: hidden; } 
-  .document-panel, .document-panel * { 
-    visibility: visible; } 
-  .document-panel { 
-    position: static; 
-    width: auto;} }
+@media print {
+  html, body { overflow: visible !important; height: auto !important; background: #fff !important; }
+  body * { visibility: hidden; }
+  .document-page, .document-page * { visibility: visible; }
+  .document-panel { position: absolute; inset: 0 auto auto 0; width: 100%; height: auto; background: #fff; border: none; box-shadow: none; animation: none; }
+  .document-panel-body { overflow: visible; }
+  .document-page { position: absolute; left: 0; top: 0; max-width: none; padding: 0; color: #111; }
+  .document-page .markdown h2, .document-page .markdown hr { border-color: #ccc; }
+  .document-page .markdown code:not(pre code) { background: #f0f0f0; } }
 @media (hover: none) {
   .user-buttons:hover { background-color: #1e293b; transform: none; }
   .sidebar button:hover,

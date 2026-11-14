@@ -3,9 +3,9 @@
 // /umbra/<id> — chatting with one bot. Tool steps appear live while the bot works.
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { flameColor } from '@/config/umbra';
-import { DocumentPanel, ReplyContent, type OpenDocument } from '@/components/documents';
+import { DocumentPanel, ReplyContent, documentVersions, type OpenDocument } from '@/components/documents';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
@@ -24,6 +24,8 @@ export default function BotChat({ botId }: { botId: string }) {
   const [error, setError] = useState('');
   // A document from a reply, open in the side panel.
   const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
+  // Every version of each document in this chat, so a revised one can be stepped through.
+  const versions = useMemo(() => documentVersions(messages.filter((m) => m.role === 'assistant').map((m) => m.content)), [messages]);
   const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLFormElement>(null);
@@ -242,7 +244,7 @@ export default function BotChat({ botId }: { botId: string }) {
               {m.role === 'assistant' ? (
                 <>
                   {m.steps && <Steps steps={m.steps} />}
-                  <ReplyContent content={m.content} onOpen={setOpenDoc} />
+                  <ReplyContent content={m.content} onOpen={setOpenDoc} versions={versions} open={openDoc} />
                 </>
               ) : (
                 <>
