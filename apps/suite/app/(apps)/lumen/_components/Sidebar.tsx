@@ -51,10 +51,10 @@ const Sidebar = () => {
           </div>
         ))}
       </div>
-      {/* Documents, web pages, images and code Lumen made, from every chat. Deleting one leaves its chat as it is. */}
+      {/* Documents, web pages, images, diagrams, components and code Lumen made, from every chat. Deleting one leaves its chat as it is. */}
       <span className='sidebar-separator'>Artifacts</span>
       <div className='chat-list artifact-list'>
-        {artifacts?.length === 0 && <p className='artifact-empty'>Documents, web pages and code Lumen makes for you show up here.</p>}
+        {artifacts?.length === 0 && <p className='artifact-empty'>Documents, web pages, diagrams, apps and code Lumen makes for you show up here.</p>}
         {artifacts?.map((a) => (
           <div className='chat-row' key={a.id}>
             <button

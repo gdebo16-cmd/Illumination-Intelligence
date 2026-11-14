@@ -520,6 +520,25 @@ textarea.input-field {
   background-image: conic-gradient(#e6e6ea 25%, transparent 0 50%, #e6e6ea 0 75%, transparent 0);
   background-size: 10px 10px; }
 .document-thumb.is-svg img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Diagram: boxes and arrows on white. */
+.document-thumb.is-mermaid { align-items: center; padding: 0.2rem; background: #fbfbfd; }
+.document-thumb.is-mermaid svg { display: block; }
+/* React component: a little app with a side bar, a switch and a button. */
+.document-thumb.is-react { align-items: flex-end; }
+.thumb-app {
+  display: flex; width: 2.9rem; height: 100%; overflow: hidden;
+  background: #fbfbfd; border-radius: 4px 4px 0 0;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  transform: translateY(2px); transition: transform 0.18s ease; }
+.thumb-app-side { width: 8px; background: #1f2433; }
+.thumb-app-main { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+.thumb-app-head { height: 4px; width: 70%; border-radius: 2px; background: #3b4256; }
+.thumb-app-row { display: flex; align-items: center; gap: 3px; }
+.thumb-app-row i { display: block; height: 2px; flex: 1; border-radius: 1px; background: #c9c9d4; }
+.thumb-app-row i.thumb-app-switch { flex: none; width: 9px; height: 5px; border-radius: 3px; background: #22c55e; }
+.thumb-app-row i.thumb-app-button { flex: none; width: 16px; height: 6px; border-radius: 2px; background: #0ea5e9; }
+.document-card:hover .thumb-app,
+.document-card.is-active .thumb-app { transform: translateY(0); }
 /* Code: a dark editor with colored, indented lines. */
 .document-thumb.is-code { align-items: stretch; padding: 0; background: #0f1117; }
 .thumb-code { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 0.5rem 0.45rem; }
@@ -600,7 +619,9 @@ textarea.input-field {
 .document-panel-language { font-size: 0.82rem; color: var(--doc-muted); padding: 0.3rem 0.2rem; }
 /* A web page runs in a sandboxed frame that fills the panel. */
 .document-panel.is-html .document-panel-body,
-.document-panel.is-svg .document-panel-body { display: flex; flex-direction: column; }
+.document-panel.is-svg .document-panel-body,
+.document-panel.is-mermaid .document-panel-body,
+.document-panel.is-react .document-panel-body { display: flex; flex-direction: column; }
 .document-frame { flex: 1; width: 100%; min-height: 0; border: none; background: #fff; }
 .document-image {
   flex: 1; display: grid; place-items: center; padding: 1.5rem;

@@ -4,11 +4,12 @@
 //
 // An artifact is one of:
 //   <document title="…">Markdown</document>                          a document (the original format)
-//   <artifact type="markdown|html|svg|code" title="…" language="…">…</artifact>
+//   <artifact type="markdown|html|svg|mermaid|react|code" title="…" language="…">…</artifact>
 // and, because small local models often ignore those tags, a whole document or page in a fenced
-// code block: ```markdown with a heading (400+ characters), a full ```html page, or an ```svg image.
+// code block: ```markdown with a heading (400+ characters), a full ```html page, an ```svg image,
+// or a ```mermaid diagram.
 
-export type ArtifactFormat = 'markdown' | 'html' | 'svg' | 'code';
+export type ArtifactFormat = 'markdown' | 'html' | 'svg' | 'mermaid' | 'react' | 'code';
 
 export type Segment =
   | { type: 'text'; text: string }
@@ -16,7 +17,7 @@ export type Segment =
 
 export type DocumentSegment = Extract<Segment, { type: 'document' }>;
 
-const FORMATS: ArtifactFormat[] = ['markdown', 'html', 'svg', 'code'];
+const FORMATS: ArtifactFormat[] = ['markdown', 'html', 'svg', 'mermaid', 'react', 'code'];
 const TAG_RE = /<(document|artifact)\b([^>]*)>([\s\S]*?)<\/\1>/g;
 const ATTR_RE = /([\w-]+)\s*=\s*"([^"]*)"/g;
 
@@ -32,6 +33,8 @@ function toFormat(type: string | undefined, language: string | undefined): { for
   if (!t || t === 'document' || t === 'md' || t === 'markdown') return { format: 'markdown' };
   if (t === 'html' || t === 'page' || t === 'webpage' || t === 'web') return { format: 'html' };
   if (t === 'svg' || t === 'svg+xml' || t === 'image') return { format: 'svg' };
+  if (t === 'mermaid' || t === 'diagram' || t === 'vnd.mermaid') return { format: 'mermaid' };
+  if (t === 'react' || t === 'component' || t === 'jsx' || t === 'tsx' || t === 'application/vnd.ant.react') return { format: 'react' };
   if (FORMATS.includes(t as ArtifactFormat)) return { format: t as ArtifactFormat, language };
   // type="python" and the like: code in that language.
   return { format: 'code', language: language || t };
@@ -63,6 +66,20 @@ function htmlTitle(html: string): string | null {
   return title || null;
 }
 
+/** A diagram's title: its front-matter or "title" line, or else the kind of diagram it is. */
+export function mermaidTitle(code: string): string {
+  const named = /^\s*title:\s*(.+)$/m.exec(code) ?? /^\s*title\s+(.+)$/m.exec(code);
+  if (named) return named[1].replace(/["']/g, '').trim();
+  const kind = /^\s*(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|journey|mindmap|timeline|gitGraph|quadrantChart|xychart-beta|sankey-beta)\b/m.exec(code)?.[1];
+  const names: Record<string, string> = {
+    flowchart: 'Flowchart', graph: 'Flowchart', sequenceDiagram: 'Sequence diagram', classDiagram: 'Class diagram',
+    stateDiagram: 'State diagram', 'stateDiagram-v2': 'State diagram', erDiagram: 'Entity diagram', gantt: 'Gantt chart',
+    pie: 'Pie chart', journey: 'User journey', mindmap: 'Mind map', timeline: 'Timeline', gitGraph: 'Git graph',
+    quadrantChart: 'Quadrant chart', 'xychart-beta': 'Chart', 'sankey-beta': 'Sankey diagram',
+  };
+  return (kind && names[kind]) || 'Diagram';
+}
+
 /** Is this fenced block an artifact? If so, which kind, and what is it called. */
 function fencedArtifact(language: string, body: string): Omit<DocumentSegment, 'type' | 'content'> | null {
   const lang = language.toLowerCase();
@@ -75,6 +92,9 @@ function fencedArtifact(language: string, body: string): Omit<DocumentSegment, '
     if (/^\s*<svg[\s>]/i.test(body)) return { title: 'Image', format: 'svg' };
     if (!/<!doctype html|<html[\s>]|<body[\s>]/i.test(body)) return null;
     return { title: htmlTitle(body) ?? 'Web page', format: 'html' };
+  }
+  if (lang === 'mermaid' || lang === 'mmd') {
+    return body.trim() ? { title: mermaidTitle(body), format: 'mermaid' } : null;
   }
   if ((lang === 'svg' || lang === 'xml') && /<svg[\s>]/i.test(body) && /<\/svg>\s*$/i.test(body)) {
     const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)?.[1].trim();
@@ -166,7 +186,7 @@ export const splitContent = (content: string): Segment[] => {
 
 /** A quick check before the full parse: could this reply hold an artifact at all? */
 export const mayHoldDocument = (content: string): boolean =>
-  /<(document|artifact)\b/.test(content) || /^[ \t]*(`{3,}|~{3,})[ \t]*(markdown|md|html|htm|svg|xml)[ \t]*$/im.test(content);
+  /<(document|artifact)\b/.test(content) || /^[ \t]*(`{3,}|~{3,})[ \t]*(markdown|md|html|htm|svg|xml|mermaid|mmd)[ \t]*$/im.test(content);
 
 /** Just the artifacts in a reply. */
 export const findDocuments = (content: string): Omit<DocumentSegment, 'type'>[] =>
@@ -178,6 +198,7 @@ export function formatForPath(path: string): { format: ArtifactFormat } | null {
   if (/\.(md|markdown|mdx)$/.test(p)) return { format: 'markdown' };
   if (/\.html?$/.test(p)) return { format: 'html' };
   if (/\.svg$/.test(p)) return { format: 'svg' };
+  if (/\.(mmd|mermaid)$/.test(p)) return { format: 'mermaid' };
   return null;
 }
 
@@ -201,6 +222,8 @@ export function formatLabel(format: ArtifactFormat, language?: string): string {
   if (format === 'markdown') return 'Document · MD';
   if (format === 'html') return 'Web page · HTML';
   if (format === 'svg') return 'Image · SVG';
+  if (format === 'mermaid') return 'Diagram · Mermaid';
+  if (format === 'react') return 'Component · React';
   const lang = (language ?? '').toLowerCase();
   return `Code · ${LANGUAGE_NAMES[lang] ?? (lang ? lang.toUpperCase() : 'Text')}`;
 }
@@ -210,6 +233,8 @@ export function formatExtension(format: ArtifactFormat, language?: string): stri
   if (format === 'markdown') return 'md';
   if (format === 'html') return 'html';
   if (format === 'svg') return 'svg';
+  if (format === 'mermaid') return 'mmd';
+  if (format === 'react') return 'jsx';
   const lang = (language ?? '').toLowerCase().replace(/[^\w+#-]/g, '');
   return EXTENSIONS[lang] ?? (lang || 'txt');
 }

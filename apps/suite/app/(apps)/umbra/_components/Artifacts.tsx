@@ -59,8 +59,8 @@ export default function Artifacts({ source }: { source?: string }) {
         <div className="umbra-intro">
           <h1>{sourceName ? `${sourceName}’s artifacts` : 'Artifacts'}</h1>
           <p>
-            What your Flickers made: documents, web pages, images and code from chats and task reports,
-            and .md, .html and .svg files they wrote in Refract. Making one again with the same name updates it.
+            What your Flickers made: documents, web pages, images, diagrams, React components and code from chats and task reports,
+            and .md, .html, .svg and .mmd files they wrote in Refract. Making one again with the same name updates it.
           </p>
         </div>
 

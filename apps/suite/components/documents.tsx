@@ -3,9 +3,10 @@
 // Artifacts, shared by Lumen and Umbra, laid out like a chat assistant's artifacts:
 //   - ReplyContent: a reply with each artifact shown as a card, with a symbol for its kind:
 //     a paper page (document), a browser window (web page), the picture itself (SVG image),
-//     or an editor with code (code file).
+//     boxes and arrows (diagram), an app window (React component), or an editor (code file).
 //   - DocumentPanel: the artifact beside the chat (full screen on a phone). Documents show formatted,
-//     web pages run in a sandboxed frame, images show as pictures, code is highlighted. It has
+//     web pages, diagrams and React components run in a sandboxed frame, images show as pictures,
+//     code is highlighted. It has
 //     Preview / Code views, version arrows when it was revised in the chat, Copy, and Download.
 //   - documentVersions: every version of each artifact in a chat, oldest first.
 //   - useArtifacts: the profile's saved artifacts for one app (lib/artifacts.ts), and opening one.
@@ -100,6 +101,26 @@ export const ArtifactIcon = ({ format = 'markdown', size = 18 }: { format?: Arti
       </Glyph>
     );
   }
+  if (format === 'mermaid') {
+    return (
+      <Glyph size={size}>
+        <rect x="3" y="3.5" width="7" height="5" rx="1.2" />
+        <rect x="14" y="15.5" width="7" height="5" rx="1.2" />
+        <rect x="14" y="3.5" width="7" height="5" rx="1.2" />
+        <path d="M10 6h4M6.5 8.5v6a2.5 2.5 0 0 0 2.5 2.5h5" />
+      </Glyph>
+    );
+  }
+  if (format === 'react') {
+    return (
+      <Glyph size={size}>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <path d="M3 8.5h18M9 8.5V20" />
+        <rect x="12" y="11.5" width="6" height="3" rx="1.5" />
+        <path d="M12 17.5h4" />
+      </Glyph>
+    );
+  }
   if (format === 'code') {
     return (
       <Glyph size={size}>
@@ -178,6 +199,37 @@ export const ArtifactThumb = ({ format = 'markdown', content }: { format?: Artif
       <span className="document-thumb is-svg" aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element -- a data: picture, not a file Next can optimise */}
         <img src={svgSrc(content)} alt="" />
+      </span>
+    );
+  }
+  if (format === 'mermaid') {
+    // Boxes joined by arrows, the shape of a flowchart.
+    return (
+      <span className="document-thumb is-mermaid" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="100%" height="100%">
+          <g fill="none" stroke="#9aa3b8" strokeWidth="1.4">
+            <path d="M24 14v6M24 28v3M24 31H13v3M24 31h11v3" />
+          </g>
+          <rect x="15" y="6" width="18" height="8" rx="2" fill="#7c83ff" />
+          <rect x="15" y="20" width="18" height="8" rx="4" fill="#5fe0a8" />
+          <rect x="6" y="34" width="14" height="8" rx="2" fill="#ffb547" />
+          <rect x="28" y="34" width="14" height="8" rx="2" fill="#ff6fd8" />
+        </svg>
+      </span>
+    );
+  }
+  if (format === 'react') {
+    // A little app: a side bar, a header, a switch and a button.
+    return (
+      <span className="document-thumb is-react" aria-hidden="true">
+        <span className="thumb-app">
+          <span className="thumb-app-side" />
+          <span className="thumb-app-main">
+            <span className="thumb-app-head" />
+            <span className="thumb-app-row"><i className="thumb-app-switch" /><i /></span>
+            <span className="thumb-app-row"><i className="thumb-app-button" /></span>
+          </span>
+        </span>
       </span>
     );
   }
@@ -304,6 +356,8 @@ const MIME: Record<ArtifactFormat, string> = {
   markdown: 'text/markdown',
   html: 'text/html',
   svg: 'image/svg+xml',
+  mermaid: 'text/plain',
+  react: 'text/javascript',
   code: 'text/plain',
 };
 
@@ -311,8 +365,72 @@ const DOWNLOAD_NAME: Record<ArtifactFormat, string> = {
   markdown: 'Markdown',
   html: 'HTML file',
   svg: 'SVG image',
+  mermaid: 'Mermaid file',
+  react: 'React component',
   code: 'File',
 };
+
+// ---------------------------------------------------------------- pages for the sandboxed frame
+// Diagrams and React components run in the same sandboxed frame as web pages. These build the page
+// for the frame: it loads its library from this app (app/api/artifact-runtime), then draws the
+// artifact. Their text goes in as a JSON string, with "<" escaped so it can't end the script early.
+const embed = (text: string) => JSON.stringify(text).replace(/</g, '\\u003c');
+const RUNTIME = '/api/artifact-runtime';
+const FRAME_HEAD = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`;
+const FRAME_ERROR_STYLE = `.artifact-error{margin:16px;padding:12px 14px;border-radius:10px;background:#fff1f1;color:#9b1c1c;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap}`;
+const FRAME_SHOW_ERROR = `function showError(title, err) {
+  var box = document.createElement('div');
+  box.className = 'artifact-error';
+  box.textContent = title + '\\n\\n' + ((err && err.message) || String(err));
+  document.body.replaceChildren(box);
+}`;
+
+function mermaidPage(code: string): string {
+  return `${FRAME_HEAD}<style>html,body{margin:0;background:#fff;font-family:system-ui,sans-serif}
+#diagram{display:flex;justify-content:center;padding:24px}#diagram svg{max-width:100%;height:auto}${FRAME_ERROR_STYLE}</style>
+</head><body><div id="diagram"></div>
+<script src="${RUNTIME}/mermaid.js"></script>
+<script>${FRAME_SHOW_ERROR}
+try {
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default' });
+  mermaid.render('artifact-diagram', ${embed(code)})
+    .then(function (out) { document.getElementById('diagram').innerHTML = out.svg; })
+    .catch(function (err) { showError('This diagram has a mistake in it:', err); });
+} catch (err) { showError('The diagram could not be drawn:', err); }
+</script></body></html>`;
+}
+
+function reactPage(code: string): string {
+  return `${FRAME_HEAD}<style>html,body{margin:0}${FRAME_ERROR_STYLE}</style>
+<script src="${RUNTIME}/tailwind.js"></script>
+</head><body><div id="root"></div>
+<script src="${RUNTIME}/react.js"></script>
+<script src="${RUNTIME}/react-dom.js"></script>
+<script src="${RUNTIME}/babel.js"></script>
+<script>${FRAME_SHOW_ERROR}
+window.addEventListener('error', function (e) { showError('The component stopped with an error:', e.error || e.message); });
+try {
+  var compiled = Babel.transform(${embed(code)}, {
+    filename: 'artifact.tsx',
+    presets: [['env', { modules: 'commonjs' }], 'react', ['typescript', { isTSX: true, allExtensions: true }]],
+  }).code;
+  var libraries = { 'react': React, 'react-dom': ReactDOM, 'react-dom/client': ReactDOM };
+  var require = function (name) {
+    if (Object.prototype.hasOwnProperty.call(libraries, name)) return libraries[name];
+    throw new Error('"' + name + '" isn\\'t available here. Components can use React (with its hooks) and Tailwind classes.');
+  };
+  var module = { exports: {} };
+  new Function('require', 'module', 'exports', 'React', compiled)(require, module, module.exports, React);
+  var App = module.exports.default || module.exports.App ||
+    Object.keys(module.exports).map(function (k) { return module.exports[k]; }).filter(function (v) { return typeof v === 'function'; })[0];
+  if (!App) throw new Error('The component needs "export default", e.g. export default function App() { … }');
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+} catch (err) { showError('The component could not run:', err); }
+</script></body></html>`;
+}
+
+/** Which language to highlight in the Code view. */
+const SOURCE_LANGUAGE: Partial<Record<ArtifactFormat, string>> = { html: 'html', svg: 'xml', mermaid: 'mermaid', react: 'jsx' };
 
 /** The artifact beside the chat. A new artifact (or another version from the chat) starts fresh. */
 export const DocumentPanel = (props: DocumentPanelProps) => <Panel key={`${props.title}\n${props.content}`} {...props} />;
@@ -389,12 +507,22 @@ const Panel = ({ title, content, format = 'markdown', language, fileName, versio
         <pre className="document-source"><code>{shown}</code></pre>
       ) : (
         <div className="document-code">
-          <MessageContent content={fenced(shown, format === 'code' ? (language ?? '') : format === 'svg' ? 'xml' : 'html')} />
+          <MessageContent content={fenced(shown, SOURCE_LANGUAGE[format] ?? language ?? '')} />
         </div>
       );
   } else if (format === 'html') {
     // The page runs in a sandbox: its scripts work, but it can't reach this app, its cookies or its data.
     body = <iframe className="document-frame" title={title} sandbox="allow-scripts allow-modals allow-forms" srcDoc={shown} />;
+  } else if (format === 'mermaid' || format === 'react') {
+    // Same sandbox as a web page: it draws the diagram or runs the component, and nothing more.
+    body = (
+      <iframe
+        className={`document-frame is-${format}`}
+        title={title}
+        sandbox="allow-scripts allow-modals allow-forms"
+        srcDoc={format === 'mermaid' ? mermaidPage(shown) : reactPage(shown)}
+      />
+    );
   } else if (format === 'svg') {
     body = (
       <div className="document-image">
