@@ -47,11 +47,13 @@ export default function Gallery({
                 type="button"
                 className={`prism-thumb ${item.kind === 'video' ? `is-video is-${item.video.status}` : ''}`}
                 aria-current={shown?.kind === item.kind && shown.id === item.id}
-                title={item.kind === 'video' ? `Video: ${item.video.prompt}` : item.image.prompt}
+                title={item.kind === 'video' ? `${item.video.smoothOf ? 'Smooth video' : 'Video'}: ${item.video.prompt}` : item.image.prompt}
                 onClick={() => show({ kind: item.kind, id: item.id })}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- small thumbnails of our own pictures */}
-                <img src={item.kind === 'video' ? item.video.poster : item.image.url} alt={item.kind === 'video' ? item.video.prompt : item.image.prompt} loading="lazy" />
+                {(item.kind === 'image' || item.video.poster) && (
+                  // eslint-disable-next-line @next/next/no-img-element -- small thumbnails of our own pictures
+                  <img src={item.kind === 'video' ? item.video.poster! : item.image.url} alt={item.kind === 'video' ? item.video.prompt : item.image.prompt} loading="lazy" />
+                )}
                 {item.kind === 'video' && (
                   <span className="prism-thumb-badge" aria-hidden="true">
                     {item.video.status === 'working' ? '…' : item.video.status === 'failed' ? '!' : '▶'}

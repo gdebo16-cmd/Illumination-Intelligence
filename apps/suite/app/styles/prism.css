@@ -142,6 +142,9 @@
   border: 1px solid currentColor; 
   border-radius: 3px; 
 }
+.prism-shape-icon.is-landscape { aspect-ratio: 16 / 9; }
+.prism-shape-icon.is-portrait { aspect-ratio: 9 / 16; }
+.prism-shape-icon.is-square { aspect-ratio: 1 / 1; }
 .prism-shape[aria-checked="true"] { 
   color: var(--text-color); 
   border-color: 
@@ -602,6 +605,22 @@
   opacity: 0.45;
   filter: blur(2px);
 }
+/* A video from words has no starting picture: an empty frame of the video's shape instead. */
+.prism-video-blank {
+  display: block;
+  height: min(24rem, 40vh);
+  max-width: 100%;
+  border-radius: 12px;
+  background: #0c1220;
+}
+.prism-video-blank.is-landscape { aspect-ratio: 16 / 9; }
+.prism-video-blank.is-portrait {
+  aspect-ratio: 9 / 16;
+  height: auto;
+  width: min(16rem, 50vw);
+  max-height: min(24rem, 40vh);
+}
+.prism-video-blank.is-square { aspect-ratio: 1 / 1; }
 .prism-video-status {
   position: absolute;
   inset: auto 1rem 1rem;

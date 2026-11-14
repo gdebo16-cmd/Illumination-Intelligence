@@ -11,6 +11,7 @@ export default function PromptBox({
   source,
   setSource,
   animating,
+  fromWords,
   editing,
   prompt,
   setPrompt,
@@ -23,6 +24,7 @@ export default function PromptBox({
   source: Source | null;
   setSource: (source: Source | null) => void;
   animating: boolean;
+  fromWords: boolean;
   editing: boolean;
   prompt: string;
   setPrompt: (text: string) => void;
@@ -58,7 +60,7 @@ export default function PromptBox({
         ref={promptBox}
         id="prism-prompt"
         className="prism-prompt"
-        aria-label={animating ? 'What should move?' : editing ? 'What should change?' : 'Describe your picture'}
+        aria-label={fromWords ? 'Describe your video' : animating ? 'What should move?' : editing ? 'What should change?' : 'Describe your picture'}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={(e) => {
@@ -69,11 +71,13 @@ export default function PromptBox({
           }
         }}
         placeholder={
-          animating
-            ? 'What should move? e.g. the waves roll in, the lighthouse beam sweeps across the sea'
-            : editing
-              ? 'What should change? e.g. make it nighttime, with a full moon'
-              : 'Describe your picture, e.g. a lighthouse on a sea cliff at night, stars, glowing beam'
+          fromWords
+            ? 'Describe your video, e.g. a lighthouse on a sea cliff at night, waves crashing, the beam sweeping across the sea'
+            : animating
+              ? 'What should move? e.g. the waves roll in, the lighthouse beam sweeps across the sea'
+              : editing
+                ? 'What should change? e.g. make it nighttime, with a full moon'
+                : 'Describe your picture, e.g. a lighthouse on a sea cliff at night, stars, glowing beam'
         }
         rows={4}
         maxLength={2000}

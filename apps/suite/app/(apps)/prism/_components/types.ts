@@ -1,6 +1,7 @@
 // Prism's shared types and small helpers: what the API sends back, and how the page formats it.
 
 import { PRISM_STYLES } from '@/config/prism-styles';
+import { PRISM_VIDEO_MODELS, VIDEO_LENGTHS, type VideoModelId } from '@/config/prism-video-models';
 
 // The shapes you can pick. Sizes are in steps of 16 pixels, as the model needs.
 export const SHAPES = [
@@ -65,7 +66,16 @@ export interface PrismVideo {
   id: string;
   imageId: string | null;
   prompt: string;
+  model: VideoModelId;
+  /** Made from a picture ('image') or from words only ('text'). */
+  mode: 'image' | 'text';
   length: string;
+  /** How long the clip is, in seconds. */
+  clipSeconds: number;
+  /** For a smoothed copy: the video it was made from. */
+  smoothOf: string | null;
+  /** Frames per second (twice the model's for a smoothed copy). */
+  fps: number;
   frames: number;
   width: number;
   height: number;
@@ -74,7 +84,8 @@ export interface PrismVideo {
   seconds: number | null;
   createdAt: string;
   url: string;
-  poster: string;
+  /** The starting picture (or a video from words' first frame); null until a video from words is done. */
+  poster: string | null;
 }
 
 // A video length you can pick, with how long it usually takes to make (`wait`, in seconds).
@@ -87,12 +98,20 @@ export interface LengthChoice {
   runs: number;
 }
 
-// Until the server answers, show the first guesses (the same ones as lib/prism/video-workflow.ts).
-export const FIRST_GUESS: LengthChoice[] = [
-  { id: 'short', name: 'Short', seconds: 2, wait: 150, runs: 0 },
-  { id: 'medium', name: 'Medium', seconds: 3, wait: 240, runs: 0 },
-  { id: 'long', name: 'Long', seconds: 5, wait: 450, runs: 0 },
-];
+// Until the server answers, show each video model's first guesses (config/prism-video-models.ts).
+export const FIRST_GUESS = Object.fromEntries(
+  PRISM_VIDEO_MODELS.map((m) => [m.id, VIDEO_LENGTHS.map((l) => ({ ...l, wait: m.estimates[l.id], runs: 0 }))]),
+) as Record<VideoModelId, LengthChoice[]>;
+
+// Whether a video model's files are in ComfyUI, for a video from a picture and from words.
+export interface VideoModelStatus {
+  id: VideoModelId;
+  ready: { image: boolean; text: boolean };
+}
+
+/** CSS modifier for an empty video frame: is-landscape, is-portrait, or is-square. */
+export const videoOrientation = (width: number, height: number) =>
+  width === height ? 'is-square' : height > width ? 'is-portrait' : 'is-landscape';
 
 // The picture to start from: a file from your device, or one of your Prism pictures.
 export type Source =
