@@ -1,24 +1,31 @@
 'use client';
 
-// Documents and artifacts, shared by Lumen and Umbra. Laid out like a chat assistant's artifacts:
-//   - ReplyContent: a reply with each document shown as a card (icon, title, kind or version).
-//   - DocumentPanel: the document beside the chat (full screen on a phone), with Preview / Markdown,
-//     version arrows when it was revised in the chat, Copy, and a Download menu (.md or PDF).
-//   - documentVersions: every version of each document in a chat, oldest first.
+// Artifacts, shared by Lumen and Umbra, laid out like a chat assistant's artifacts:
+//   - ReplyContent: a reply with each artifact shown as a card, with a symbol for its kind:
+//     a paper page (document), a browser window (web page), the picture itself (SVG image),
+//     or an editor with code (code file).
+//   - DocumentPanel: the artifact beside the chat (full screen on a phone). Documents show formatted,
+//     web pages run in a sandboxed frame, images show as pictures, code is highlighted. It has
+//     Preview / Code views, version arrows when it was revised in the chat, Copy, and Download.
+//   - documentVersions: every version of each artifact in a chat, oldest first.
 //   - useArtifacts: the profile's saved artifacts for one app (lib/artifacts.ts), and opening one.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageContent } from '@/components/MessageContent';
-import { splitContent } from '@/lib/document-blocks';
+import { formatExtension, formatLabel, splitContent, type ArtifactFormat } from '@/lib/document-blocks';
 
-export { splitContent };
+export { splitContent, type ArtifactFormat };
 
 /** What the artifacts API sends back for a list (mirrors lib/artifacts.ts, which is server-only). */
 export interface ArtifactSummary {
   id: string;
   app: 'lumen' | 'umbra';
-  /** 'document': a <document> block in a reply. 'file': a .md file a Flicker wrote in Refract. */
+  /** 'document': a block in a reply. 'file': a file a Flicker wrote in Refract. */
   kind: 'document' | 'file';
+  /** markdown (a document), html (a web page), svg (an image) or code. */
+  format: ArtifactFormat;
+  /** For code: its language. */
+  language: string;
   sourceKind: 'chat' | 'bot' | 'team';
   sourceId: string;
   sourceName: string;
@@ -28,15 +35,18 @@ export interface ArtifactSummary {
   updatedAt: string;
 }
 
-/** A document open in the side panel. */
+/** An artifact open in the side panel. */
 export interface OpenDocument {
   title: string;
   content: string;
+  /** What it is; Markdown when not given. */
+  format?: ArtifactFormat;
+  language?: string;
   /** The file name to download as; made from the title when not given. */
   fileName?: string;
-  /** Every version of this document in the chat, oldest first (content is one of them). */
+  /** Every version of this artifact in the chat, oldest first (content is one of them). */
   versions?: string[];
-  /** A short line under the title, e.g. "From Corn". */
+  /** A short line under the title, e.g. "Document · MD · from Corn". */
   subtitle?: string;
 }
 
@@ -44,7 +54,7 @@ export interface OpenDocument {
 export const artifactFileName = (a: Pick<ArtifactSummary, 'kind' | 'title'>): string | undefined =>
   a.kind === 'file' ? a.title.split('/').pop() : undefined;
 
-/** Every version of each document in a chat's replies, by title, oldest first. */
+/** Every version of each artifact in a chat's replies, by title, oldest first. */
 export function documentVersions(replies: string[]): Map<string, string[]> {
   const versions = new Map<string, string[]>();
   for (const reply of replies) {
@@ -59,19 +69,60 @@ export function documentVersions(replies: string[]): Map<string, string[]> {
   return versions;
 }
 
-// ---------------------------------------------------------------- icons
-/** The document symbol for small places: a page with a folded corner and a few lines. */
-export const DocumentIcon = ({ size = 18 }: { size?: number }) => (
+/** An SVG as a picture address. As an <img>, any script inside it never runs. */
+const svgSrc = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+
+// ---------------------------------------------------------------- icons (small places)
+const Glyph = ({ size, children }: { size: number; children: React.ReactNode }) => (
   <svg className="document-icon" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.5z" />
-    <path d="M14.5 3v4.5H19" />
-    <path d="M8.5 12.5h7M8.5 16h5" />
+    {children}
   </svg>
 );
 
+/** The artifact symbol for small places (lists, buttons), one per kind. */
+export const ArtifactIcon = ({ format = 'markdown', size = 18 }: { format?: ArtifactFormat; size?: number }) => {
+  if (format === 'html') {
+    return (
+      <Glyph size={size}>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <path d="M3 8.5h18" />
+        <path d="M6 6.25h.01M8.5 6.25h.01" strokeWidth="2.2" />
+        <path d="M10 12.5l-2 2 2 2M14 12.5l2 2-2 2" />
+      </Glyph>
+    );
+  }
+  if (format === 'svg') {
+    return (
+      <Glyph size={size}>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <circle cx="9" cy="9.5" r="1.6" />
+        <path d="M21 16l-5-5-8 9" />
+      </Glyph>
+    );
+  }
+  if (format === 'code') {
+    return (
+      <Glyph size={size}>
+        <path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5M13.5 5l-3 14" />
+      </Glyph>
+    );
+  }
+  return (
+    <Glyph size={size}>
+      <path d="M14.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.5z" />
+      <path d="M14.5 3v4.5H19" />
+      <path d="M8.5 12.5h7M8.5 16h5" />
+    </Glyph>
+  );
+};
+
+/** The document symbol (kept for places that only ever show documents). */
+export const DocumentIcon = ({ size = 18 }: { size?: number }) => <ArtifactIcon format="markdown" size={size} />;
+
+// ---------------------------------------------------------------- thumbnails (cards)
 type ThumbLine = { kind: 'heading' | 'text' | 'item' | 'rule'; width: number };
 
-/** A few lines that sketch the document's shape: headings, paragraphs, list items. */
+/** A few lines that sketch a document's shape: headings, paragraphs, list items. */
 function sketch(content: string): ThumbLine[] {
   const lines: ThumbLine[] = [];
   const width = (text: string, min: number) => Math.max(min, Math.min(100, Math.round(text.length * 1.8)));
@@ -91,16 +142,69 @@ function sketch(content: string): ThumbLine[] {
   return lines.slice(0, 7);
 }
 
-/** A small page that shows the document's shape, like a thumbnail. */
-export const DocumentThumb = ({ content }: { content: string }) => (
-  <span className="document-thumb" aria-hidden="true">
-    <span className="document-thumb-page">
-      {sketch(content).map((l, i) => (
-        <span key={i} className={`document-thumb-line is-${l.kind}`} style={{ width: `${l.width}%` }} />
-      ))}
+/** The first color a page's CSS uses, to tint its little browser window. */
+function pageAccent(html: string): string | null {
+  const m = /(?:background(?:-color)?|color)\s*:\s*(#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\))/i.exec(html);
+  return m && !/^#(fff|ffffff|000|000000)$/i.test(m[1]) ? m[1] : null;
+}
+
+/** A code file's first lines, as indented colored bars. */
+function codeBars(code: string): { indent: number; width: number }[] {
+  return code
+    .split('\n')
+    .filter((l) => l.trim())
+    .slice(0, 7)
+    .map((l) => ({ indent: Math.min(3, Math.floor((l.length - l.trimStart().length) / 2)), width: Math.max(25, Math.min(100, l.trim().length * 3)) }));
+}
+
+/** The card's picture: what the artifact looks like, in miniature. */
+export const ArtifactThumb = ({ format = 'markdown', content }: { format?: ArtifactFormat; content: string }) => {
+  if (format === 'html') {
+    const accent = pageAccent(content);
+    return (
+      <span className="document-thumb is-html" aria-hidden="true">
+        <span className="thumb-window" style={accent ? ({ '--thumb-accent': accent } as React.CSSProperties) : undefined}>
+          <span className="thumb-window-bar"><i /><i /><i /></span>
+          <span className="thumb-window-hero" />
+          <span className="thumb-window-line" />
+          <span className="thumb-window-line is-short" />
+          <span className="thumb-window-tiles"><i /><i /></span>
+        </span>
+      </span>
+    );
+  }
+  if (format === 'svg') {
+    return (
+      <span className="document-thumb is-svg" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a data: picture, not a file Next can optimise */}
+        <img src={svgSrc(content)} alt="" />
+      </span>
+    );
+  }
+  if (format === 'code') {
+    return (
+      <span className="document-thumb is-code" aria-hidden="true">
+        <span className="thumb-code">
+          {codeBars(content).map((b, i) => (
+            <span key={i} className={`thumb-code-line c${i % 4}`} style={{ marginLeft: `${b.indent * 5}px`, width: `${b.width}%` }} />
+          ))}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="document-thumb" aria-hidden="true">
+      <span className="document-thumb-page">
+        {sketch(content).map((l, i) => (
+          <span key={i} className={`document-thumb-line is-${l.kind}`} style={{ width: `${l.width}%` }} />
+        ))}
+      </span>
     </span>
-  </span>
-);
+  );
+};
+
+/** The paper-page thumbnail for a document. */
+export const DocumentThumb = ({ content }: { content: string }) => <ArtifactThumb format="markdown" content={content} />;
 
 const Chevron = ({ dir }: { dir: 'left' | 'right' | 'down' }) => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,38 +217,43 @@ const CloseIcon = () => (
   </svg>
 );
 
-// ---------------------------------------------------------------- reply with document cards
+// ---------------------------------------------------------------- reply with artifact cards
 interface DocumentCardProps {
   title: string;
-  /** The document's text, sketched on the card's little page. */
+  /** The artifact's text, drawn in miniature on the card. */
   content: string;
-  /** Under the title: "Document · MD", or "Version 2 · MD" for a revision. */
-  subtitle?: string;
-  /** This document is the one open in the panel. */
+  format?: ArtifactFormat;
+  language?: string;
+  /** Which version this is, when it was revised in the chat. */
+  version?: number;
+  /** This artifact is the one open in the panel. */
   active?: boolean;
   onOpen: () => void;
 }
 
-export const DocumentCard = ({ title, content, subtitle = 'Document · MD', active, onOpen }: DocumentCardProps) => (
-  <button type="button" className={`document-card ${active ? 'is-active' : ''}`} onClick={onOpen} aria-pressed={active}>
-    <DocumentThumb content={content} />
-    <span className="document-card-text">
-      <span className="document-card-title">{title}</span>
-      <span className="document-card-subtitle">{subtitle}</span>
-    </span>
-  </button>
-);
+export const DocumentCard = ({ title, content, format = 'markdown', language, version, active, onOpen }: DocumentCardProps) => {
+  const label = formatLabel(format, language);
+  return (
+    <button type="button" className={`document-card ${active ? 'is-active' : ''}`} onClick={onOpen} aria-pressed={active}>
+      <ArtifactThumb format={format} content={content} />
+      <span className="document-card-text">
+        <span className="document-card-title">{title}</span>
+        <span className="document-card-subtitle">{version ? `Version ${version} · ${label.split(' · ')[1]}` : label}</span>
+      </span>
+    </button>
+  );
+};
 
 interface ReplyContentProps {
   content: string;
   onOpen: (doc: OpenDocument) => void;
   /** documentVersions() of the whole chat, to label revisions and let the panel step through them. */
   versions?: Map<string, string[]>;
-  /** The document open in the panel right now, to highlight its card. */
+  /** The artifact open in the panel right now, to highlight its card. */
   open?: OpenDocument | null;
 }
 
-/** A reply in Markdown, with each document shown as a card that opens it beside the chat. */
+/** A reply in Markdown, with each artifact shown as a card that opens it beside the chat. */
 export const ReplyContent = ({ content, onOpen, versions, open }: ReplyContentProps) => (
   <>
     {splitContent(content).map((seg, i) => {
@@ -156,9 +265,11 @@ export const ReplyContent = ({ content, onOpen, versions, open }: ReplyContentPr
           key={i}
           title={seg.title}
           content={seg.content}
-          subtitle={list.length > 1 && at >= 0 ? `Version ${at + 1} · MD` : undefined}
+          format={seg.format}
+          language={seg.language}
+          version={list.length > 1 && at >= 0 ? at + 1 : undefined}
           active={open?.title === seg.title && open.content === seg.content}
-          onOpen={() => onOpen({ title: seg.title, content: seg.content, versions: list })}
+          onOpen={() => onOpen({ title: seg.title, content: seg.content, format: seg.format, language: seg.language, versions: list })}
         />
       );
     })}
@@ -182,17 +293,40 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
-/** The document beside the chat. A new document (or another version from the chat) starts fresh. */
+/** Code wrapped in a fence long enough that nothing inside can close it early. */
+function fenced(code: string, language: string): string {
+  const longest = Math.max(2, ...[...code.matchAll(/`+/g)].map((m) => m[0].length));
+  const fence = '`'.repeat(longest + 1);
+  return `${fence}${language}\n${code}\n${fence}`;
+}
+
+const MIME: Record<ArtifactFormat, string> = {
+  markdown: 'text/markdown',
+  html: 'text/html',
+  svg: 'image/svg+xml',
+  code: 'text/plain',
+};
+
+const DOWNLOAD_NAME: Record<ArtifactFormat, string> = {
+  markdown: 'Markdown',
+  html: 'HTML file',
+  svg: 'SVG image',
+  code: 'File',
+};
+
+/** The artifact beside the chat. A new artifact (or another version from the chat) starts fresh. */
 export const DocumentPanel = (props: DocumentPanelProps) => <Panel key={`${props.title}\n${props.content}`} {...props} />;
 
-const Panel = ({ title, content, fileName, versions, subtitle, onClose }: DocumentPanelProps) => {
+const Panel = ({ title, content, format = 'markdown', language, fileName, versions, subtitle, onClose }: DocumentPanelProps) => {
   const list = versions?.length ? versions : [content];
   const [index, setIndex] = useState(() => Math.max(0, list.indexOf(content)));
-  const [view, setView] = useState<'preview' | 'source'>('preview');
+  // Code files have only the code view.
+  const [view, setView] = useState<'preview' | 'source'>(format === 'code' ? 'source' : 'preview');
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const shown = list[index] ?? content;
+  const ext = formatExtension(format, language);
 
   // Escape closes the menu, or else the panel.
   useEffect(() => {
@@ -225,13 +359,14 @@ const Panel = ({ title, content, fileName, versions, subtitle, onClose }: Docume
     }
   };
 
-  const downloadMarkdown = () => {
+  const downloadFile = () => {
     setMenuOpen(false);
-    const blob = new Blob([shown], { type: 'text/markdown;charset=utf-8' });
+    const blob = new Blob([shown], { type: `${MIME[format]};charset=utf-8` });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName || `${title.replace(/[^\w\- ]+/g, '').trim() || 'document'}.md`;
+    const base = title.replace(/\.[\w]+$/, '').replace(/[^\w\- ]+/g, '').trim() || 'artifact';
+    a.download = fileName || `${base}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -243,14 +378,45 @@ const Panel = ({ title, content, fileName, versions, subtitle, onClose }: Docume
     setTimeout(() => window.print(), 50);
   };
 
-  const meta = [list.length > 1 ? `Version ${index + 1} of ${list.length}` : null, subtitle ?? 'Markdown'].filter(Boolean).join(' · ');
+  const meta = [list.length > 1 ? `Version ${index + 1} of ${list.length}` : null, subtitle ?? formatLabel(format, language)]
+    .filter(Boolean)
+    .join(' · ');
+
+  let body: React.ReactNode;
+  if (view === 'source') {
+    body =
+      format === 'markdown' ? (
+        <pre className="document-source"><code>{shown}</code></pre>
+      ) : (
+        <div className="document-code">
+          <MessageContent content={fenced(shown, format === 'code' ? (language ?? '') : format === 'svg' ? 'xml' : 'html')} />
+        </div>
+      );
+  } else if (format === 'html') {
+    // The page runs in a sandbox: its scripts work, but it can't reach this app, its cookies or its data.
+    body = <iframe className="document-frame" title={title} sandbox="allow-scripts allow-modals allow-forms" srcDoc={shown} />;
+  } else if (format === 'svg') {
+    body = (
+      <div className="document-image">
+        {/* eslint-disable-next-line @next/next/no-img-element -- a data: picture, not a file Next can optimise */}
+        <img src={svgSrc(shown)} alt={title} />
+      </div>
+    );
+  } else {
+    body = (
+      <article className="document-page">
+        <MessageContent content={shown} />
+      </article>
+    );
+  }
 
   return (
-    <aside className="document-panel" aria-label={`Document: ${title}`}>
+    <aside className={`document-panel is-${format}`} aria-label={`${formatLabel(format, language).split(' · ')[0]}: ${title}`}>
       <div className="document-panel-header">
-        <button type="button" className="document-icon-button document-panel-close" onClick={onClose} aria-label="Close document" title="Close">
+        <button type="button" className="document-icon-button document-panel-close" onClick={onClose} aria-label="Close" title="Close">
           <CloseIcon />
         </button>
+        <span className="document-panel-icon"><ArtifactIcon format={format} size={18} /></span>
         <div className="document-panel-heading">
           <h2 className="document-panel-title">{title}</h2>
           <span className="document-panel-meta">{meta}</span>
@@ -268,10 +434,16 @@ const Panel = ({ title, content, fileName, versions, subtitle, onClose }: Docume
       </div>
 
       <div className="document-panel-toolbar">
-        <div className="document-toggle" role="tablist" aria-label="View">
-          <button type="button" role="tab" aria-selected={view === 'preview'} onClick={() => setView('preview')}>Preview</button>
-          <button type="button" role="tab" aria-selected={view === 'source'} onClick={() => setView('source')}>Markdown</button>
-        </div>
+        {format === 'code' ? (
+          <span className="document-panel-language">{formatLabel(format, language).split(' · ')[1]}</span>
+        ) : (
+          <div className="document-toggle" role="tablist" aria-label="View">
+            <button type="button" role="tab" aria-selected={view === 'preview'} onClick={() => setView('preview')}>Preview</button>
+            <button type="button" role="tab" aria-selected={view === 'source'} onClick={() => setView('source')}>
+              {format === 'markdown' ? 'Markdown' : 'Code'}
+            </button>
+          </div>
+        )}
         <div className="document-panel-actions">
           <button type="button" className="document-action" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</button>
           <div className="document-menu" ref={menuRef}>
@@ -280,23 +452,17 @@ const Panel = ({ title, content, fileName, versions, subtitle, onClose }: Docume
             </button>
             {menuOpen && (
               <div className="document-menu-list" role="menu">
-                <button type="button" role="menuitem" onClick={downloadMarkdown}>Markdown (.md)</button>
-                <button type="button" role="menuitem" onClick={printPdf}>PDF (print)</button>
+                <button type="button" role="menuitem" onClick={downloadFile}>
+                  {format === 'code' ? `${formatLabel(format, language).split(' · ')[1]} file` : DOWNLOAD_NAME[format]} (.{ext})
+                </button>
+                {format === 'markdown' && <button type="button" role="menuitem" onClick={printPdf}>PDF (print)</button>}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="document-panel-body">
-        {view === 'preview' ? (
-          <article className="document-page">
-            <MessageContent content={shown} />
-          </article>
-        ) : (
-          <pre className="document-source"><code>{shown}</code></pre>
-        )}
-      </div>
+      <div className="document-panel-body">{body}</div>
     </aside>
   );
 };
@@ -349,8 +515,10 @@ export function useArtifacts(app: 'lumen' | 'umbra', source?: string) {
       return {
         title: full.title,
         content: full.content,
+        format: full.format,
+        language: full.language || undefined,
         fileName: artifactFileName(full),
-        subtitle: `${full.kind === 'file' ? 'Refract file' : 'Markdown'} · from ${full.sourceName}`,
+        subtitle: `${full.kind === 'file' ? `Refract file · ${formatLabel(full.format, full.language).split(' · ')[1]}` : formatLabel(full.format, full.language)} · from ${full.sourceName}`,
       };
     } catch (err) {
       setError((err as Error).message);

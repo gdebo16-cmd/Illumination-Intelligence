@@ -308,5 +308,9 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_key ON Artifact (user_id, app, source_kind, source_id, kind, title);
   CREATE INDEX IF NOT EXISTS idx_artifact_user ON Artifact (user_id, app, updatedAt);
 `);
+// What an artifact is: markdown (a document), html (a web page), svg (an image) or code, and the
+// code's language. Artifacts saved before these existed are all Markdown.
+addColumn('Artifact', 'format', "TEXT NOT NULL DEFAULT 'markdown'");
+addColumn('Artifact', 'language', "TEXT NOT NULL DEFAULT ''");
 
 export default db;

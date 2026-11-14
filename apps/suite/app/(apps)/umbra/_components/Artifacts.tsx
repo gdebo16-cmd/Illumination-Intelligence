@@ -1,12 +1,13 @@
 'use client';
 
-// /umbra/artifacts — the Markdown documents your Flickers and teams have written:
+// /umbra/artifacts — what your Flickers and teams have made (documents, web pages, images, code):
 // <document> blocks from chats and task reports, and .md files a Flicker wrote in Refract.
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { flameColor } from '@/config/umbra';
-import { DocumentIcon, DocumentPanel, useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
+import { ArtifactIcon, DocumentPanel, useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
+import { formatLabel } from '@/lib/document-blocks';
 import Flame from './Flame';
 import type { Bot, Team } from './types';
 
@@ -58,15 +59,15 @@ export default function Artifacts({ source }: { source?: string }) {
         <div className="umbra-intro">
           <h1>{sourceName ? `${sourceName}’s artifacts` : 'Artifacts'}</h1>
           <p>
-            Markdown documents your Flickers wrote: long write-ups from chats and task reports, and .md files
-            they made in Refract. Writing one again with the same name updates it.
+            What your Flickers made: documents, web pages, images and code from chats and task reports,
+            and .md, .html and .svg files they wrote in Refract. Making one again with the same name updates it.
           </p>
         </div>
 
         {error && <p className="umbra-error" role="alert">{error}</p>}
         {artifacts === null && !error && <p className="umbra-muted">Loading…</p>}
         {artifacts?.length === 0 && (
-          <p className="umbra-muted">No artifacts yet. Ask a Flicker to write a report, plan or guide.</p>
+          <p className="umbra-muted">No artifacts yet. Ask a Flicker to write a report, build a web page or draw a logo.</p>
         )}
 
         <ul className="umbra-inbox">
@@ -79,11 +80,11 @@ export default function Artifacts({ source }: { source?: string }) {
                 style={flame ? ({ '--bot-color': flameColor(flame) } as React.CSSProperties) : undefined}
               >
                 <button type="button" className="umbra-report-head" onClick={() => show(a)}>
-                  {flame ? <Flame flame={flame} size={40} still /> : <span className="umbra-artifact-icon"><DocumentIcon size={20} /></span>}
+                  {flame ? <Flame flame={flame} size={40} still /> : <span className="umbra-artifact-icon"><ArtifactIcon format={a.format} size={20} /></span>}
                   <span className="umbra-report-who">
                     <span className="umbra-report-title">{a.title}</span>
                     <span className="umbra-report-meta">
-                      {a.kind === 'file' ? 'Refract file' : 'Document'} · {a.sourceName}
+                      {a.kind === 'file' ? `Refract file · ${formatLabel(a.format, a.language).split(' · ')[1]}` : formatLabel(a.format, a.language)} · {a.sourceName}
                       {a.sourceKind === 'team' && ' (team)'} · {when(a.updatedAt)} · {size(a.size)}
                     </span>
                   </span>
