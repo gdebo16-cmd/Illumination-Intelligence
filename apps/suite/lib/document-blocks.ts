@@ -238,3 +238,27 @@ export function formatExtension(format: ArtifactFormat, language?: string): stri
   const lang = (language ?? '').toLowerCase().replace(/[^\w+#-]/g, '');
   return EXTENSIONS[lang] ?? (lang || 'txt');
 }
+
+/** UTF-8 byte length of an artifact's text, for the card's size line. */
+export function contentByteSize(content: string): number {
+  return new TextEncoder().encode(content).length;
+}
+
+/** A short file size, e.g. "17 kB", "512 B", "1.2 MB". */
+export function formatArtifactSize(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) {
+    const n = bytes / 1000;
+    const value = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+    return `${value} kB`;
+  }
+  const n = bytes / 1_000_000;
+  const value = n >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+  return `${value} MB`;
+}
+
+/** "Document · MD · 17 kB". Size is left off when it isn't known. */
+export function formatCardMeta(format: ArtifactFormat, language?: string, bytes?: number): string {
+  const label = formatLabel(format, language);
+  return bytes == null ? label : `${label} · ${formatArtifactSize(bytes)}`;
+}

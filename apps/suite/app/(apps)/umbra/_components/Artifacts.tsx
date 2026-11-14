@@ -5,21 +5,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { flameColor } from '@/config/umbra';
-import { ArtifactIcon, DocumentPanel, useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
-import { formatLabel } from '@/lib/document-blocks';
-import Flame from './Flame';
+import { ArtifactThumb, DocumentPanel, useArtifacts, type ArtifactSummary, type OpenDocument } from '@/components/documents';
+import { formatArtifactSize, formatLabel } from '@/lib/document-blocks';
 import type { Bot, Team } from './types';
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-const size = (chars: number) => (chars < 1000 ? `${chars} characters` : `${(chars / 1000).toFixed(1)}k characters`);
-
 export default function Artifacts({ source }: { source?: string }) {
   const { artifacts, error, open, remove } = useArtifacts('umbra', source);
   const [openDoc, setOpenDoc] = useState<OpenDocument | null>(null);
-  // The flames to draw next to each artifact, from your Flickers and teams.
+  // Known Flickers and teams, so a card can offer a link back to their chat.
   const [flames, setFlames] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -73,22 +69,21 @@ export default function Artifacts({ source }: { source?: string }) {
         <ul className="umbra-inbox">
           {artifacts?.map((a) => {
             const flame = flames[a.sourceId];
+            const kindLabel = a.kind === 'file'
+              ? `Refract file · ${formatLabel(a.format, a.language).split(' · ')[1]}`
+              : formatLabel(a.format, a.language);
+            const meta = `${kindLabel} · ${formatArtifactSize(a.size)}`;
             return (
-              <li
-                key={a.id}
-                className="umbra-report umbra-artifact"
-                style={flame ? ({ '--bot-color': flameColor(flame) } as React.CSSProperties) : undefined}
-              >
-                <button type="button" className="umbra-report-head" onClick={() => show(a)}>
-                  {flame ? <Flame flame={flame} size={40} still /> : <span className="umbra-artifact-icon"><ArtifactIcon format={a.format} size={20} /></span>}
-                  <span className="umbra-report-who">
-                    <span className="umbra-report-title">{a.title}</span>
-                    <span className="umbra-report-meta">
-                      {a.kind === 'file' ? `Refract file · ${formatLabel(a.format, a.language).split(' · ')[1]}` : formatLabel(a.format, a.language)} · {a.sourceName}
-                      {a.sourceKind === 'team' && ' (team)'} · {when(a.updatedAt)} · {size(a.size)}
+              <li key={a.id} className="umbra-artifact">
+                <button type="button" className={`document-card is-${a.format}`} onClick={() => show(a)}>
+                  <ArtifactThumb format={a.format} />
+                  <span className="document-card-text">
+                    <span className="document-card-title">{a.title}</span>
+                    <span className="document-card-subtitle">{meta}</span>
+                    <span className="document-card-origin">
+                      {a.sourceName}{a.sourceKind === 'team' ? ' (team)' : ''} · {when(a.updatedAt)}
                     </span>
                   </span>
-                  <span className="document-card-action">Open</span>
                 </button>
                 <div className="umbra-report-actions umbra-artifact-actions">
                   {flame && <Link href={chatLink(a)}>Chat with {a.sourceName}</Link>}

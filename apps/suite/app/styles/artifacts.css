@@ -12,102 +12,73 @@
   --doc-accent: var(--bot-color, #8f93ff);
 }
 .document-card {
-  display: flex; align-items: center; gap: 0.85rem;
-  width: 100%; max-width: 440px; margin: 0.75rem 0; padding: 0.7rem 0.8rem;
+  /* Per-kind tile colors: a vertical gradient, darker at the bottom, and a lighter icon tint. */
+  --doc-tile-top: #1e4d8c;
+  --doc-tile-bottom: #0a1630;
+  --doc-tile-icon: #8eb8f0;
+  --doc-tile-icon-mask: url(/artifact-icons/document.svg);
+  display: flex; align-items: flex-start; gap: 1.15rem;
+  width: 100%; max-width: 32rem; margin: 0.75rem 0;
+  padding: 0.7rem 1.25rem 0 0.7rem;
+  overflow: hidden;
   font: inherit; text-align: left; color: var(--doc-text);
-  background: rgb(255 255 255 / 0.04);
-  border: 1px solid rgb(255 255 255 / 0.12); border-radius: 14px;
+  background: rgb(16 18 24 / 0.88);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.09); border-radius: 1.35rem;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
-.document-card:hover { background: rgb(255 255 255 / 0.07); border-color: rgb(255 255 255 / 0.2); }
+.document-card:hover { background: rgb(22 24 32 / 0.94); border-color: rgb(255 255 255 / 0.16); }
 .document-card:active { transform: scale(0.99); }
-.document-card.is-active { border-color: rgb(255 255 255 / 0.32); background: rgb(255 255 255 / 0.08); }
-/* The card's little page: off-white paper, a folded corner, and grey bars sketching the text. */
+.document-card.is-active { border-color: rgb(255 255 255 / 0.28); background: rgb(24 26 34 / 0.96); }
+.document-card.is-code,
+.artifact-button.is-code {
+  --doc-tile-top: #1a6b45; --doc-tile-bottom: #071a12; --doc-tile-icon: #7ee0a8;
+  --doc-tile-icon-mask: url(/artifact-icons/code.svg); }
+.document-card.is-html,
+.artifact-button.is-html {
+  --doc-tile-top: #b4531a; --doc-tile-bottom: #2a1206; --doc-tile-icon: #ffc089;
+  --doc-tile-icon-mask: url(/artifact-icons/web.svg); }
+.document-card.is-mermaid,
+.artifact-button.is-mermaid {
+  --doc-tile-top: #157a78; --doc-tile-bottom: #062022; --doc-tile-icon: #7eefe6;
+  --doc-tile-icon-mask: url(/artifact-icons/diagram.svg); }
+.document-card.is-react,
+.artifact-button.is-react {
+  --doc-tile-top: #9a2a6e; --doc-tile-bottom: #220817; --doc-tile-icon: #f5a8d4;
+  --doc-tile-icon-mask: url(/artifact-icons/component.svg); }
+.document-card.is-svg,
+.artifact-button.is-svg {
+  --doc-tile-top: #b56a12; --doc-tile-bottom: #261506; --doc-tile-icon: #ffd37a;
+  --doc-tile-icon-mask: url(/artifact-icons/image.svg); }
+.document-card.is-markdown,
+.artifact-button.is-markdown {
+  --doc-tile-top: #1e4d8c; --doc-tile-bottom: #0a1630; --doc-tile-icon: #8eb8f0;
+  --doc-tile-icon-mask: url(/artifact-icons/document.svg); }
+/* Tall 3:4 tile: rounded at the top, runs off the card's bottom edge and is clipped by it. */
 .document-thumb {
-  display: flex; align-items: flex-end; justify-content: center; flex-shrink: 0;
-  width: 3.5rem; height: 3.5rem; padding-top: 0.45rem; overflow: hidden;
-  background: rgb(255 255 255 / 0.05);
-  border: 1px solid rgb(255 255 255 / 0.1); border-radius: 10px; }
-.document-thumb-page {
-  position: relative;
-  display: flex; flex-direction: column; gap: 3px;
-  width: 2.6rem; height: 100%; padding: 0.4rem 0.35rem 0;
-  background: #f4f2ee;
-  border-radius: 3px 3px 0 0;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
-  transform: translateY(2px);
-  transition: transform 0.18s ease;
-  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); }
-.document-thumb-page::after {
-  content: ''; position: absolute; top: 0; right: 0;
-  width: 9px; height: 9px;
-  background: linear-gradient(225deg, transparent 50%, #d9d5cc 50%); }
-.document-card:hover .document-thumb-page,
-.document-card.is-active .document-thumb-page { transform: translateY(0); }
-.document-thumb-line { display: block; flex-shrink: 0; height: 2px; border-radius: 1px; background: #c9c5bd; }
-.document-thumb-line.is-heading { height: 3px; margin-bottom: 1px; background: #55534e; }
-.document-thumb-line.is-item { margin-left: 4px; }
-.document-thumb-line.is-rule { height: 1px; background: #dedad2; }
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 4.4rem; height: 5.85rem;
+  background: linear-gradient(180deg, var(--doc-tile-top) 0%, var(--doc-tile-bottom) 100%);
+  border-radius: 1rem 1rem 0.7rem 0.7rem;
+  color: var(--doc-tile-icon);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14); }
+.document-thumb-icon {
+  display: block; width: 24px; height: 24px;
+  background-color: currentColor;
+  -webkit-mask: var(--doc-tile-icon-mask) center / contain no-repeat;
+  mask: var(--doc-tile-icon-mask) center / contain no-repeat; }
 .document-icon { display: block; flex-shrink: 0; }
-/* Web page: a little browser window, tinted with the page's own first color. */
-.document-thumb.is-html { align-items: flex-end; }
-.thumb-window {
-  --thumb-accent: #7c83ff;
-  display: flex; flex-direction: column; gap: 3px;
-  width: 2.9rem; height: 100%;
-  padding-bottom: 4px; overflow: hidden;
-  background: #fbfbfd;
-  border-radius: 4px 4px 0 0;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
-  transform: translateY(2px);
-  transition: transform 0.18s ease; }
-.thumb-window-bar { display: flex; gap: 2px; align-items: center; height: 6px; padding: 0 3px; background: #e4e4ea; }
-.thumb-window-bar i { width: 3px; height: 3px; border-radius: 50%; background: #b5b5c0; }
-.thumb-window-bar i:first-child { background: #ff6b6b; }
-.thumb-window-hero { height: 9px; margin: 1px 4px 0; border-radius: 2px; background: var(--thumb-accent); }
-.thumb-window-line { height: 2px; margin: 0 4px; width: 80%; border-radius: 1px; background: #c9c9d4; }
-.thumb-window-line.is-short { width: 55%; }
-.thumb-window-tiles { display: flex; gap: 3px; margin: 1px 4px 0; }
-.thumb-window-tiles i { flex: 1; height: 7px; border-radius: 2px; background: color-mix(in srgb, var(--thumb-accent) 22%, #eceef4); }
-.document-card:hover .thumb-window,
-.document-card.is-active .thumb-window { transform: translateY(0); }
-/* Image: the SVG itself, on a light checkerboard so transparent parts read as transparent. */
-.document-thumb.is-svg {
-  align-items: center; padding: 0.35rem;
-  background-color: #f4f4f6;
-  background-image: conic-gradient(#e6e6ea 25%, transparent 0 50%, #e6e6ea 0 75%, transparent 0);
-  background-size: 10px 10px; }
-.document-thumb.is-svg img { display: block; width: 100%; height: 100%; object-fit: contain; }
-/* Diagram: boxes and arrows on white. */
-.document-thumb.is-mermaid { align-items: center; padding: 0.2rem; background: #fbfbfd; }
-.document-thumb.is-mermaid svg { display: block; }
-/* React component: a little app with a side bar, a switch and a button. */
-.document-thumb.is-react { align-items: flex-end; }
-.thumb-app {
-  display: flex; width: 2.9rem; height: 100%; overflow: hidden;
-  background: #fbfbfd; border-radius: 4px 4px 0 0;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
-  transform: translateY(2px); transition: transform 0.18s ease; }
-.thumb-app-side { width: 8px; background: #1f2433; }
-.thumb-app-main { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 4px; }
-.thumb-app-head { height: 4px; width: 70%; border-radius: 2px; background: #3b4256; }
-.thumb-app-row { display: flex; align-items: center; gap: 3px; }
-.thumb-app-row i { display: block; height: 2px; flex: 1; border-radius: 1px; background: #c9c9d4; }
-.thumb-app-row i.thumb-app-switch { flex: none; width: 9px; height: 5px; border-radius: 3px; background: #22c55e; }
-.thumb-app-row i.thumb-app-button { flex: none; width: 16px; height: 6px; border-radius: 2px; background: #0ea5e9; }
-.document-card:hover .thumb-app,
-.document-card.is-active .thumb-app { transform: translateY(0); }
-/* Code: a dark editor with colored, indented lines. */
-.document-thumb.is-code { align-items: stretch; padding: 0; background: #0f1117; }
-.thumb-code { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 0.5rem 0.45rem; }
-.thumb-code-line { display: block; height: 2px; border-radius: 1px; background: #8b93a7; }
-.thumb-code-line.c0 { background: #c792ea; }
-.thumb-code-line.c1 { background: #82aaff; }
-.thumb-code-line.c2 { background: #c3e88d; }
-.thumb-code-line.c3 { background: #8b93a7; }
-.document-card-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.document-card-title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.document-card-subtitle { font-size: 0.78rem; color: var(--doc-muted); }
+.document-card-text {
+  display: flex; flex-direction: column; gap: 0.22rem;
+  min-width: 0; flex: 1;
+  align-self: center;
+  padding-bottom: 0.7rem; }
+.document-card-title {
+  font-weight: 600; font-size: 1.15rem; line-height: 1.25; letter-spacing: -0.01em;
+  color: #f4f5f8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-card-subtitle { font-size: 0.92rem; font-weight: 500; color: #8b8e99; }
+.document-card-origin { font-size: 0.78rem; color: var(--doc-muted); }
 
 .document-panel {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 70;
@@ -221,7 +192,7 @@
 .artifact-icon {
   display: inline-flex;
   flex-shrink: 0;
-  color: #aab; }
+  color: var(--doc-tile-icon, #aab); }
 .artifact-title {
   min-width: 0;
   overflow: hidden;
@@ -232,22 +203,16 @@
   font-size: 0.8rem;
   color: #9a9cb8;
   white-space: normal; }
-.umbra-artifact-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  color: #d5d7ea;
-  background: rgb(255 255 255 / 0.05);
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 10px; }
-.umbra-artifact .umbra-report-title {
-  overflow-wrap: anywhere; }
+/* Umbra's Artifacts page: the same tile card as in chat, full width, with actions under the text. */
+.umbra-inbox > .umbra-artifact {
+  background: none;
+  border: none;
+  border-radius: 0;
+  overflow: visible; }
+.umbra-inbox .document-card { max-width: none; margin: 0; }
 .umbra-artifact-actions {
   margin-top: 0;
-  padding: 0 1rem 0.75rem 3.75rem; }
+  padding: 0.4rem 1.25rem 0.15rem 6.25rem; }
 .umbra-chat-name {
   overflow: hidden;
   white-space: nowrap;

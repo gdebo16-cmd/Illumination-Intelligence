@@ -57,7 +57,7 @@ const ChatSidebar = () => {
         {artifacts?.map((a) => (
           <div className='chat-row' key={a.id}>
             <button
-              className='chat-button artifact-button'
+              className={`chat-button artifact-button is-${a.format}`}
               title={`From: ${a.sourceName}`}
               onClick={() => { void openArtifact(a); panel.closeOnPhone(); }}
             >
