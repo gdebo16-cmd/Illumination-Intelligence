@@ -587,6 +587,8 @@ header ~ main.umbra-chat > .umbra-chat-bar {
   min-height: calc(var(--header-h) - var(--safe-top));
   padding-top: 0;
   padding-bottom: 0;
+  /* The header's side-panel button (42px, top left) sits over this bar: start the back arrow after it. */
+  padding-left: calc(max(1rem, env(safe-area-inset-left)) + 42px + 0.5rem);
   box-sizing: border-box;
 }
 header ~ main.umbra-chat .umbra-messages::before { content: none; }
