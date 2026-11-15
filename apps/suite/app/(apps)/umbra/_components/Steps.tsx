@@ -11,8 +11,9 @@ import type { AgentStep, ApprovalRequest, CodeEdit } from './types';
 // line of its thinking). Afterwards it sums the work up ("Thought for 12s · 4 steps"). Tap it to
 // open the timeline: thinking, what the bot said on the way, and each tool, in order.
 // Anything waiting on you (a change to apply, a restart to approve) opens it by itself, and
-// pictures stay in view below it.
-export function Steps({ steps, live = false }: { steps: AgentStep[]; live?: boolean }) {
+// pictures stay in view below it. With `flame`, the Flicker itself sits beside whatever it is
+// working on right now, where a loading circle would be.
+export function Steps({ steps, live = false, flame }: { steps: AgentStep[]; live?: boolean; flame?: string }) {
   const [chosen, setChosen] = useState<boolean | null>(null);
   if (steps.length === 0 && !live) return null;
 
@@ -24,11 +25,15 @@ export function Steps({ steps, live = false }: { steps: AgentStep[]; live?: bool
   return (
     <div className={`umbra-work ${open ? 'is-open' : ''} ${live ? 'is-live' : ''}`}>
       <button type="button" className="umbra-work-head" aria-expanded={open} onClick={() => setChosen(!open)}>
-        <span className={`umbra-work-icon ${live ? 'is-spinning' : ''}`} aria-hidden />
+        {live && flame ? (
+          <Flame flame={flame} size={22} mood="working" className="umbra-work-flame" />
+        ) : (
+          <span className={`umbra-work-icon ${live ? 'is-spinning' : ''}`} aria-hidden />
+        )}
         <span className="umbra-work-title">{live ? liveTitle(running) : doneTitle(steps)}</span>
         <span className="umbra-work-chevron" aria-hidden>›</span>
       </button>
-      {open && steps.length > 0 && <StepList steps={steps} />}
+      {open && steps.length > 0 && <StepList steps={steps} flame={flame} />}
       {images.map((image) => (
         <a key={image.url} href={image.url} target="_blank" rel="noreferrer" className="umbra-step-image">
           {/* eslint-disable-next-line @next/next/no-img-element -- a picture Prism made, served by our own API */}
@@ -83,7 +88,7 @@ function formatSeconds(total: number): string {
 }
 
 // The timeline itself. Teammates' own steps (in a team chat) are listed the same way, indented.
-function StepList({ steps }: { steps: AgentStep[] }) {
+function StepList({ steps, flame }: { steps: AgentStep[]; flame?: string }) {
   return (
     <ol className="umbra-steps">
       {steps.map((step) => {
@@ -91,7 +96,11 @@ function StepList({ steps }: { steps: AgentStep[] }) {
           const kind = step.tool === 'thinking' ? 'is-thought' : 'is-note';
           return (
             <li key={step.id} className={`umbra-step ${kind} is-${step.status}`}>
-              <span className="umbra-step-mark" aria-hidden />
+              {step.status === 'running' && flame ? (
+                <Flame flame={flame} size={18} mood="working" className="umbra-step-flame is-now" />
+              ) : (
+                <span className="umbra-step-mark" aria-hidden />
+              )}
               <span className="umbra-step-body">
                 {step.tool === 'thinking' && (
                   <span className="umbra-step-label">{step.status === 'running' ? 'Thinking' : step.label}</span>
@@ -113,6 +122,8 @@ function StepList({ steps }: { steps: AgentStep[] }) {
           >
             {step.bot ? (
               <Flame flame={step.bot.flame} size={26} still mood={step.status === 'running' ? 'working' : 'idle'} className="umbra-step-flame" />
+            ) : step.status === 'running' && flame ? (
+              <Flame flame={flame} size={18} mood="working" className="umbra-step-flame is-now" />
             ) : (
               <span className="umbra-step-mark" aria-hidden>
                 {step.status === 'running' ? '' : step.status === 'done' ? '✓' : '!'}
@@ -120,7 +131,7 @@ function StepList({ steps }: { steps: AgentStep[] }) {
             )}
             <span className="umbra-step-body">
               <span className="umbra-step-label">{step.label}</span>
-              {step.children && step.children.length > 0 && <StepList steps={step.children} />}
+              {step.children && step.children.length > 0 && <StepList steps={step.children} flame={step.bot?.flame ?? flame} />}
               {step.summary && step.status !== 'running' && !step.detail && <span className="umbra-step-summary">{step.summary}</span>}
               {step.detail && step.bot && (
                 <details className="umbra-step-detail">

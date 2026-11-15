@@ -830,11 +830,19 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
 }
 /* #endregion */
 /* #region Umbra replies read like Claude's: plain words beside the flame, no bubble around them.
-   Your own messages keep theirs. */
+   Your own messages get the tinted bubble the replies used to have, mirrored to the right. */
 .umbra-message.assistant .umbra-bubble {
   padding-left: 0.25rem;
   padding-right: 0;
   background: transparent;
   border: none;
 }
+.umbra-message.user .umbra-bubble {
+  background: color-mix(in srgb, var(--bot-color) 12%, rgb(255 255 255 / 0.03));
+  border: 1px solid color-mix(in srgb, var(--bot-color) 28%, transparent);
+  border-bottom-right-radius: 4px;
+}
+/* The Flicker beside what it's working on right now, in place of a loading circle. */
+.umbra-work-flame { flex-shrink: 0; margin: -3px 0; }
+.umbra-step-flame.is-now { margin-top: -1px; }
 /* #endregion */

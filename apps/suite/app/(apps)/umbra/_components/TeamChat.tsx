@@ -238,7 +238,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
             <div className="umbra-bubble">
               {m.role === 'assistant' ? (
                 <>
-                  {m.steps && <Steps steps={m.steps} />}
+                  {m.steps && <Steps steps={m.steps} flame={leader.flame} />}
                   <ReplyContent content={m.content} onOpen={setOpenDoc} />
                 </>
               ) : (
@@ -251,7 +251,7 @@ export default function TeamChat({ teamId }: { teamId: string }) {
           <div className="umbra-message assistant">
             <Flame flame={leader.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
-              <Steps steps={liveSteps} live />
+              <Steps steps={liveSteps} live flame={leader.flame} />
             </div>
           </div>
         )}

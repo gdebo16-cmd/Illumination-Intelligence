@@ -334,7 +334,7 @@ export default function BotChat({ botId }: { botId: string }) {
             <div className="umbra-bubble">
               {m.role === 'assistant' ? (
                 <>
-                  {m.steps && <Steps steps={m.steps} />}
+                  {m.steps && <Steps steps={m.steps} flame={bot.flame} />}
                   <ReplyContent content={m.content} onOpen={setOpenDoc} />
                 </>
               ) : (
@@ -350,7 +350,7 @@ export default function BotChat({ botId }: { botId: string }) {
           <div className="umbra-message assistant">
             <Flame flame={bot.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
-              <Steps steps={liveSteps} live />
+              <Steps steps={liveSteps} live flame={bot.flame} />
             </div>
           </div>
         )}
