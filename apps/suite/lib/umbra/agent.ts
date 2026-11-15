@@ -305,13 +305,13 @@ export async function runAgent(options: {
     );
     let calls = reply.message?.tool_calls ?? [];
     let spoken = reply.message?.content ?? '';
-    // Some models write a tool request as JSON in the reply text instead of
-    // Ollama's official tool_calls slot. Turn that into a real tool request.
+    // Some models write a tool request as JSON or an XML-style tag in the reply
+    // text instead of Ollama's official tool_calls slot. Turn that into a real tool request.
     if (calls.length === 0) {
-      const fromText = parseTextToolCalls(spoken, (name) => tools.has(name));
+      const fromText = parseTextToolCalls(spoken, (name) => resolveTool(name, tools) !== null);
       if (fromText.length) {
         calls = fromText;
-        spoken = ''; // the JSON was a tool request, not the answer to show
+        spoken = ''; // the text was a tool request, not the answer to show
       }
     }
 
@@ -372,10 +372,10 @@ export async function runAgent(options: {
     }
 
     // The model wants to use tools. Keep its request in the conversation, then run each one.
-    const parsed = calls.map((c) => ({
-      name: c.function.name,
-      args: typeof c.function.arguments === 'string' ? safeJson(c.function.arguments) : c.function.arguments ?? {},
-    }));
+    const parsed = calls.map((c) => {
+      const args = typeof c.function.arguments === 'string' ? safeJson(c.function.arguments) : c.function.arguments ?? {};
+      return resolveTool(c.function.name, tools)?.(args) ?? { name: c.function.name, args };
+    });
     // What it said on the way ("First I'll look at the config"), shown with its steps.
     if (spoken.trim()) {
       const note: AgentStep = { id: crypto.randomUUID(), tool: 'note', label: 'Update', status: 'done', thought: spoken.trim() };
@@ -448,10 +448,39 @@ function joinPieces(first: string, second: string): string {
 }
 
 /**
+ * Models often guess generic tool names (list_folder, read_file, search_code) that this bot
+ * doesn't have, e.g. when it works through the Refract tools instead. Map a guess onto the bot's
+ * matching tool, renaming arguments where they differ. Returns null if nothing fits.
+ */
+const TOOL_ALIASES: Record<string, { name: string; args?: Record<string, string> }[]> = {
+  list_folder: [{ name: 'refract_list' }],
+  read_file: [{ name: 'refract_read' }],
+  search_code: [{ name: 'refract_search', args: { text: 'query' } }],
+  refract_list: [{ name: 'list_folder' }],
+  refract_read: [{ name: 'read_file' }],
+  refract_search: [{ name: 'search_code', args: { query: 'text' } }],
+};
+
+function resolveTool(
+  name: string,
+  tools: ReadonlyMap<string, unknown>,
+): ((args: Record<string, unknown>) => { name: string; args: Record<string, unknown> }) | null {
+  if (tools.has(name)) return (args) => ({ name, args });
+  const alias = TOOL_ALIASES[name]?.find((a) => tools.has(a.name));
+  if (!alias) return null;
+  return (args) => {
+    const renamed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(args)) renamed[alias.args?.[key] ?? key] = value;
+    return { name: alias.name, args: renamed };
+  };
+}
+
+/**
  * Some models (Devstral, for example) write a tool request as JSON in the reply
  * text instead of Ollama's official tool_calls slot: {"name": "search_code",
- * "arguments": {"text": "page.tsx"}}. If that JSON names a real tool, treat it
- * as a real request so the tool actually runs.
+ * "arguments": {"text": "page.tsx"}}, or as an XML-style tag:
+ * <search_code text="page.tsx"/>. If it names a real tool, treat it as a real
+ * request so the tool actually runs.
  */
 function parseTextToolCalls(
   content: string,
@@ -503,6 +532,18 @@ function parseTextToolCalls(
     } catch {
       // keep looking
     }
+  }
+  if (found.length) return found;
+
+  // Others write it as an XML-style tag: <list_folder path="src"/>. Only tags
+  // that name a real tool count, so ordinary HTML in a reply is left alone.
+  for (const m of unfenced.matchAll(/<([a-z_][a-z0-9_]*)((?:\s+[a-z_][a-z0-9_]*\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*\/?>/gi)) {
+    if (!isTool(m[1])) continue;
+    const args: Record<string, unknown> = {};
+    for (const a of m[2].matchAll(/([a-z_][a-z0-9_]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+      args[a[1]] = a[2] ?? a[3] ?? '';
+    }
+    found.push({ function: { name: m[1], arguments: args } });
   }
   return found;
 }
