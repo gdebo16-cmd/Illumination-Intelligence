@@ -152,6 +152,32 @@ export function chatContext(chat: ChatRef): { summary: string; history: HistoryM
   return { summary: state.summary, history: messagesAfter(chat, state.summaryUpto) };
 }
 
+export function getGasGauge(history: HistoryMessage[], budget: number): number {
+  return (calculateUsedHistory(history) / budget) * 100;
+}
+
+export function calculateUsedHistory(history: HistoryMessage[]): number {
+  return history.reduce((acc, m) => acc + sizeOf(m), 0);
+}
+
+export function foldSummary(chat: ChatRef, history: HistoryMessage[]): void {
+  const state = stateOf(chat.key);
+  const { summary, summaryUpto } = state;
+  
+  // Take the first 5 messages that haven't been summarized yet
+  const toFold = history.slice(0, 5);
+  const contentToFold = toFold.map(m => m.content).join('\n');
+  
+  // In a real scenario, we'd call the LLM here to create a new summary
+  // For now, we'll just append the content to the existing summary
+  const newSummary = summary + '\n' + contentToFold;
+  
+  saveState(chat.key, {
+    summary: newSummary,
+    summaryUpto: summaryUpto + toFold.length
+  });
+}
+
 /** Forget a chat's summary and saved exchanges (when the chat is deleted or cleared). */
 export function forgetChat(key: string): void {
   db.prepare('DELETE FROM ChatMemory WHERE chat = ?').run(key);
@@ -336,6 +362,17 @@ async function embedNewEpisodes(chat: ChatRef): Promise<void> {
   } finally {
     embedding.delete(chat.key);
   }
+}
+
+/** Calculate the total "weight" of a message history. */
+export function calculateUsedHistory(history: HistoryMessage[]): number {
+  return history.reduce((sum, m) => sum + m.content.length + (m.images.length * 100), 0);
+}
+
+/** Returns a 0-100% gauge of the current history relative to the budget. */
+export function getGasGauge(history: HistoryMessage[], budget: number): number {
+  const used = calculateUsedHistory(history);
+  return Math.min(100, Math.round((used / budget) * 100));
 }
 
 // Fold when the messages since the summary pass this share of their budget, down to this share.

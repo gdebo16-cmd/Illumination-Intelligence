@@ -17,7 +17,7 @@ import { getCurrentUserId, noProfile } from '@/lib/user';
 import { USERS } from '@/lib/profiles';
 import { addMessage, getBot, systemPrompt } from '@/lib/umbra/bots';
 import { botHistoryBudget, type ChatMessage } from '@/lib/umbra/agent';
-import { chatContext, fitHistory, recall, umbraChat, getGasGauge, foldSummary } from '@/lib/chat-memory';
+import { chatContext, fitHistory, recall, umbraChat, foldSummary, getGasGauge } from '@/lib/chat-memory';
 import { activeRun, RunBusyError, startRun, workshopPrompt } from '@/lib/umbra/runs';
 import { canSeeImages } from '@/config/models';
 import { chatKey, PhotoError, preparePhotos, savePhotos, uploadedPhotos, withPhotos } from '@/lib/chat-images';
@@ -116,11 +116,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // older part, past exchanges that match, and with Memory on what it knows about you;
   // lib/chat-memory.ts), the newest messages word for word, and the new message.
   const chat = umbraChat(userId, bot.id);
-  const { summary, history } = chatContext(chat);
+  let { summary, history } = chatContext(chat);
+
+  // Calculate the budget for the recent messages.
+  const budget = historyBudget(
+    bot.numCtx,
+    systemPrompt.length,
+    bot.tools.length > 0 ? 0.8 : 1
+  );
+
+  // This is the "Gas Gauge" check.
+  const gauge = getGasGauge(history, budget);
+  if (gauge > 90) {
+    foldSummary(chat, history);
+    const { history: freshHistory } = chatContext(chat);
+    history = freshHistory;
+  }
+
   const sent = addMessage(bot.id, 'user', message, undefined, savePhotos(userId, chatKey.umbra(bot.id), photos));
   // withPhotos swaps photo ids for the pictures themselves, when this bot's model can see them.
   const repo = bot.tools.includes('refract') ? readSelectedRepo(body.repo) : null;
   const sheet = systemPrompt(bot, USERS[userId]) + workshopPrompt(repo ?? undefined);
+<<<<<<< HEAD
+  const recent = fitHistory(
+=======
 
   const budget = botHistoryBudget(bot.tools, sheet.length, bot.think);
   const gauge = getGasGauge(history, budget);
@@ -132,6 +151,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const recent = fitHistory(history, Math.max(2000, budget - message.length));
+>>>>>>> origin/main
   const remembered = await recall(chat, {
     summary, recent, message,
     facts: bot.tools.includes('notes') ? { botId: bot.id, userName: USERS[userId] } : false,
