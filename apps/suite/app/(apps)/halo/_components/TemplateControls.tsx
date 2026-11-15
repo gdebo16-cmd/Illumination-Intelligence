@@ -1,18 +1,30 @@
 "use client";
 
 // Halo's Templates mode: pick a ready-made animation (lib/halo/templates.ts) and change its settings.
-// Each template lists its own settings, so this one screen draws the right controls for any of them.
+// Each template lists its own settings and parts, so this one screen draws the right controls for
+// any of them, including the Layers panel (the same options for every part).
 
-import { TEMPLATES, type Template, type TemplateValues } from "@/lib/halo/templates";
+import {
+  DEFAULT_LAYER,
+  partsOf,
+  settingShown,
+  TEMPLATES,
+  type LayerOptions,
+  type Template,
+  type TemplateLayers,
+  type TemplateValues,
+} from "@/lib/halo/templates";
 
 interface Props {
   template: Template;
   values: TemplateValues;
+  layers: TemplateLayers;
   onPick: (t: Template) => void;
   onChange: (id: string, value: string | number | boolean) => void;
+  onLayerChange: (partId: string, change: Partial<LayerOptions>) => void;
 }
 
-export default function TemplateControls({ template, values, onPick, onChange }: Props) {
+export default function TemplateControls({ template, values, layers, onPick, onChange, onLayerChange }: Props) {
   return (
     <>
       <section className="halo-panel" aria-label="Template">
@@ -35,7 +47,7 @@ export default function TemplateControls({ template, values, onPick, onChange }:
 
       <section className="halo-panel" aria-label="Settings">
         <h2>Settings</h2>
-        {template.settings.map((s) => {
+        {template.settings.filter((s) => settingShown(template, s, values)).map((s) => {
           const value = values[s.id] ?? s.default;
           if (s.kind === "color")
             return (
@@ -83,6 +95,83 @@ export default function TemplateControls({ template, values, onPick, onChange }:
           );
         })}
         <p className="halo-note">{template.howToUse}</p>
+      </section>
+
+      <section className="halo-panel" aria-label="Layers">
+        <h2>Layers</h2>
+        <p className="halo-help">Each part of the template, top to bottom. Untick one to hide it.</p>
+        {partsOf(template, values).map((p) => {
+          const o = { ...DEFAULT_LAYER, ...layers[p.id] };
+          return (
+            <div key={p.id} className={`halo-layer ${o.visible ? "" : "is-hidden"}`}>
+              <label className="halo-layer-name">
+                <input type="checkbox" checked={o.visible} onChange={(e) => onLayerChange(p.id, { visible: e.target.checked })} />
+                {p.name}
+              </label>
+              {o.visible && (
+                <div className="halo-layer-options">
+                  <label>
+                    Solid
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={o.opacity}
+                      aria-label={`${p.name}: how solid`}
+                      onChange={(e) => onLayerChange(p.id, { opacity: Number(e.target.value) })}
+                    />
+                    <span>{o.opacity}%</span>
+                  </label>
+                  {p.canShade && (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={o.shade !== null}
+                        onChange={(e) => onLayerChange(p.id, { shade: e.target.checked ? "#000000" : null })}
+                      />
+                      Shading to
+                      <input
+                        type="color"
+                        value={o.shade ?? "#000000"}
+                        disabled={o.shade === null}
+                        aria-label={`${p.name}: shading colour`}
+                        onChange={(e) => onLayerChange(p.id, { shade: e.target.value })}
+                      />
+                    </label>
+                  )}
+                  {p.canOutline && (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={o.outline !== null}
+                        onChange={(e) => onLayerChange(p.id, { outline: e.target.checked ? { color: "#000000", width: 4 } : null })}
+                      />
+                      Outline
+                      <input
+                        type="color"
+                        value={o.outline?.color ?? "#000000"}
+                        disabled={!o.outline}
+                        aria-label={`${p.name}: outline colour`}
+                        onChange={(e) => o.outline && onLayerChange(p.id, { outline: { ...o.outline, color: e.target.value } })}
+                      />
+                      <input
+                        type="range"
+                        min={1}
+                        max={16}
+                        step={1}
+                        value={o.outline?.width ?? 4}
+                        disabled={!o.outline}
+                        aria-label={`${p.name}: outline thickness`}
+                        onChange={(e) => o.outline && onLayerChange(p.id, { outline: { ...o.outline, width: Number(e.target.value) } })}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </section>
     </>
   );

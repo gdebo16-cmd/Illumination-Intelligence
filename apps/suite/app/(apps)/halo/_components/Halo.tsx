@@ -17,7 +17,16 @@ import {
 import { parsePath, toSvgPath, type Bezier } from "@/lib/halo/path";
 import { buildLottie, MAX_INNER_LAYERS, type InnerLayer, type MoveSetting } from "@/lib/halo/lottie";
 import type { DescribedAnimation, DescribedShape } from "@/lib/halo/describe";
-import { defaultValues, TEMPLATES, type Template, type TemplateValues } from "@/lib/halo/templates";
+import {
+  defaultValues,
+  TEMPLATES,
+  type LayerOptions,
+  type Template,
+  type TemplateLayers,
+  type TemplateValues,
+} from "@/lib/halo/templates";
+
+const NO_LAYERS: TemplateLayers = {}; // one shared empty object, so the preview doesn't restart for nothing
 import TemplateControls from "./TemplateControls";
 
 type Upload = { name: string; paths: Bezier[]; skipped: string[] };
@@ -42,6 +51,8 @@ export default function Halo() {
   const [mode, setMode] = useState<"shape" | "template">("shape");
   const [template, setTemplate] = useState<Template>(TEMPLATES[0]);
   const [templateValues, setTemplateValues] = useState<Record<string, TemplateValues>>({});
+  const [templateLayers, setTemplateLayers] = useState<Record<string, TemplateLayers>>({});
+  const currentLayers = templateLayers[template.id] ?? NO_LAYERS;
   // useMemo so the defaults are the same object each time; a new one would restart the preview.
   const currentValues = useMemo(() => templateValues[template.id] ?? defaultValues(template), [templateValues, template]);
   const [error, setError] = useState<string | null>(null);
@@ -58,9 +69,9 @@ export default function Halo() {
   const animation = useMemo(
     () =>
       mode === "template"
-        ? template.build(currentValues, name.trim() || template.name)
+        ? template.build(currentValues, name.trim() || template.name, currentLayers)
         : buildLottie({ name: name.trim() || "Halo animation", paths, color, moves, seconds, pivot, shade, outline, inner }),
-    [mode, template, currentValues, name, paths, color, moves, seconds, pivot, shade, outline, inner],
+    [mode, template, currentValues, currentLayers, name, paths, color, moves, seconds, pivot, shade, outline, inner],
   );
 
   const pickMode = (next: "shape" | "template") => {
@@ -73,6 +84,11 @@ export default function Halo() {
     setTemplate(t);
     setName(t.name);
   };
+  const changeLayer = (partId: string, change: Partial<LayerOptions>) =>
+    setTemplateLayers((all) => {
+      const mine = all[template.id] ?? {};
+      return { ...all, [template.id]: { ...mine, [partId]: { ...mine[partId], ...change } as LayerOptions } };
+    });
   const changeTemplateValue = (id: string, value: string | number | boolean) =>
     setTemplateValues((all) => ({ ...all, [template.id]: { ...(all[template.id] ?? defaultValues(template)), [id]: value } }));
 
@@ -224,7 +240,14 @@ export default function Halo() {
           {error && <p className="halo-error" role="alert">{error}</p>}
 
           {mode === "template" && (
-            <TemplateControls template={template} values={currentValues} onPick={pickTemplate} onChange={changeTemplateValue} />
+            <TemplateControls
+              template={template}
+              values={currentValues}
+              layers={currentLayers}
+              onPick={pickTemplate}
+              onChange={changeTemplateValue}
+              onLayerChange={changeLayer}
+            />
           )}
 
           {mode === "shape" && (<>
