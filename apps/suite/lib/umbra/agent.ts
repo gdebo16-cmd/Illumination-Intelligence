@@ -215,7 +215,7 @@ export async function runAgent(options: {
     // Some models write a tool request as JSON or an XML-style tag in the reply
     // text instead of Ollama's official tool_calls slot. Turn that into a real tool request.
     if (calls.length === 0) {
-      const fromText = parseTextToolCalls(spoken, (name) => tools.has(name));
+      const fromText = parseTextToolCalls(spoken, (name) => resolveTool(name, tools) !== null);
       if (fromText.length) {
         calls = fromText;
         spoken = ''; // the text was a tool request, not the answer to show
@@ -241,10 +241,10 @@ export async function runAgent(options: {
     }
 
     // The model wants to use tools. Keep its request in the conversation, then run each one.
-    const parsed = calls.map((c) => ({
-      name: c.function.name,
-      args: typeof c.function.arguments === 'string' ? safeJson(c.function.arguments) : c.function.arguments ?? {},
-    }));
+    const parsed = calls.map((c) => {
+      const args = typeof c.function.arguments === 'string' ? safeJson(c.function.arguments) : c.function.arguments ?? {};
+      return resolveTool(c.function.name, tools)?.(args) ?? { name: c.function.name, args };
+    });
     messages.push({
       role: 'assistant',
       content: spoken,
@@ -302,6 +302,34 @@ export async function runAgent(options: {
   return { reply: '…', steps }; // not reached: the last round always returns
 }
 
+
+/**
+ * Models often guess generic tool names (list_folder, read_file, search_code) that this bot
+ * doesn't have, e.g. when it works through the Refract tools instead. Map a guess onto the bot's
+ * matching tool, renaming arguments where they differ. Returns null if nothing fits.
+ */
+const TOOL_ALIASES: Record<string, { name: string; args?: Record<string, string> }[]> = {
+  list_folder: [{ name: 'refract_list' }],
+  read_file: [{ name: 'refract_read' }],
+  search_code: [{ name: 'refract_search', args: { text: 'query' } }],
+  refract_list: [{ name: 'list_folder' }],
+  refract_read: [{ name: 'read_file' }],
+  refract_search: [{ name: 'search_code', args: { query: 'text' } }],
+};
+
+function resolveTool(
+  name: string,
+  tools: ReadonlyMap<string, unknown>,
+): ((args: Record<string, unknown>) => { name: string; args: Record<string, unknown> }) | null {
+  if (tools.has(name)) return (args) => ({ name, args });
+  const alias = TOOL_ALIASES[name]?.find((a) => tools.has(a.name));
+  if (!alias) return null;
+  return (args) => {
+    const renamed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(args)) renamed[alias.args?.[key] ?? key] = value;
+    return { name: alias.name, args: renamed };
+  };
+}
 
 /**
  * Some models (Devstral, for example) write a tool request as JSON in the reply
