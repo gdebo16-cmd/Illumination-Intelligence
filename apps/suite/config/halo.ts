@@ -86,8 +86,15 @@ export const MOVES: readonly Move[] = [
     name: 'Flicker',
     description: 'Restless, uneven stretching and dimming, like firelight.',
     apply: (t, s) => {
-      // TODO(human): write the flicker recipe.
-      return {};
+      // Three waves at uneven speeds (3, 7 and 13 per loop) added together, so the pattern never looks
+      // like a steady beat. Whole numbers of waves, so the loop still ends where it started.
+      const jitter = wave(t, 3) + 0.5 * wave(t, 7) + 0.25 * wave(t, 13);
+      return {
+        scaleY: 1 + 0.07 * s * jitter, // reaches up…
+        scaleX: 1 - 0.035 * s * jitter, // …and gets thinner as it does, like a real flame
+        rotate: 2.5 * s * wave(t, 5), // a small nervous lean
+        opacity: 1 - 0.2 * s * swell(t, 4) * swell(t, 9), // brief dips in brightness
+      };
     },
   },
 ];
