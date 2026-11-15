@@ -33,12 +33,69 @@ const READING_TOOLS: ToolId[] = ['web_search', 'read_webpage', 'code', 'refract'
 export const numCtxFor = (toolIds: ToolId[]) =>
   toolIds.some((id) => READING_TOOLS.includes(id)) ? OLLAMA_NUM_CTX : OLLAMA_CHAT_NUM_CTX;
 
+// Thinking is written into the same window as the answer, before it. A bot that thinks keeps this
+// much more room free (in tokens), so the thinking doesn't leave too little for the answer itself.
+const THINKING_ROOM_TOKENS = 2048;
+
 /**
  * How many characters of earlier chat a bot with these tools reads, next to a character sheet
- * `promptChars` long. A bot with tools keeps half its room free for what the tools bring back.
+ * `promptChars` long. A bot with tools keeps half its room free for what the tools bring back,
+ * and a bot that thinks keeps extra room for its thinking.
  */
-export const botHistoryBudget = (toolIds: ToolId[], promptChars: number) =>
-  historyBudget(numCtxFor(toolIds), promptChars, toolIds.length ? 0.5 : 1);
+export const botHistoryBudget = (toolIds: ToolId[], promptChars: number, think = false) => {
+  const numCtx = numCtxFor(toolIds);
+  const thinkingRoom = think ? Math.min(THINKING_ROOM_TOKENS, Math.floor(numCtx / 4)) * 3 : 0;
+  return historyBudget(numCtx, promptChars + thinkingRoom, toolIds.length ? 0.5 : 1);
+};
+
+// How the conversation is kept inside the window while a bot works (about 3 characters a token).
+/** One tool result may take at most this share of the window. */
+const TOOL_RESULT_SHARE = 0.25;
+/** Before each step, older tool results are shortened until the conversation fits in this share… */
+const WORKING_SHARE = 0.7;
+/** …down to this many characters each. */
+const SHORTENED_TOOL_CHARS = 1200;
+
+/** Cut text to `max` characters, saying that it was cut. */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n\n[…cut: ${text.length - max} more characters left out to save room.]`;
+}
+
+/**
+ * Keep the conversation inside the window: while it is too long, shorten the oldest tool results
+ * (never the newest one, which the model is about to read). The system prompt and the chat itself
+ * are left alone; their size was already fitted before the run (lib/chat-memory.ts).
+ */
+function fitToWindow(messages: ChatMessage[], numCtx: number) {
+  const limit = numCtx * 3 * WORKING_SHARE;
+  const size = () => messages.reduce((n, m) => n + m.content.length + (m.thinking?.length ?? 0), 0);
+  let total = size();
+  if (total <= limit) return;
+  const lastTool = messages.map((m) => m.role).lastIndexOf('tool');
+  for (let i = 0; i < messages.length && total > limit; i++) {
+    const m = messages[i];
+    if (i === lastTool) continue;
+    // Old thinking can go first: the model only needs its conclusions.
+    if (m.thinking) {
+      total -= m.thinking.length;
+      messages[i] = { ...m, thinking: undefined };
+    }
+    if (m.role === 'tool' && m.content.length > SHORTENED_TOOL_CHARS) {
+      const short = clip(m.content, SHORTENED_TOOL_CHARS);
+      total -= m.content.length - short.length;
+      messages[i] = { ...messages[i], content: short };
+    }
+  }
+}
+
+// When the window fills up part-way through a reply, Ollama stops and says why ("length"). The bot
+// is then asked to go on from where it stopped, this many times at most, before the reply is kept
+// as it is, marked as cut off.
+const MAX_CONTINUES = 2;
+const CONTINUE_PROMPT =
+  'Your reply was cut off. Continue exactly where you stopped, without repeating anything or starting over.';
+const CUT_OFF_NOTE = '\n\n_(This reply was cut off: it ran out of room. Ask me to go on.)_';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -52,6 +109,8 @@ interface ChatMessage {
 }
 
 interface OllamaReply {
+  /** Why the model stopped: "stop" when it finished, "length" when it ran out of room. */
+  done_reason?: string;
   message?: {
     content?: string;
     thinking?: string;
@@ -113,10 +172,12 @@ async function readThinkingReply(res: Response, onThinking: (thinking: string) =
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let doneReason: string | undefined;
   const take = (line: string) => {
     if (!line.trim()) return;
     const piece = JSON.parse(line) as OllamaReply & { error?: string };
     if (piece.error) throw new Error(`Ollama error: ${piece.error}`);
+    if (piece.done_reason) doneReason = piece.done_reason;
     if (piece.message?.thinking) {
       message.thinking += piece.message.thinking;
       onThinking(message.thinking);
@@ -135,7 +196,7 @@ async function readThinkingReply(res: Response, onThinking: (thinking: string) =
     }
   }
   take(buffer);
-  return { message };
+  return { message, done_reason: doneReason };
 }
 
 // How much of the thinking is sent to the chat while it is still growing (the page shows only the
@@ -206,6 +267,7 @@ export async function runAgent(options: {
       options.onStep({ ...thought, thought: thinking.slice(-LIVE_THOUGHT_CHARS) });
     };
 
+    fitToWindow(messages, numCtx);
     const reply = await askModel(
       options.model, messages, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
       thinks ? showThinking : undefined,
@@ -237,7 +299,26 @@ export async function runAgent(options: {
     }
 
     if (calls.length === 0 || lastRound) {
-      return { reply: reply.message?.content?.trim() || '…', steps };
+      let answer = reply.message?.content ?? '';
+      let cutOff = reply.done_reason === 'length';
+      // Ran out of room part-way: make room and ask the model to go on from where it stopped.
+      // Without thinking this time, so all the room goes to the answer.
+      for (let tries = 0; cutOff && tries < MAX_CONTINUES; tries++) {
+        const more = [
+          ...messages,
+          ...(answer.trim() ? [{ role: 'assistant' as const, content: answer }] : []),
+          { role: 'user' as const, content: answer.trim() ? CONTINUE_PROMPT : 'Answer now, briefly, without thinking it through again.' },
+        ];
+        fitToWindow(more, numCtx);
+        const next = await askModel(options.model, more, [], numCtx, options.priority ?? 'high', options.context.userId);
+        const piece = next.message?.content ?? '';
+        if (!piece.trim()) break;
+        answer = answer.trim() ? joinPieces(answer, piece) : piece;
+        cutOff = next.done_reason === 'length';
+      }
+      answer = answer.trim();
+      if (cutOff && answer) answer += CUT_OFF_NOTE;
+      return { reply: answer || '…', steps };
     }
 
     // The model wants to use tools. Keep its request in the conversation, then run each one.
@@ -295,13 +376,20 @@ export async function runAgent(options: {
 
       steps.push(step);
       options.onStep({ ...step });
-      messages.push({ role: 'tool', tool_name: call.name, content: output });
+      messages.push({ role: 'tool', tool_name: call.name, content: clip(output, Math.floor(numCtx * 3 * TOOL_RESULT_SHARE)) });
       checkpoint(round);
     }
   }
   return { reply: '…', steps }; // not reached: the last round always returns
 }
 
+/** Put a continued reply back together, keeping the space (or line break) between the two pieces. */
+function joinPieces(first: string, second: string): string {
+  if (/\s$/.test(first) || /^\s/.test(second)) return first + second;
+  // The model almost always stops between words (its pieces of text start with the space), so the
+  // two parts get a space between them, unless the second goes on with punctuation.
+  return /^[.,;:!?)\]}'’"]/.test(second) ? first + second : `${first} ${second}`;
+}
 
 /**
  * Some models (Devstral, for example) write a tool request as JSON in the reply

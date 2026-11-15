@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const leader = team.leader;
   const chat = teamChat(userId, team.id);
   const { summary, history: all } = chatContext(chat);
-  const budget = botHistoryBudget(leader.tools, leaderPromptChars(team, userName));
+  const budget = botHistoryBudget(leader.tools, leaderPromptChars(team, userName), leader.think);
   const recent = fitHistory(all, Math.max(2000, budget - message.length));
   const remembered = await recall(chat, { summary, recent, message, facts: false });
   const history = recent.map((m) => ({ role: m.role, content: m.content }));

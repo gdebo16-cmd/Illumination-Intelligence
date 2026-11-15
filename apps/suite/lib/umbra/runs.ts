@@ -431,7 +431,7 @@ function launch(run: {
       // summary once it has grown (lib/chat-memory.ts).
       maintainChat(
         umbraChat(userId, bot.id), run.model, numCtxFor(run.toolIds),
-        botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0),
+        botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0, run.think),
       );
       // With Memory on, read what you said for things worth remembering, as Lumen does. Only for
       // your own chat: a job another Flicker handed over isn't you talking.
