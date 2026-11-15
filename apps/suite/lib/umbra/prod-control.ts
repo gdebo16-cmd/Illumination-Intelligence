@@ -186,11 +186,19 @@ function launchRestart(id: string): void {
   if (!fs.existsSync(/* turbopackIgnore: true */ SCRIPT)) throw new Error('The restart script (apps/suite/scripts/prod-restart.ps1) is missing.');
   const now = new Date().toISOString();
   writeResult({ id, status: 'queued', message: 'Starting in a few seconds.', startedAt: now, updatedAt: now, finishedAt: null });
-  const child = spawn(
-    'powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', SCRIPT, '-Id', id, '-Suite', APP_DIR, '-Result', RESULT_FILE],
-    { cwd: APP_DIR, detached: true, stdio: 'ignore', windowsHide: true, env: scriptEnv() as NodeJS.ProcessEnv },
-  );
+  // PowerShell is started through `cmd /c start`, not spawned directly. Two Windows traps:
+  //   - `detached: true` means DETACHED_PROCESS (no console), and Windows PowerShell 5.1 then
+  //     exits with code 0 without running a line of the script: the card sat at "queued" forever.
+  //   - Without `detached`, Node puts the child in a kill-on-close job object, so the script would
+  //     die the moment it stopped prod (this server) in step 3.
+  // `start` gives PowerShell its own console outside the job. Every value is quoted for cmd; the
+  // id is a UUID and the paths are the app's own, so there are no quotes inside them.
+  const psArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', SCRIPT, '-Id', id, '-Suite', APP_DIR, '-Result', RESULT_FILE];
+  const line = 'start "" /min powershell.exe ' + psArgs.map((a) => (a.startsWith('-') ? a : `"${a}"`)).join(' ');
+  const child = spawn('cmd.exe', ['/d', '/s', '/c', `"${line}"`], {
+    cwd: APP_DIR, detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true,
+    env: scriptEnv() as NodeJS.ProcessEnv,
+  });
   child.on('error', (err) => {
     const at = new Date().toISOString();
     writeResult({ id, status: 'failed', stage: 'start', message: `The restart script couldn't start: ${err.message}`, startedAt: now, updatedAt: at, finishedAt: at });
