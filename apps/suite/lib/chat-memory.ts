@@ -329,6 +329,17 @@ async function embedNewEpisodes(chat: ChatRef): Promise<void> {
   }
 }
 
+/** Calculate the total "weight" of a message history. */
+export function calculateUsedHistory(history: HistoryMessage[]): number {
+  return history.reduce((sum, m) => sum + m.content.length + (m.images.length * 100), 0);
+}
+
+/** Returns a 0-100% gauge of the current history relative to the budget. */
+export function getGasGauge(history: HistoryMessage[], budget: number): number {
+  const used = calculateUsedHistory(history);
+  return Math.min(100, Math.round((used / budget) * 100));
+}
+
 // Fold when the messages since the summary pass this share of their budget, down to this share.
 const FOLD_ABOVE = 0.9;
 const FOLD_DOWN_TO = 0.5;
