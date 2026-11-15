@@ -299,10 +299,18 @@ export async function runAgent(options: {
     fitToWindow(messages, numCtx);
     // A bot that ran out of steps mid-job says where it got to instead of just stopping.
     const asked = lastRound && round > 0 ? [...messages, { role: 'system' as const, content: LAST_ROUND_PROMPT }] : messages;
+    const askedAt = Date.now();
     const reply = await askModel(
       options.model, asked, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
       thinks ? showThinking : undefined,
     );
+    // Some models write their thinking into the reply itself, between <think> tags. Move it to
+    // where thinking goes, so the reply is only the answer.
+    if (reply.message) {
+      const split = splitThinking(reply.message.content ?? '');
+      reply.message.content = split.content;
+      if (split.thinking) reply.message.thinking = [reply.message.thinking, split.thinking].filter(Boolean).join('\n\n');
+    }
     let calls = reply.message?.tool_calls ?? [];
     let spoken = reply.message?.content ?? '';
     // Some models write a tool request as JSON or an XML-style tag in the reply
@@ -317,7 +325,13 @@ export async function runAgent(options: {
 
     // The thinking is over: keep it with the reply, folded away under how long it took.
     const thinking = reply.message?.thinking?.trim() ?? '';
-    if (thought && thinking) {
+    if (thinking) {
+      // Thinking that came inside the reply wasn't shown live: it took about as long as the reply.
+      if (!thought) {
+        thought = { id: crypto.randomUUID(), tool: 'thinking', label: 'Thinking', status: 'running' };
+        thinkingFrom = askedAt;
+        thinkingUntil = Date.now();
+      }
       const seconds = Math.max(1, Math.round((thinkingUntil - thinkingFrom) / 1000));
       const done: AgentStep = {
         ...thought,
@@ -361,7 +375,7 @@ export async function runAgent(options: {
         ];
         fitToWindow(more, numCtx);
         const next = await askModel(options.model, more, [], numCtx, options.priority ?? 'high', options.context.userId);
-        const piece = next.message?.content ?? '';
+        const piece = splitThinking(next.message?.content ?? '').content;
         if (!piece.trim()) break;
         answer = answer.trim() ? joinPieces(answer, piece) : piece;
         cutOff = next.done_reason === 'length';
@@ -437,6 +451,33 @@ export async function runAgent(options: {
     }
   }
   return { reply: '…', steps }; // not reached: the last round always returns
+}
+
+/**
+ * Split thinking written inside a reply (<think>…</think>, as DeepSeek-R1 and Qwen do when their
+ * thinking isn't switched on through Ollama) from the answer. Also handles a reply whose opening
+ * <think> tag was left out, and one cut off before its closing tag.
+ */
+function splitThinking(text: string): { thinking: string; content: string } {
+  if (!/<\/?think>/i.test(text)) return { thinking: '', content: text };
+  const parts: string[] = [];
+  let content = text.replace(/<think>([\s\S]*?)<\/think>/gi, (_, inner: string) => {
+    parts.push(inner.trim());
+    return '';
+  });
+  // "…thinking…</think>answer": the opening tag was in the prompt template, not the reply.
+  const close = content.search(/<\/think>/i);
+  if (close >= 0) {
+    parts.unshift(content.slice(0, close).trim());
+    content = content.slice(close).replace(/^<\/think>/i, '');
+  }
+  // "<think>thinking…" with no end: it never got to the answer.
+  const open = content.search(/<think>/i);
+  if (open >= 0) {
+    parts.push(content.slice(open + '<think>'.length).trim());
+    content = content.slice(0, open);
+  }
+  return { thinking: parts.filter(Boolean).join('\n\n'), content: content.trim() };
 }
 
 /** Put a continued reply back together, keeping the space (or line break) between the two pieces. */

@@ -7,19 +7,18 @@ import Flame from './Flame';
 import type { AgentStep, ApprovalRequest, CodeEdit } from './types';
 
 // The work behind a reply, folded into one line above it, the way Claude shows its thinking.
-// While the Flicker works, the line says what it is doing right now, with the newest line of its
-// thinking underneath. Afterwards it sums the work up ("Thought for 12s · 4 steps"). Tap it to
+// While the Flicker works, the line says what it is doing right now (while it thinks, the newest
+// line of its thinking). Afterwards it sums the work up ("Thought for 12s · 4 steps"). Tap it to
 // open the timeline: thinking, what the bot said on the way, and each tool, in order.
 // Anything waiting on you (a change to apply, a restart to approve) opens it by itself, and
 // pictures stay in view below it.
 export function Steps({ steps, live = false }: { steps: AgentStep[]; live?: boolean }) {
   const [chosen, setChosen] = useState<boolean | null>(null);
-  if (steps.length === 0) return null;
+  if (steps.length === 0 && !live) return null;
 
   const waiting = steps.some(needsYou);
   const open = chosen ?? waiting;
   const running = live ? deepestRunning(steps) : undefined;
-  const preview = running?.thought ? lastLine(running.thought) : '';
   const images = open ? [] : steps.flatMap((s) => (s.image ? [s.image] : []));
 
   return (
@@ -29,8 +28,7 @@ export function Steps({ steps, live = false }: { steps: AgentStep[]; live?: bool
         <span className="umbra-work-title">{live ? liveTitle(running) : doneTitle(steps)}</span>
         <span className="umbra-work-chevron" aria-hidden>›</span>
       </button>
-      {!open && preview && <span className="umbra-work-preview">{preview}</span>}
-      {open && <StepList steps={steps} />}
+      {open && steps.length > 0 && <StepList steps={steps} />}
       {images.map((image) => (
         <a key={image.url} href={image.url} target="_blank" rel="noreferrer" className="umbra-step-image">
           {/* eslint-disable-next-line @next/next/no-img-element -- a picture Prism made, served by our own API */}
@@ -58,8 +56,8 @@ function deepestRunning(steps: AgentStep[]): AgentStep | undefined {
 const lastLine = (text: string) => text.trim().split(/\n+/).pop()?.trim() ?? '';
 
 function liveTitle(running: AgentStep | undefined): string {
-  if (!running) return 'Working…';
-  if (running.tool === 'thinking') return 'Thinking…';
+  if (!running) return 'Thinking…';
+  if (running.tool === 'thinking') return (running.thought && lastLine(running.thought)) || 'Thinking…';
   return `${running.label}…`;
 }
 

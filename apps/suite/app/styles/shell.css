@@ -802,16 +802,6 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
   transition: transform 0.15s ease;
 }
 .umbra-work.is-open .umbra-work-chevron { transform: rotate(90deg); }
-/* Folded while it works: the newest line of its thinking, under the title. */
-.umbra-work-preview {
-  padding-left: 1.6rem;
-  font-size: 0.8rem;
-  font-style: italic;
-  color: #9a9cb8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 /* Open: the timeline, joined by a thin line down the left. */
 .umbra-work > .umbra-steps {
   margin: 0 0 0 0.45rem;
@@ -837,5 +827,14 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
   .umbra-work-chevron { transition: none; }
   .umbra-work.is-live .umbra-work-title,
   .umbra-step.is-thought.is-running .umbra-step-mark { animation: none; }
+}
+/* #endregion */
+/* #region Umbra replies read like Claude's: plain words beside the flame, no bubble around them.
+   Your own messages keep theirs. */
+.umbra-message.assistant .umbra-bubble {
+  padding-left: 0.25rem;
+  padding-right: 0;
+  background: transparent;
+  border: none;
 }
 /* #endregion */
