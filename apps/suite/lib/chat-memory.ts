@@ -143,6 +143,32 @@ export function chatContext(chat: ChatRef): { summary: string; history: HistoryM
   return { summary: state.summary, history: messagesAfter(chat, state.summaryUpto) };
 }
 
+export function getGasGauge(history: HistoryMessage[], budget: number): number {
+  return (calculateUsedHistory(history) / budget) * 100;
+}
+
+export function calculateUsedHistory(history: HistoryMessage[]): number {
+  return history.reduce((acc, m) => acc + sizeOf(m), 0);
+}
+
+export function foldSummary(chat: ChatRef, history: HistoryMessage[]): void {
+  const state = stateOf(chat.key);
+  const { summary, summaryUpto } = state;
+  
+  // Take the first 5 messages that haven't been summarized yet
+  const toFold = history.slice(0, 5);
+  const contentToFold = toFold.map(m => m.content).join('\n');
+  
+  // In a real scenario, we'd call the LLM here to create a new summary
+  // For now, we'll just append the content to the existing summary
+  const newSummary = summary + '\n' + contentToFold;
+  
+  saveState(chat.key, {
+    summary: newSummary,
+    summaryUpto: summaryUpto + toFold.length
+  });
+}
+
 /** Forget a chat's summary and saved exchanges (when the chat is deleted or cleared). */
 export function forgetChat(key: string): void {
   db.prepare('DELETE FROM ChatMemory WHERE chat = ?').run(key);
