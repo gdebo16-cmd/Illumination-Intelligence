@@ -154,6 +154,8 @@ interface PartSpec {
   shadeTo: number[];
   /** Goes between the shapes and the paint (a trim, for lines that draw themselves). */
   trim?: object;
+  /** More paint drawn on top of the main paint (a progress bar's moving stripes). */
+  extra?: object[];
   p?: object;
   s?: object;
   r?: object;
@@ -202,6 +204,7 @@ function part(spec: PartSpec, layers: TemplateLayers) {
     it: [
       ...spec.shapes,
       ...(spec.trim ? [spec.trim] : []),
+      ...(spec.extra ?? []),
       ...paints(spec.paint, opts, spec.shadeFrom, spec.shadeTo),
       transform({
         p: spec.p,
@@ -213,7 +216,8 @@ function part(spec: PartSpec, layers: TemplateLayers) {
   };
 }
 
-interface LayerMotion { p?: object; r?: object }
+/** The whole file's movement: position, turn, and the point it turns round (anchor). */
+interface LayerMotion { p?: object; r?: object; a?: object }
 function file(name: string, w: number, h: number, frames: number, groups: (object | null)[], motion: LayerMotion = {}, markers: object[] = [], fps = FRAME_RATE) {
   return {
     v: '5.7.4',
@@ -237,7 +241,7 @@ function file(name: string, w: number, h: number, frames: number, groups: (objec
           o: fixed(100),
           r: motion.r ?? fixed(0),
           p: motion.p ?? fixed([0, 0, 0]),
-          a: fixed([0, 0, 0]),
+          a: motion.a ?? fixed([0, 0, 0]),
           s: fixed([100, 100, 100]),
         },
         ao: 0,
@@ -1320,26 +1324,70 @@ function heartPath(k: number) {
   };
 }
 const starShape = (R: number) => ({ ty: 'sr', sy: 1, d: 1, pt: fixed(5), p: fixed([0, 0]), r: fixed(0), ir: fixed(R * 0.45), is: fixed(0), or: fixed(R), os: fixed(0) });
+/** A closed shape through straight points (round its corners with `rounded` after it). */
+const polygon = (points: number[][]) => ({
+  ty: 'sh',
+  ks: fixed({ c: true, v: points, i: points.map(() => [0, 0]), o: points.map(() => [0, 0]) }),
+});
+const rounded = (r: number) => ({ ty: 'rd', r: fixed(r) });
+
+/** The like icon's outline, as a list of shapes (fresh each time). About 110 tall, centred on 0,0. */
+function likeShapes(shape: string): object[] {
+  if (shape === 'star') return [starShape(60)];
+  if (shape === 'bookmark') return [polygon([[-38, -55], [38, -55], [38, 55], [0, 26], [-38, 55]]), rounded(8)];
+  if (shape === 'thumbs')
+    // A cuff on the left, and a hand with its thumb sticking up from the top.
+    return [
+      rect(-42, 22, 18, 52, 4),
+      polygon([[-24, -4], [-8, -16], [0, -48], [14, -48], [18, -20], [44, -20], [50, -10], [42, 48], [-24, 48]]),
+      rounded(7),
+    ];
+  return [heartPath(1.4)];
+}
+const LIKE_NAMES: Record<string, string> = { heart: 'Heart', star: 'Star', bookmark: 'Bookmark', thumbs: 'Thumb' };
 
 const like: Template = {
   id: 'like',
   name: 'Like heart',
-  description: 'An empty heart (or star) that fills in with a pop when tapped, and empties again when tapped off.',
+  description: 'An empty heart, star, bookmark or thumbs-up that fills in when tapped (with a pop, sparks or floating hearts), and empties again when tapped off.',
   howToUse:
     'The file has two markers: “like” and “unlike”. Play “like” when it’s tapped on and “unlike” when it’s tapped off. The preview plays both in a row.',
   settings: [
-    { id: 'shape', label: 'Shape', kind: 'choice', options: [{ value: 'heart', label: 'Heart' }, { value: 'star', label: 'Star (favourite)' }], default: 'heart' },
-    { id: 'style', label: 'Style', kind: 'choice', options: [{ value: 'burst', label: 'Pop with a burst of sparks' }, { value: 'pop', label: 'Just a pop' }], default: 'burst' },
+    {
+      id: 'shape',
+      label: 'Shape',
+      kind: 'choice',
+      options: [
+        { value: 'heart', label: 'Heart' },
+        { value: 'star', label: 'Star (favourite)' },
+        { value: 'bookmark', label: 'Bookmark (fills from the top)' },
+        { value: 'thumbs', label: 'Thumbs-up (tilts up)' },
+      ],
+      default: 'heart',
+    },
+    {
+      id: 'style',
+      label: 'Style',
+      kind: 'choice',
+      options: [
+        { value: 'burst', label: 'Pop with a burst of sparks' },
+        { value: 'float', label: 'Little hearts float up' },
+        { value: 'pop', label: 'Just a pop' },
+      ],
+      default: 'burst',
+    },
     { id: 'color', label: 'Colour when liked', kind: 'color', default: '#ff3b5c' },
     { id: 'off', label: 'Outline when not liked', kind: 'color', default: '#8a8a99' },
-    { id: 'sparks', label: 'Spark colour', kind: 'color', default: '#ffb340', when: (v) => v.style === 'burst' },
+    { id: 'sparks', label: 'Spark / little heart colour', kind: 'color', default: '#ffb340', when: (v) => v.style !== 'pop' },
     { id: 'seconds', label: 'One tap takes', kind: 'number', min: 0.4, max: 2, step: 0.1, default: 0.8, unit: 's' },
   ],
   parts: (v) => {
-    const name = v.shape === 'star' ? 'Star' : 'Heart';
+    const name = LIKE_NAMES[String(v.shape)] ?? 'Heart';
     return [
       ...(v.style === 'burst' ? [{ id: 'sparks', name: 'Sparks', canShade: false, canOutline: false }] : []),
-      solidPart('heart', `${name} (filled)`),
+      ...(v.style === 'float' ? [{ id: 'sparks', name: 'Little hearts', canShade: true, canOutline: true }] : []),
+      // The bookmark fills with its own see-through blend, so it can't also be shaded.
+      { id: 'heart', name: `${name} (filled)`, canShade: v.shape !== 'bookmark', canOutline: true },
       ...(v.style === 'burst' ? [{ id: 'ring', name: 'Burst ring', canShade: false, canOutline: false }] : []),
       { id: 'empty', name: `${name} outline (not liked)`, canShade: true, canOutline: false },
     ];
@@ -1348,46 +1396,90 @@ const like: Template = {
     const F = Math.max(12, Math.round(num(v, 'seconds', 0.8) * FRAME_RATE));
     const at = (share: number) => Math.round(F * share);
     const S = 200;
-    const centre = fixed([S / 2, S / 2]);
-    const star = str(v, 'shape', 'heart') === 'star';
-    const shape = () => (star ? starShape(60) : heartPath(1.4)); // a fresh one each time
-    const burst = str(v, 'style', 'burst') === 'burst';
+    const centre = () => fixed([S / 2, S / 2]);
+    const shape = str(v, 'shape', 'heart');
+    const style = str(v, 'style', 'burst');
     const color = str(v, 'color', '#ff3b5c');
     const sparkColour = str(v, 'sparks', '#ffb340');
+    const bookmark = shape === 'bookmark';
 
     // Like: the filled one grows from nothing, a bit too big, then settles. Unlike: it shrinks away.
-    const heart = part({
-      id: 'heart',
-      shapes: [shape()],
-      paint: { kind: 'fill', color },
-      shadeFrom: [0, -50],
-      shadeTo: [0, 50],
-      p: centre,
-      s: eased([
-        { t: 0, v: [0, 0] },
-        { t: at(0.15), v: [0, 0] },
-        { t: at(0.5), v: burst ? [115, 115] : [125, 125] },
-        { t: at(0.7), v: [100, 100] },
-        { t: F, v: [100, 100] },
-        { t: F + at(0.4), v: [0, 0] },
-        { t: F * 2, v: [0, 0] },
-      ]),
-    }, layers);
+    // The bookmark instead stays full size and fills from the top down (and empties upwards).
+    const grow = bookmark
+      ? easedU([{ t: 0, v: [100, 100] }, { t: at(0.6), v: [100, 100] }, { t: at(0.7), v: [108, 108] }, { t: at(0.82), v: [100, 100] }, { t: F * 2, v: [100, 100] }])
+      : easedU([
+          { t: 0, v: [0, 0] },
+          { t: at(0.15), v: [0, 0] },
+          { t: at(0.5), v: style === 'pop' ? [125, 125] : [115, 115] },
+          { t: at(0.7), v: [100, 100] },
+          { t: F, v: [100, 100] },
+          { t: F + at(0.4), v: [0, 0] },
+          { t: F * 2, v: [0, 0] },
+        ]);
+    // The thumbs-up tips back, then flicks up past straight and settles.
+    const tilt =
+      shape === 'thumbs'
+        ? easedU([{ t: 0, v: [-20] }, { t: at(0.15), v: [-20] }, { t: at(0.5), v: [12] }, { t: at(0.7), v: [0] }, { t: F, v: [0] }, { t: F + at(0.4), v: [-20] }, { t: F * 2, v: [-20] }])
+        : undefined;
+
+    let heart: object | null;
+    if (bookmark) {
+      // A see-through blend with a hard edge: solid above the edge, clear below it. Moving the edge
+      // from the top to the bottom fills it in.
+      const opts = optionsFor('heart', layers);
+      const at2 = (ys: [number, number][]) => easedU(ys.map(([t, y]) => ({ t, v: [0, y] })));
+      const top = -58, bottom = 58;
+      const ys: [number, number][] = [[0, top], [at(0.15), top], [at(0.6), bottom], [F, bottom], [F + at(0.45), top], [F * 2, top]];
+      const c = hexToRgb(color);
+      heart = opts.visible
+        ? {
+            ty: 'gr',
+            nm: 'heart',
+            it: [
+              ...likeShapes(shape),
+              ...(opts.outline ? [{ ty: 'st', c: fixed(rgba(opts.outline.color)), o: fixed(100), w: fixed(opts.outline.width), ...ROUND }] : []),
+              {
+                ty: 'gf',
+                t: 1,
+                s: at2(ys.map(([t, y]) => [t, y - 1])),
+                e: at2(ys.map(([t, y]) => [t, y + 1])),
+                g: { p: 2, k: fixed([0, ...c, 1, ...c, 0, 1, 0.5, 1, 0.51, 0, 1, 0]) },
+                o: fixed(100),
+                r: 1,
+              },
+              transform({ p: centre(), s: grow, o: fixed(clampOpacity(opts.opacity)) }),
+            ],
+          }
+        : null;
+    } else {
+      heart = part({
+        id: 'heart',
+        shapes: likeShapes(shape),
+        paint: { kind: 'fill', color },
+        shadeFrom: [0, -55],
+        shadeTo: [0, 55],
+        p: centre(),
+        s: grow,
+        r: tilt,
+      }, layers);
+    }
     // The empty outline shows when it's not liked: it fades as the fill arrives, and back after.
+    // (The bookmark's stays, since the fill covers it from the top down.)
     const empty = part({
       id: 'empty',
-      shapes: [shape()],
+      shapes: likeShapes(shape),
       paint: { kind: 'line', color: str(v, 'off', '#8a8a99'), width: 6 },
-      shadeFrom: [0, -50],
-      shadeTo: [0, 50],
-      p: centre,
-      fade: [{ t: 0, v: 100 }, { t: at(0.3), v: 0 }, { t: F + at(0.3), v: 0 }, { t: F + at(0.5), v: 100 }, { t: F * 2, v: 100 }],
+      shadeFrom: [0, -55],
+      shadeTo: [0, 55],
+      p: centre(),
+      r: shape === 'thumbs' ? easedU([{ t: 0, v: [0] }, { t: at(0.3), v: [12] }, { t: F + at(0.3), v: [12] }, { t: F * 2, v: [0] }]) : undefined,
+      fade: bookmark ? undefined : [{ t: 0, v: 100 }, { t: at(0.3), v: 0 }, { t: F + at(0.3), v: 0 }, { t: F + at(0.5), v: 100 }, { t: F * 2, v: 100 }],
     }, layers);
 
-    // A ring that bursts outwards and thins to nothing, just as the heart arrives.
+    // Burst: a ring that bursts outwards and thins to nothing, just as the icon arrives.
     const ringOpts = optionsFor('ring', layers);
     const ring =
-      burst && ringOpts.visible
+      style === 'burst' && ringOpts.visible
         ? {
             ty: 'gr',
             nm: 'ring',
@@ -1395,33 +1487,50 @@ const like: Template = {
               { ty: 'el', d: 1, p: fixed([0, 0]), s: eased([{ t: 0, v: [20, 20] }, { t: at(0.4), v: [170, 170] }, { t: F * 2, v: [170, 170] }]) },
               { ty: 'st', c: fixed(rgba(sparkColour)), o: fixed(100), w: eased([{ t: 0, v: [24] }, { t: at(0.4), v: [1] }, { t: F * 2, v: [1] }]), ...ROUND },
               transform({
-                p: centre,
+                p: centre(),
                 o: eased([{ t: 0, v: [clampOpacity(ringOpts.opacity)] }, { t: at(0.4), v: [0] }, { t: F * 2, v: [0] }]),
               }),
             ],
           }
         : null;
 
-    // Eight sparks fly out in a circle and shrink away, alternating the spark and like colours.
-    const sparks = burst
-      ? colourGroup(
-          'sparks',
-          Array.from({ length: 8 }, (_, n): Piece => {
-            const angle = (n / 8) * TAU - TAU / 4;
-            const spot = (r: number) => [round(S / 2 + r * Math.cos(angle)), round(S / 2 + r * Math.sin(angle))];
-            return {
-              shapes: [ellipse(0, 0, n % 2 ? 12 : 16)],
-              paint: { kind: 'fill', color: n % 2 ? color : sparkColour },
-              size: 16,
-              p: eased([{ t: 0, v: spot(45) }, { t: at(0.3), v: spot(45) }, { t: at(0.75), v: spot(92) }, { t: F * 2, v: spot(92) }]),
-              s: eased([{ t: 0, v: [0, 0] }, { t: at(0.3), v: [100, 100] }, { t: at(0.75), v: [0, 0] }, { t: F * 2, v: [0, 0] }]),
-            };
-          }),
-          layers,
-        )
-      : null;
+    let extras: Piece[] = [];
+    if (style === 'burst')
+      // Eight sparks fly out in a circle and shrink away, alternating the spark and like colours.
+      extras = Array.from({ length: 8 }, (_, n): Piece => {
+        const angle = (n / 8) * TAU - TAU / 4;
+        const spot = (r: number) => [round(S / 2 + r * Math.cos(angle)), round(S / 2 + r * Math.sin(angle))];
+        return {
+          shapes: [ellipse(0, 0, n % 2 ? 12 : 16)],
+          paint: { kind: 'fill', color: n % 2 ? color : sparkColour },
+          size: 16,
+          p: eased([{ t: 0, v: spot(45) }, { t: at(0.3), v: spot(45) }, { t: at(0.75), v: spot(92) }, { t: F * 2, v: spot(92) }]),
+          s: eased([{ t: 0, v: [0, 0] }, { t: at(0.3), v: [100, 100] }, { t: at(0.75), v: [0, 0] }, { t: F * 2, v: [0, 0] }]),
+        };
+      });
+    if (style === 'float')
+      // Five little hearts drift up from the icon, swaying a little, and fade away.
+      extras = [-36, -14, 6, 26, 42].map((dx, n): Piece => {
+        const start = at(0.25 + n * 0.06);
+        const x = S / 2 + dx;
+        const way = n % 2 ? 1 : -1;
+        return {
+          shapes: [heartPath(n % 2 ? 0.3 : 0.4)],
+          paint: { kind: 'fill', color: n % 2 ? color : sparkColour },
+          size: 14,
+          p: easedU([
+            { t: 0, v: [x, S / 2 - 20] },
+            { t: start, v: [x, S / 2 - 20] },
+            { t: start + at(0.35), v: [x + way * 10, S / 2 - 65] },
+            { t: start + at(0.6), v: [x - way * 6, 12] },
+            { t: F * 2, v: [x - way * 6, 12] },
+          ]),
+          s: easedU([{ t: 0, v: [0, 0] }, { t: start, v: [0, 0] }, { t: start + at(0.15), v: [100, 100] }, { t: F * 2, v: [100, 100] }]),
+          o: easedU([{ t: 0, v: [100] }, { t: start + at(0.3), v: [100] }, { t: start + at(0.6), v: [0] }, { t: F * 2, v: [0] }]),
+        };
+      });
 
-    return file(name, S, S, F * 2, [sparks, heart, ring, empty], {}, [
+    return file(name, S, S, F * 2, [colourGroup('sparks', extras, layers), heart, ring, empty], {}, [
       { tm: 0, cm: 'like', dr: F },
       { tm: F, cm: 'unlike', dr: F },
     ]);
@@ -1431,7 +1540,7 @@ const like: Template = {
 const progress: Template = {
   id: 'progress',
   name: 'Progress bar',
-  description: 'A bar (or ring, or row of blocks) that fills from 0 to 100%. Your app can stop it at any point to show real progress.',
+  description: 'Something that fills from 0 to 100%: a bar (plain, striped, or with a glowing tip), a ring, a row of blocks, or a battery. Your app can stop it at any point to show real progress.',
   howToUse:
     'The file is exactly 100 frames long, so frame 40 shows 40% done. In your app, jump to the frame that matches the real progress (in lottie-web: anim.goToAndStop(40, true)). The preview just plays it filling up.',
   settings: [
@@ -1441,18 +1550,29 @@ const progress: Template = {
       kind: 'choice',
       options: [
         { value: 'bar', label: 'Bar' },
+        { value: 'striped', label: 'Bar with moving stripes' },
+        { value: 'tip', label: 'Bar with a glowing tip' },
         { value: 'ring', label: 'Ring' },
         { value: 'blocks', label: 'Row of blocks' },
+        { value: 'battery', label: 'Battery (red to green)' },
       ],
       default: 'bar',
     },
-    { id: 'color', label: 'Progress colour', kind: 'color', default: '#34c759' },
+    { id: 'color', label: 'Progress colour (full)', kind: 'color', default: '#34c759' },
+    { id: 'low', label: 'Colour when nearly empty', kind: 'color', default: '#ff3b30', when: (v) => v.style === 'battery' },
+    { id: 'mid', label: 'Colour when half full', kind: 'color', default: '#ffcc00', when: (v) => v.style === 'battery' },
     { id: 'track', label: 'Empty colour', kind: 'color', default: '#2e2e38' },
-    { id: 'thickness', label: 'Thickness', kind: 'number', min: 6, max: 40, step: 1, default: 18, when: (v) => v.style !== 'blocks' },
+    { id: 'thickness', label: 'Thickness', kind: 'number', min: 6, max: 40, step: 1, default: 18, when: (v) => v.style !== 'blocks' && v.style !== 'battery' },
     { id: 'seconds', label: 'Preview fills in', kind: 'number', min: 1, max: 10, step: 0.5, default: 3, unit: 's' },
   ],
   parts: (v) =>
-    v.style === 'blocks' ? [solidPart('fill', 'Blocks')] : [solidPart('fill', 'Progress'), solidPart('track', 'Track (empty part)')],
+    v.style === 'blocks'
+      ? [solidPart('fill', 'Blocks')]
+      : [
+          ...(v.style === 'tip' ? [{ id: 'tip', name: 'Glowing tip', canShade: false, canOutline: false }] : []),
+          solidPart('fill', v.style === 'battery' ? 'Charge' : 'Progress'),
+          solidPart('track', v.style === 'battery' ? 'Battery outline' : 'Track (empty part)'),
+        ],
   build(v, name, layers) {
     const frames = 100;
     const fps = frames / num(v, 'seconds', 3); // 100 frames over however long the preview should take
@@ -1461,7 +1581,8 @@ const progress: Template = {
     const track = str(v, 'track', '#2e2e38');
     const width = num(v, 'thickness', 18);
     // Steady speed, so frame number = percentage.
-    const fill = () => trim(fixed(0), linear([{ t: 0, v: [0] }, { t: frames, v: [100] }]));
+    const steady = (from: number[], to: number[]) => linear([{ t: 0, v: from }, { t: frames, v: to }]);
+    const fill = () => trim(fixed(0), steady([0], [100]));
 
     if (style === 'blocks') {
       const W = 400, H = 80, count = 10, gap = 6;
@@ -1482,18 +1603,94 @@ const progress: Template = {
 
     if (style === 'ring') {
       const S = 200, size = 140;
-      const ends = { shadeFrom: [size / 2, 0], shadeTo: [-size / 2, 0], p: fixed([S / 2, S / 2]), r: fixed(-90) }; // turned to start at the top
-      const progressPart = part({ id: 'fill', shapes: [ellipse(0, 0, size)], trim: fill(), paint: { kind: 'line', color, width }, ...ends }, layers);
-      const trackPart = part({ id: 'track', shapes: [ellipse(0, 0, size)], paint: { kind: 'line', color: track, width }, ...ends }, layers);
+      const ends = { shadeFrom: [size / 2, 0], shadeTo: [-size / 2, 0], r: fixed(-90) }; // turned to start at the top
+      const progressPart = part({ id: 'fill', shapes: [ellipse(0, 0, size)], trim: fill(), paint: { kind: 'line', color, width }, ...ends, p: fixed([S / 2, S / 2]) }, layers);
+      const trackPart = part({ id: 'track', shapes: [ellipse(0, 0, size)], paint: { kind: 'line', color: track, width }, ...ends, p: fixed([S / 2, S / 2]), r: fixed(-90) }, layers);
       return file(name, S, S, frames, [progressPart, trackPart], {}, [], fps);
     }
 
+    if (style === 'battery') {
+      // A battery outline with a nub on the right; the charge inside grows from the left and changes
+      // colour from red (empty) through yellow to green (full).
+      const W = 400, H = 200, bw = 300, bh = 130, line = 8, pad = 10;
+      const left = (W - bw) / 2 - 10;
+      const innerW = bw - line - pad * 2, innerH = bh - line - pad * 2;
+      const x0 = left + line / 2 + pad;
+      const outline = part({
+        id: 'track',
+        shapes: [rect(left + bw / 2, H / 2, bw, bh, 18), rect(left + bw + 14, H / 2, 16, 50, 5)],
+        paint: { kind: 'line', color: track === '#2e2e38' ? '#8a8a99' : track, width: line },
+        shadeFrom: [0, H / 2 - bh / 2],
+        shadeTo: [0, H / 2 + bh / 2],
+      }, layers);
+      const charge = part({
+        id: 'fill',
+        shapes: [
+          {
+            ty: 'rc',
+            d: 1,
+            p: steady([x0, H / 2], [x0 + innerW / 2, H / 2]), // its middle, half its width in from the left
+            s: steady([0, innerH], [innerW, innerH]),
+            r: fixed(8),
+          },
+        ],
+        paint: {
+          kind: 'fill',
+          color: [{ t: 0, hex: str(v, 'low', '#ff3b30') }, { t: 50, hex: str(v, 'mid', '#ffcc00') }, { t: frames, hex: color }],
+        },
+        shadeFrom: [0, H / 2 - innerH / 2],
+        shadeTo: [0, H / 2 + innerH / 2],
+      }, layers);
+      return file(name, W, H, frames, [charge, outline], {}, [], fps);
+    }
+
     const W = 400, H = 80;
-    const line = () => straightPath([[40, H / 2], [W - 40, H / 2]]);
+    const x0 = 40, x1 = W - 40;
+    const line = () => straightPath([[x0, H / 2], [x1, H / 2]]);
     const ends = { shadeFrom: [0, H / 2 - width / 2], shadeTo: [0, H / 2 + width / 2] };
-    const progressPart = part({ id: 'fill', shapes: [line()], trim: fill(), paint: { kind: 'line', color, width }, ...ends }, layers);
+    // Striped: a second, see-through dashed line over the filled part; sliding the dashes along
+    // makes the stripes move. 12 slides per fill, so the stripes keep moving at a steady pace.
+    const stripes =
+      style === 'striped'
+        ? [{
+            ty: 'st',
+            c: fixed([1, 1, 1, 1]),
+            o: fixed(28),
+            w: fixed(width),
+            lc: 1,
+            lj: 1,
+            d: [
+              { n: 'd', nm: 'dash', v: fixed(round(width * 0.9)) },
+              { n: 'g', nm: 'gap', v: fixed(round(width * 0.9)) },
+              { n: 'o', nm: 'offset', v: steady([0], [-round(width * 1.8 * 12)]) },
+            ],
+          }]
+        : undefined;
+    const progressPart = part({ id: 'fill', shapes: [line()], trim: fill(), extra: stripes, paint: { kind: 'line', color, width }, ...ends }, layers);
     const trackPart = part({ id: 'track', shapes: [line()], paint: { kind: 'line', color: track, width }, ...ends }, layers);
-    return file(name, W, H, frames, [progressPart, trackPart], {}, [], fps);
+
+    // Glowing tip: a bright dot in a soft glow, riding the front of the bar.
+    const tipOpts = optionsFor('tip', layers);
+    const c = hexToRgb(color);
+    const tip =
+      style === 'tip' && tipOpts.visible
+        ? {
+            ty: 'gr',
+            nm: 'tip',
+            it: [
+              ellipse(0, 0, width * 0.6),
+              { ty: 'fl', c: fixed([1, 1, 1, 1]), o: fixed(100), r: 1 },
+              ellipse(0, 0, width * 3),
+              { ty: 'gf', t: 2, s: fixed([0, 0]), e: fixed([round(width * 1.5), 0]), h: fixed(0), a: fixed(0), g: { p: 2, k: fixed([0, 1, 1, 1, 1, ...c, 0, 0.9, 0.4, 0.5, 1, 0]) }, o: fixed(100), r: 1 },
+              transform({
+                p: steady([x0, H / 2], [x1, H / 2]),
+                // Hidden at 0%, so there's no lonely dot before anything has started.
+                o: easedU([{ t: 0, v: [0] }, { t: 2, v: [clampOpacity(tipOpts.opacity)] }, { t: frames, v: [clampOpacity(tipOpts.opacity)] }]),
+              }),
+            ],
+          }
+        : null;
+    return file(name, W, H, frames, [tip, progressPart, trackPart], {}, [], fps);
   },
 };
 
@@ -1502,53 +1699,83 @@ const LINE_IDS = ['top', 'middle', 'bottom'];
 const menu: Template = {
   id: 'menu',
   name: 'Menu to close',
-  description: 'The three-line menu icon turns into an X (or a back arrow) and back again.',
+  description: 'A menu icon that changes and back: three lines to an X (still or spinning) or a back arrow, a plus that twists into an X, or three dots that stretch into lines.',
   howToUse:
-    'The file has two markers: “open” (lines → X) and “close” (X → lines). Play “open” when the menu opens and “close” when it shuts. The preview plays both in a row.',
+    'The file has two markers: “open” and “close”. Play “open” when the menu opens and “close” when it shuts. The preview plays both in a row.',
   settings: [
-    { id: 'style', label: 'Turns into', kind: 'choice', options: [{ value: 'cross', label: 'An X' }, { value: 'arrow', label: 'A back arrow' }], default: 'cross' },
+    {
+      id: 'style',
+      label: 'Turns into',
+      kind: 'choice',
+      options: [
+        { value: 'cross', label: 'Lines → X' },
+        { value: 'spin', label: 'Lines → X, spinning round' },
+        { value: 'arrow', label: 'Lines → back arrow' },
+        { value: 'plus', label: 'Plus → X (twists)' },
+        { value: 'dots', label: 'Three dots → three lines' },
+      ],
+      default: 'cross',
+    },
     { id: 'color', label: 'Colour', kind: 'color', default: '#ffffff' },
     { id: 'thickness', label: 'Line thickness', kind: 'number', min: 4, max: 14, step: 1, default: 8 },
     { id: 'speed', label: 'One change takes', kind: 'number', min: 0.15, max: 1, step: 0.05, default: 0.35, unit: 's' },
   ],
-  parts: [solidPart('top', 'Top line'), solidPart('middle', 'Middle line'), solidPart('bottom', 'Bottom line')],
+  parts: (v) =>
+    v.style === 'plus'
+      ? [solidPart('top', 'Line 1'), solidPart('bottom', 'Line 2')]
+      : v.style === 'dots'
+        ? [solidPart('top', 'Top'), solidPart('middle', 'Middle'), solidPart('bottom', 'Bottom')]
+        : [solidPart('top', 'Top line'), solidPart('middle', 'Middle line'), solidPart('bottom', 'Bottom line')],
   build(v, name, layers) {
     const F = Math.max(4, Math.round(num(v, 'speed', 0.35) * FRAME_RATE));
     const S = 120, half = 36; // each line is 72 long, centred on its group
     const color = str(v, 'color', '#ffffff');
-    const width = num(v, 'thickness', 8);
-    const arrow = str(v, 'style', 'cross') === 'arrow';
+    const style = str(v, 'style', 'cross');
+    const dots = style === 'dots';
+    const width = num(v, 'thickness', 8) * (dots ? 1.6 : 1); // dots look better a bit fatter
     // The arrow's two short lines meet the middle line's left end (24, 60), slanting 45° up and down.
     const slant = (half / 2) * Math.SQRT1_2;
-    // Where each line ends up: position, turn, and width (in %).
-    const goal: Record<string, { p: number[]; r: number; s: number; fade?: boolean }> = arrow
-      ? {
-          top: { p: [24 + slant, 60 - slant], r: -45, s: 50 },
-          middle: { p: [60, 60], r: 0, s: 100 },
-          bottom: { p: [24 + slant, 60 + slant], r: 45, s: 50 },
-        }
-      : {
-          top: { p: [60, 60], r: 45, s: 100 },
-          middle: { p: [60, 60], r: 0, s: 0, fade: true },
-          bottom: { p: [60, 60], r: -45, s: 100 },
-        };
+    type Pose = { p: number[]; r: number; s: number; hide?: boolean };
+    // Each line's start and end: position, turn, and width (in %).
+    const flat = (n: number): Pose => ({ p: [60, 36 + n * 24], r: 0, s: 100 });
+    const poses: Record<string, [Pose, Pose][]> = {
+      cross: [[flat(0), { p: [60, 60], r: 45, s: 100 }], [flat(1), { p: [60, 60], r: 0, s: 0, hide: true }], [flat(2), { p: [60, 60], r: -45, s: 100 }]],
+      arrow: [
+        [flat(0), { p: [24 + slant, 60 - slant], r: -45, s: 50 }],
+        [flat(1), flat(1)],
+        [flat(2), { p: [24 + slant, 60 + slant], r: 45, s: 50 }],
+      ],
+      // A plus (one flat, one upright) gives a quarter twist into an X.
+      plus: [[{ p: [60, 60], r: 0, s: 100 }, { p: [60, 60], r: 45, s: 100 }], [flat(1), flat(1)], [{ p: [60, 60], r: 90, s: 100 }, { p: [60, 60], r: 135, s: 100 }]],
+      // Dots are lines with nearly no length (round ends make them dots); they stretch out to full length.
+      dots: [[flat(0), flat(0)], [flat(1), flat(1)], [flat(2), flat(2)]],
+    };
+    const plan = poses[style === 'spin' ? 'cross' : style] ?? poses.cross;
     const there = (from: number[], to: number[]) => eased([{ t: 0, v: from }, { t: F, v: to }, { t: F * 2, v: from }]);
     const lines = LINE_IDS.map((id, n) => {
-      const g = goal[id];
-      const start = [60, 36 + n * 24];
+      if (style === 'plus' && id === 'middle') return null; // a plus only needs two lines
+      const [a, b] = plan[n];
       return part({
         id,
         shapes: [straightPath([[-half, 0], [half, 0]])],
+        trim: dots
+          ? trim(there([49.5], [0]), there([50.5], [100]))
+          : undefined,
         paint: { kind: 'line', color, width },
         shadeFrom: [0, -width / 2],
         shadeTo: [0, width / 2],
-        p: there(start, g.p),
-        r: there([0], [g.r]),
-        s: there([100, 100], [g.s, 100]),
-        fade: g.fade ? [{ t: 0, v: 100 }, { t: F, v: 0 }, { t: F * 2, v: 100 }] : undefined,
+        p: there(a.p, b.p),
+        r: there([a.r], [b.r]),
+        s: there([a.s, 100], [b.s, 100]),
+        fade: b.hide ? [{ t: 0, v: 100 }, { t: F, v: 0 }, { t: F * 2, v: 100 }] : undefined,
       }, layers);
     });
-    return file(name, S, S, F * 2, lines, {}, [
+    // Spin: the whole icon also turns half a circle each way (an X looks the same upside down).
+    const spin =
+      style === 'spin'
+        ? { p: fixed([S / 2, S / 2, 0]), a: fixed([S / 2, S / 2, 0]), r: eased([{ t: 0, v: [0] }, { t: F, v: [180] }, { t: F * 2, v: [360] }]) }
+        : {};
+    return file(name, S, S, F * 2, lines, spin, [
       { tm: 0, cm: 'open', dr: F },
       { tm: F, cm: 'close', dr: F },
     ]);
