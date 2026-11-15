@@ -212,13 +212,13 @@ export async function runAgent(options: {
     );
     let calls = reply.message?.tool_calls ?? [];
     let spoken = reply.message?.content ?? '';
-    // Some models write a tool request as JSON in the reply text instead of
-    // Ollama's official tool_calls slot. Turn that into a real tool request.
+    // Some models write a tool request as JSON or an XML-style tag in the reply
+    // text instead of Ollama's official tool_calls slot. Turn that into a real tool request.
     if (calls.length === 0) {
       const fromText = parseTextToolCalls(spoken, (name) => tools.has(name));
       if (fromText.length) {
         calls = fromText;
-        spoken = ''; // the JSON was a tool request, not the answer to show
+        spoken = ''; // the text was a tool request, not the answer to show
       }
     }
 
@@ -306,8 +306,9 @@ export async function runAgent(options: {
 /**
  * Some models (Devstral, for example) write a tool request as JSON in the reply
  * text instead of Ollama's official tool_calls slot: {"name": "search_code",
- * "arguments": {"text": "page.tsx"}}. If that JSON names a real tool, treat it
- * as a real request so the tool actually runs.
+ * "arguments": {"text": "page.tsx"}}, or as an XML-style tag:
+ * <search_code text="page.tsx"/>. If it names a real tool, treat it as a real
+ * request so the tool actually runs.
  */
 function parseTextToolCalls(
   content: string,
@@ -359,6 +360,18 @@ function parseTextToolCalls(
     } catch {
       // keep looking
     }
+  }
+  if (found.length) return found;
+
+  // Others write it as an XML-style tag: <list_folder path="src"/>. Only tags
+  // that name a real tool count, so ordinary HTML in a reply is left alone.
+  for (const m of unfenced.matchAll(/<([a-z_][a-z0-9_]*)((?:\s+[a-z_][a-z0-9_]*\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*\/?>/gi)) {
+    if (!isTool(m[1])) continue;
+    const args: Record<string, unknown> = {};
+    for (const a of m[2].matchAll(/([a-z_][a-z0-9_]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+      args[a[1]] = a[2] ?? a[3] ?? '';
+    }
+    found.push({ function: { name: m[1], arguments: args } });
   }
   return found;
 }
