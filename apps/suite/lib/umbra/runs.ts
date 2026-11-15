@@ -850,7 +850,7 @@ function delegationTools(userId: string, bot: Bot, userName: string): ToolDef[] 
       const waitS = Math.max(0, Math.min(MAX_WAIT_S, Math.floor(Number(a.wait_seconds ?? 0)) || 0));
       const now = run.status === 'working' && waitS > 0 ? (await waitForRun(run.id, userId, waitS * 1000)) ?? run : run;
       if (now.status !== 'working') return jobResult(target, now);
-      const doing = now.steps.filter((s) => s.tool !== 'thinking').map((s) => `- ${s.label} (${s.status})`).join('\n');
+      const doing = now.steps.filter((s) => s.tool !== 'thinking' && s.tool !== 'note').map((s) => `- ${s.label} (${s.status})`).join('\n');
       return {
         output: `${target.name} is still working on the job (started ${now.startedAt}).${doing ? `\nSteps so far:\n${doing}` : ''}`,
         summary: `${target.name} is still working`,

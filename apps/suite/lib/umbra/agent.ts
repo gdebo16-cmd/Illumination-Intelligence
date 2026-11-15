@@ -22,9 +22,35 @@ import type { AgentStep, ToolContext, ToolDef } from './types';
 type Priority = 'high' | 'low';
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? 'http://localhost:11434';
-const MAX_ROUNDS = 6;
+const MAX_ROUNDS = 10;
 // Working on code takes more looking around (list, search, read, read again…) before answering.
-const MAX_ROUNDS_CODE = 14;
+const MAX_ROUNDS_CODE = 24;
+
+// Smaller models often stop to say what they're about to do ("Let me check the tests now.")
+// without doing it, which ends the run. When a reply sounds like that, the bot is told to go on,
+// this many times at most per message.
+const MAX_NUDGES = 3;
+const NUDGE_PROMPT =
+  'Go on: do that now with your tools instead of describing it. Keep working until the whole job is done. ' +
+  'If you are actually finished, or you truly need a decision from the user, reply with only the word DONE.';
+/** The last lines of a reply that announce more work instead of finishing. */
+const ANNOUNCES_MORE =
+  /\b(let me|let's|i'll|i will|i'm going to|i am going to|i'm now|i am now|now i|next,? i|i need to|i should|going to (now )?(check|look|run|read|search|open|write|fix|try)|one moment|hang tight|stand by|working on it)\b/i;
+/** Wording that means the bot is done or waiting on the user, so it shouldn't be pushed on. */
+const WAITS_ON_USER =
+  /\?\s*$|\b(let me know|if you('d| would)? like|would you like|do you want|shall i|should i|want me to|your (call|decision|approval)|once you|when you('re| are) ready|approve)\b/i;
+
+/** Whether a reply ends by announcing work it then didn't do. */
+function announcesMoreWork(text: string): boolean {
+  const tail = text.trim().split(/\n+/).slice(-2).join(' ').slice(-400);
+  if (!tail) return false;
+  return ANNOUNCES_MORE.test(tail) && !WAITS_ON_USER.test(tail);
+}
+
+/** Said on the last round, when the tools are taken away. */
+const LAST_ROUND_PROMPT =
+  'You have used all your steps for this message, so stop using tools now. Tell the user what you got done, ' +
+  'what is still left, and that they can say "continue" for you to pick it back up.';
 
 // Tools whose results are long (web pages, files, command output) need the large context window.
 // A Flicker without them only talks, so it gets the small one and uses less graphics memory.
@@ -245,6 +271,9 @@ export async function runAgent(options: {
     }
   };
   const firstRound = Math.max(0, Math.min(maxRounds, Math.floor(options.startRound ?? 0)));
+  let nudges = 0;
+  // A reply the bot gave before being told to go on: kept in case it turns out it was finished.
+  let heldAnswer = '';
 
   for (let round = firstRound; round <= maxRounds; round++) {
     // On the last round, take the tools away so the bot has to answer with what it has.
@@ -268,8 +297,10 @@ export async function runAgent(options: {
     };
 
     fitToWindow(messages, numCtx);
+    // A bot that ran out of steps mid-job says where it got to instead of just stopping.
+    const asked = lastRound && round > 0 ? [...messages, { role: 'system' as const, content: LAST_ROUND_PROMPT }] : messages;
     const reply = await askModel(
-      options.model, messages, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
+      options.model, asked, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
       thinks ? showThinking : undefined,
     );
     let calls = reply.message?.tool_calls ?? [];
@@ -292,14 +323,33 @@ export async function runAgent(options: {
         ...thought,
         status: 'done',
         label: `Thought for ${seconds} second${seconds === 1 ? '' : 's'}`,
+        seconds,
         thought: thinking.length > SAVED_THOUGHT_CHARS ? `${thinking.slice(0, SAVED_THOUGHT_CHARS)}…` : thinking,
       };
       steps.push(done);
       options.onStep({ ...done });
     }
 
+    // It said what it would do next but didn't do it: show what it said as a step, and tell it
+    // to go on.
+    if (calls.length === 0 && !lastRound && schemas.length > 0 && nudges < MAX_NUDGES && reply.done_reason !== 'length' && announcesMoreWork(spoken)) {
+      nudges++;
+      heldAnswer = spoken.trim();
+      const note: AgentStep = { id: crypto.randomUUID(), tool: 'note', label: 'Update', status: 'done', thought: heldAnswer };
+      steps.push(note);
+      options.onStep({ ...note });
+      messages.push({ role: 'assistant', content: spoken }, { role: 'user', content: NUDGE_PROMPT });
+      checkpoint(round);
+      continue;
+    }
+
     if (calls.length === 0 || lastRound) {
       let answer = reply.message?.content ?? '';
+      // Told to go on, it said it was already done: its earlier reply was the answer after all.
+      if (heldAnswer && /^\W*done\W*$/i.test(answer.trim())) {
+        steps.splice(steps.findLastIndex((s) => s.tool === 'note'), 1);
+        return { reply: heldAnswer, steps };
+      }
       let cutOff = reply.done_reason === 'length';
       // Ran out of room part-way: make room and ask the model to go on from where it stopped.
       // Without thinking this time, so all the room goes to the answer.
@@ -326,6 +376,12 @@ export async function runAgent(options: {
       name: c.function.name,
       args: typeof c.function.arguments === 'string' ? safeJson(c.function.arguments) : c.function.arguments ?? {},
     }));
+    // What it said on the way ("First I'll look at the config"), shown with its steps.
+    if (spoken.trim()) {
+      const note: AgentStep = { id: crypto.randomUUID(), tool: 'note', label: 'Update', status: 'done', thought: spoken.trim() };
+      steps.push(note);
+      options.onStep({ ...note });
+    }
     messages.push({
       role: 'assistant',
       content: spoken,

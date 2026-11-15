@@ -749,3 +749,93 @@ textarea.input-field, .umbra-field > textarea { transition: border-color 0.2s ea
 @media (prefers-reduced-motion: reduce) {
   .umbra-form .umbra-tool input[type="checkbox"] { transition: none; } }
 /* #endregion */
+/* #region Umbra work log (Steps.tsx): a Flicker's work folded into one line above its reply */
+.umbra-work {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0 0 0.6rem;
+}
+.umbra-work-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.2rem 0.55rem 0.2rem 0.35rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #b8bad0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.umbra-work-head:hover,
+.umbra-work.is-open .umbra-work-head {
+  color: #d5d7ea;
+  background: rgb(255 255 255 / 0.04);
+  border-color: rgb(255 255 255 / 0.06);
+}
+.umbra-work-head:focus-visible { outline: 2px solid var(--bot-color); outline-offset: 2px; }
+.umbra-work-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.umbra-work.is-live .umbra-work-title { animation: pulse 1.6s ease-in-out infinite; }
+/* A small dot when done; a spinning ring while it works. */
+.umbra-work-icon {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bot-color) 70%, transparent);
+}
+.umbra-work-icon.is-spinning {
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--bot-color) 30%, transparent);
+  border-top-color: var(--bot-color);
+  animation: umbra-spin 0.8s linear infinite;
+}
+.umbra-work-chevron {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.umbra-work.is-open .umbra-work-chevron { transform: rotate(90deg); }
+/* Folded while it works: the newest line of its thinking, under the title. */
+.umbra-work-preview {
+  padding-left: 1.6rem;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #9a9cb8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Open: the timeline, joined by a thin line down the left. */
+.umbra-work > .umbra-steps {
+  margin: 0 0 0 0.45rem;
+  padding: 0.2rem 0 0.2rem 0.9rem;
+  border-bottom: none;
+  border-left: 1px solid color-mix(in srgb, var(--bot-color) 25%, transparent);
+}
+.umbra-step.is-thought .umbra-step-mark,
+.umbra-step.is-note .umbra-step-mark {
+  width: 7px;
+  height: 7px;
+  margin: 0.45rem 5.5px 0;
+  background: color-mix(in srgb, var(--bot-color) 45%, #9a9cb8);
+  border: none;
+  animation: none;
+}
+.umbra-step.is-thought.is-running .umbra-step-mark { animation: pulse 1.6s ease-in-out infinite; }
+.umbra-step.is-thought .umbra-step-label { color: #9a9cb8; font-size: 0.8rem; }
+.umbra-step.is-thought:not(.is-running) .umbra-thought { max-height: 16rem; overflow-y: auto; }
+.umbra-step.is-note .umbra-thought { color: #d5d7ea; font-size: 0.85rem; }
+.umbra-work > .umbra-step-image img { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .umbra-work-chevron { transition: none; }
+  .umbra-work.is-live .umbra-work-title,
+  .umbra-step.is-thought.is-running .umbra-step-mark { animation: none; }
+}
+/* #endregion */

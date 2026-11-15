@@ -195,21 +195,13 @@ export default function TeamChat({ teamId }: { teamId: string }) {
   }
 
   const leader = team.leader;
-  // What's happening right now: the deepest running step (a teammate's tool, if one is busy).
-  // Also which teammates are busy right now, so their flames can show it.
+  // Which teammates are busy right now, so their flames can show it.
   const busyMates = new Set<string>();
-  const running = (() => {
-    let found: AgentStep | undefined;
-    const walk = (list: AgentStep[]) => list.forEach((s) => {
-      if (s.status === 'running') {
-        found = s;
-        if (s.bot) busyMates.add(s.bot.id);
-      }
-      if (s.children) walk(s.children);
-    });
-    walk(liveSteps);
-    return found;
-  })();
+  const walk = (list: AgentStep[]) => list.forEach((s) => {
+    if (s.status === 'running' && s.bot) busyMates.add(s.bot.id);
+    if (s.children) walk(s.children);
+  });
+  walk(liveSteps);
 
   return (
     <main className="umbra umbra-chat" style={{ '--bot-color': flameColor(leader.flame) } as React.CSSProperties}>
@@ -259,10 +251,10 @@ export default function TeamChat({ teamId }: { teamId: string }) {
           <div className="umbra-message assistant">
             <Flame flame={leader.flame} size={32} mood="working" className="umbra-message-flame" />
             <div className="umbra-bubble">
-              <Steps steps={liveSteps} />
-              {/* A "Thinking" step already says what's happening, with the thinking itself. */}
-              {running?.tool !== 'thinking' && (
-                <span className="umbra-thinking">{running ? `${running.label}…` : `${leader.name} is thinking…`}</span>
+              <Steps steps={liveSteps} live />
+              {/* Once there are steps, their line says what's happening. */}
+              {liveSteps.length === 0 && (
+                <span className="umbra-thinking">{leader.name} is thinking…</span>
               )}
             </div>
           </div>
