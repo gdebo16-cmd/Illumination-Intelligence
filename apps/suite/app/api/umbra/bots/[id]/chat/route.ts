@@ -17,7 +17,7 @@ import { getCurrentUserId, noProfile } from '@/lib/user';
 import { USERS } from '@/lib/profiles';
 import { addMessage, getBot, systemPrompt } from '@/lib/umbra/bots';
 import { botHistoryBudget, type ChatMessage } from '@/lib/umbra/agent';
-import { chatContext, fitHistory, recall, umbraChat } from '@/lib/chat-memory';
+import { chatContext, fitHistory, recall, umbraChat, getGasGauge, foldSummary } from '@/lib/chat-memory';
 import { activeRun, RunBusyError, startRun, workshopPrompt } from '@/lib/umbra/runs';
 import { canSeeImages } from '@/config/models';
 import { chatKey, PhotoError, preparePhotos, savePhotos, uploadedPhotos, withPhotos } from '@/lib/chat-images';
@@ -121,7 +121,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // withPhotos swaps photo ids for the pictures themselves, when this bot's model can see them.
   const repo = bot.tools.includes('refract') ? readSelectedRepo(body.repo) : null;
   const sheet = systemPrompt(bot, USERS[userId]) + workshopPrompt(repo ?? undefined);
-  const recent = fitHistory(history, Math.max(2000, botHistoryBudget(bot.tools, sheet.length, bot.think) - message.length));
+
+  const budget = botHistoryBudget(bot.tools, sheet.length, bot.think);
+  const gauge = getGasGauge(history, budget);
+
+  if (gauge > 90) {
+    foldSummary(chat, history);
+    let { history: freshHistory } = chatContext(chat);
+    history = freshHistory;
+  }
+
+  const recent = fitHistory(history, Math.max(2000, budget - message.length));
   const remembered = await recall(chat, {
     summary, recent, message,
     facts: bot.tools.includes('notes') ? { botId: bot.id, userName: USERS[userId] } : false,

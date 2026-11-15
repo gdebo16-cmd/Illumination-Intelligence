@@ -1,6 +1,6 @@
 import { PRISM_STYLES } from '@/config/prism-styles';
 import {
-  PRISM_VIDEO_MODELS, VIDEO_SHAPES, findVideoModel,
+  PRISM_VIDEO_MODELS, VIDEO_SHAPES, findVideoModel, isCloudVideo,
   type VideoModelId, type VideoShapeId,
 } from '@/config/prism-video-models';
 import { SHAPES, type ModelChoice, type ShapeId } from './types';
@@ -58,14 +58,16 @@ export default function StudioSettings({
           >
             {PRISM_VIDEO_MODELS.map((m) => (
               <option key={m.id} value={m.id} disabled={!videoReady(m.id)}>
-                {videoReady(m.id) ? m.name : `${m.name} (not downloaded yet)`}
+                {videoReady(m.id) ? m.name : `${m.name} (${isCloudVideo(m.id) ? 'not set up yet' : 'not downloaded yet'})`}
               </option>
             ))}
           </select>
           <p className="prism-note">{findVideoModel(videoModel).note}</p>
           {!videoReady(videoModel) && (
             <p className="prism-note">
-              {fromWords ? 'Videos from words' : 'Videos from a picture'} need more files for this model. See docs/prism-video.md.
+              {isCloudVideo(videoModel)
+                ? 'Cloud Movies need a Comfy account key first. See lib/prism/cloud.ts.'
+                : `${fromWords ? 'Videos from words' : 'Videos from a picture'} need more files for this model. See docs/prism-video.md.`}
             </p>
           )}
 
@@ -96,7 +98,7 @@ export default function StudioSettings({
           <select id="prism-model" className="prism-select" value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => (
               <option key={m.id} value={m.id} disabled={!m.ready}>
-                {m.ready ? m.name : `${m.name} (not downloaded yet)`}
+                {m.ready ? m.name : `${m.name} (${m.cloud ? 'not set up yet' : 'not downloaded yet'})`}
               </option>
             ))}
           </select>

@@ -73,8 +73,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         send({ type: 'reply', message: addTeamMessage(team.id, 'assistant', result.reply, result.steps) });
         // In the background: keep the exchange for recall, fold old messages into the summary, and
         // (with the leader's Memory on) pick up facts about you.
-        maintainChat(chat, leader.model, numCtxFor(leader.tools), budget);
-        rememberFromChat(userId, leader, { cursorKey: teamChatKey(team.id), table: 'UmbraTeamMessage', column: 'team_id', id: team.id });
+        maintainChat(chat, result.model, numCtxFor(leader.tools), budget);
+        rememberFromChat(userId, leader, { cursorKey: teamChatKey(team.id), table: 'UmbraTeamMessage', column: 'team_id', id: team.id }, result.model);
       } catch (err) {
         console.error('Umbra team chat error:', err);
         const text = (err as Error).message ?? '';

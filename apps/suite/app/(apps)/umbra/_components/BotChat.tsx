@@ -330,7 +330,7 @@ export default function BotChat({ botId }: { botId: string }) {
         )}
         {messages.map((m) => (
           <div key={m.id} className={`umbra-message ${m.role}`}>
-            {m.role === 'assistant' && <Flame flame={bot.flame} size={32} still className="umbra-message-flame" />}
+            {m.role === 'assistant'}
             <div className="umbra-bubble">
               {m.role === 'assistant' ? (
                 <>
@@ -347,8 +347,7 @@ export default function BotChat({ botId }: { botId: string }) {
           </div>
         ))}
         {thinking && (
-          <div className="umbra-message assistant">
-            <Flame flame={bot.flame} size={32} mood="working" className="umbra-message-flame" />
+          <div className="umbra-message assistant">        
             <div className="umbra-bubble">
               <Steps steps={liveSteps} live flame={bot.flame} />
             </div>

@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { applyStyle, styleLora } from '../../config/prism-styles.ts';
-import { PRISM_MODELS, findPrismModel, type PrismModelId } from '../../config/prism-models.ts';
+import { PRISM_MODELS, findPrismModel, isCloudPainting, type LocalPrismModelId, type PrismModelId } from '../../config/prism-models.ts';
 import { GPU_WORKERS, LOCAL_WORKER, type GpuWorker } from '../../config/gpu-workers.ts';
 import { LOADERS, checkWorkers } from '../gpu/health.ts';
 import type { GpuNeeds } from '../gpu/router.ts';
@@ -74,8 +74,8 @@ interface ModelRecipes {
 
 // The recipe files, two for each model in config/prism-models.ts.
 // To add a model: add it to config/prism-models.ts, put its two recipes in lib/prism, and add
-// an entry here.
-const RECIPES: Record<PrismModelId, ModelRecipes> = {
+// an entry here. (Cloud Painting has no recipe file: lib/prism/cloud.ts writes its own.)
+const RECIPES: Record<LocalPrismModelId, ModelRecipes> = {
   'flux2-klein': {
     create: 'klein-workflow.json',
     edit: 'klein-edit-workflow.json',
@@ -96,6 +96,14 @@ const RECIPES: Record<PrismModelId, ModelRecipes> = {
     expander: true,
   },
 };
+
+// The model to paint with here. Cloud Painting never comes this way: only the Prism page can ask
+// for it (app/api/prism/generate), and that goes to lib/prism/cloud.ts.
+function localModel(id: unknown): LocalPrismModelId {
+  const model = findPrismModel(id).id;
+  if (isCloudPainting(model)) throw new Error('Cloud Painting isn’t painted on this computer.');
+  return model;
+}
 
 const readRecipe = (file: string) =>
   JSON.parse(fs.readFileSync(path.join(process.cwd(), 'lib', 'prism', file), 'utf8')) as Workflow;
@@ -154,7 +162,7 @@ function buildWorkflow(
   request: ImageRequest,
   uploadedName?: string,
 ): { workflow: Workflow; seed: number; width: number; height: number; model: PrismModelId; expanding: boolean } {
-  const model = findPrismModel(request.model).id;
+  const model = localModel(request.model);
   const recipe = RECIPES[model];
   const editing = Boolean(request.source && uploadedName);
   const workflow = readRecipe(editing ? recipe.edit : recipe.create);
@@ -202,7 +210,7 @@ export function modelFiles(workflow: Workflow): string[] {
  */
 export function imageNeeds(request: ImageRequest): GpuNeeds {
   const model = findPrismModel(request.model);
-  const recipe = RECIPES[model.id];
+  const recipe = RECIPES[localModel(model.id)];
   const lora = styleLora(request.style, model.id);
   return {
     label: `${model.name} ${request.source ? 'edit' : 'picture'}`,
@@ -235,8 +243,9 @@ export async function listModels(): Promise<ModelStatus[]> {
   const online = (await checkWorkers(GPU_WORKERS)).filter((s) => s.online);
   if (!online.length) throw new Error('ComfyUI isn’t running on any machine.');
 
-  return PRISM_MODELS.map((model) => {
-    const recipe = RECIPES[model.id];
+  // (The models route adds Cloud Painting: it has no files to look for.)
+  return PRISM_MODELS.filter((model) => !isCloudPainting(model.id)).map((model) => {
+    const recipe = RECIPES[localModel(model.id)];
     const files = [...new Set([...modelFiles(readRecipe(recipe.create)), ...modelFiles(readRecipe(recipe.edit))])];
     // What each machine is missing. The model is ready on the machines missing nothing.
     const missingOn = online.map((s) => ({ name: s.worker.name, missing: files.filter((f) => !s.files.has(f)) }));
@@ -278,12 +287,15 @@ async function askSafely<T>(address: string, timeoutMs: number, step: string, re
   }
 }
 
-/** Step 1, ORDER: hand the recipe to ComfyUI. Returns the ticket number. */
-export async function order(url: string, workflow: Workflow): Promise<string> {
+/**
+ * Step 1, ORDER: hand the recipe to ComfyUI. Returns the ticket number.
+ * `extraData` rides along with the recipe: a cloud job's account key (lib/prism/cloud.ts).
+ */
+export async function order(url: string, workflow: Workflow, extraData?: Record<string, unknown>): Promise<string> {
   const res = await fetch(`${url}/prompt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: workflow }),
+    body: JSON.stringify({ prompt: workflow, ...(extraData ? { extra_data: extraData } : {}) }),
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {

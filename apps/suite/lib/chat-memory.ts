@@ -22,7 +22,7 @@
 
 import 'server-only';
 import db from '@/lib/db';
-import { thinkSetting } from '@/config/models';
+import { localOnly, thinkSetting } from '@/config/models';
 import { chatKey, PHOTO_CONTEXT_CHARS, photoIds } from '@/lib/chat-images';
 import { buildMemoryBlock, embed, EMBED_TAG, fromBlob, hasMemories, keyTerms, matchScore, toBlob } from '@/lib/memory';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_URL } from '@/lib/queue';
@@ -77,12 +77,21 @@ export function historyBudget(numCtx: number, promptChars: number, share = 1): n
 
 const sizeOf = (m: { content: string; images: string[] }) => m.content.length + m.images.length * PHOTO_CONTEXT_CHARS;
 
+/** Calculate the total character count of a message history. */
+export function calculateUsedHistory<T extends { content: string; images: string[] }>(history: T[]): number {
+  return history.reduce((acc, m) => acc + sizeOf(m), 0);
+}
+
+/** Returns the percentage of the history budget currently occupied (0-100). */
+export function getGasGauge<T extends { content: string; images: string[] }>(history: T[], budget: number): number {
+  const used = calculateUsedHistory(history);
+  return Math.min(100, Math.round((used / budget) * 100));
+}
+
 /** Keep the newest messages that fit in the budget, so Ollama never has to cut off the start. */
 export function fitHistory<T extends { content: string; images: string[] }>(history: T[], budget: number): T[] {
-  let used = 0;
   let start = history.length;
-  while (start > 0 && used + sizeOf(history[start - 1]) <= budget) {
-    used += sizeOf(history[start - 1]);
+  while (start > 0 && calculateUsedHistory(history.slice(0, start)) <= budget) {
     start--;
   }
   return history.slice(start);
@@ -411,7 +420,8 @@ async function foldSummary(chat: ChatRef, model: string, numCtx: number, budget:
  * grown. `model` and `numCtx` are the ones the chat just used (already on the card); `budget` is
  * the history budget the chat was given (historyBudget).
  */
-export function maintainChat(chat: ChatRef, model: string, numCtx: number, budget: number): void {
+export function maintainChat(chat: ChatRef, chatModel: string, numCtx: number, budget: number): void {
+  const model = localOnly(chatModel); // after a cloud reply, a local model writes the summary
   embedNewEpisodes(chat).catch((err) => console.error('Chat recall upkeep error:', (err as Error)?.message ?? err));
   // Only take a turn on the graphics card when there's something to summarize.
   if (!pendingFold(chat, budget)) return;

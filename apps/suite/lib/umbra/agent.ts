@@ -14,7 +14,9 @@ import crypto from 'node:crypto';
 import { gpuQueue, OLLAMA_CHAT_NUM_CTX, OLLAMA_KEEP_ALIVE, OLLAMA_NUM_CTX } from '@/lib/queue';
 import type { ToolId } from '@/config/umbra';
 import { historyBudget } from '@/lib/chat-memory';
-import { canThink, thinkSetting } from '@/config/models';
+import { AUTO_MODEL, CLOUD_MODEL, canThink, isCloudModel, thinkSetting } from '@/config/models';
+import { chooseLocalModel } from '@/lib/auto-model';
+import { cloudChat, pickCloudModel } from '@/lib/cloud-model';
 import { toolsFor } from './tools';
 import type { AgentStep, ToolContext, ToolDef } from './types';
 
@@ -158,22 +160,30 @@ async function askModel(
   userId: string,
   onThinking?: (thinking: string) => void,
 ): Promise<OllamaReply> {
-  const ask = (think: boolean) =>
-    fetch(`${OLLAMA_URL}/api/chat`, {
+  // A cloud model (lib/cloud-model.ts) takes the same request, sent to Ollama's servers. It uses
+  // no graphics memory here, so it doesn't wait in the GPU queue.
+  const cloud = isCloudModel(model);
+  const ask = (think: boolean) => {
+    const body = {
+      model,
+      messages,
+      stream: think,
+      ...thinkSetting(model, think),
+      ...(tools.length ? { tools } : {}),
+    };
+    if (cloud) return cloudChat(body);
+    return fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model,
-        messages,
-        stream: think,
+        ...body,
         options: { num_ctx: numCtx },
         keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
-        ...thinkSetting(model, think),
-        ...(tools.length ? { tools } : {}),
       }),
     });
+  };
 
-  return gpuQueue.add(async () => {
+  const run = async () => {
     let res = await ask(Boolean(onThinking));
     let failure = res.ok ? '' : await res.text();
     // A model that can't think says so; ask it again the ordinary way.
@@ -182,10 +192,11 @@ async function askModel(
       res = await ask(false);
       failure = res.ok ? '' : await res.text();
     }
-    if (!res.ok) throw new Error(`Ollama error ${res.status}: ${failure}`);
+    if (!res.ok) throw new Error(`${cloud ? 'Cloud' : 'Ollama'} error ${res.status}: ${failure}`);
     if (!onThinking) return (await res.json()) as OllamaReply;
     return readThinkingReply(res, onThinking);
-  }, priority, 'ollama', { userId, model });
+  };
+  return cloud ? run() : gpuQueue.add(run, priority, 'ollama', { userId, model });
 }
 
 /**
@@ -253,14 +264,26 @@ export async function runAgent(options: {
    * everything needed to go on from here if the server stops. `round` is the round in progress.
    */
   onCheckpoint?: (checkpoint: { messages: ChatMessage[]; round: number }) => void;
-}): Promise<{ reply: string; steps: AgentStep[] }> {
+  /** `model` in the result is the one that answered: for a Flicker set to Auto, the fish Auto chose. */
+}): Promise<{ reply: string; steps: AgentStep[]; model: string }> {
+  // A Flicker set to Auto: the rules in lib/auto-model.ts choose a local model for this message.
+  // One set to Cloud Fish: lib/cloud-model.ts chooses between the cloud models the same way.
+  const lastAsked = options.messages.findLast((m) => m.role === 'user')?.content ?? '';
+  const model = options.model === AUTO_MODEL
+    ? await chooseLocalModel(lastAsked, options.messages.some((m) => Boolean(m.images?.length)))
+    : options.model === CLOUD_MODEL
+      ? pickCloudModel({
+          prompt: lastAsked,
+          working: Boolean(options.think) || options.toolIds.includes('code') || options.toolIds.includes('refract'),
+        })
+      : options.model;
   const tools = toolsFor(options.toolIds);
   for (const tool of options.extraTools ?? []) tools.set(tool.schema.function.name, tool);
   const schemas = [...tools.values()].map((t) => t.schema);
   const messages = [...options.messages];
   const steps: AgentStep[] = [...(options.initialSteps ?? [])];
   const maxRounds = options.toolIds.includes('code') || options.toolIds.includes('refract') ? MAX_ROUNDS_CODE : MAX_ROUNDS;
-  const thinks = Boolean(options.think) && canThink(options.model);
+  const thinks = Boolean(options.think) && canThink(model);
   const numCtx = numCtxFor(options.toolIds);
 
   const checkpoint = (round: number) => {
@@ -301,7 +324,7 @@ export async function runAgent(options: {
     const asked = lastRound && round > 0 ? [...messages, { role: 'system' as const, content: LAST_ROUND_PROMPT }] : messages;
     const askedAt = Date.now();
     const reply = await askModel(
-      options.model, asked, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
+      model, asked, lastRound ? [] : schemas, numCtx, options.priority ?? 'high', options.context.userId,
       thinks ? showThinking : undefined,
     );
     // Some models write their thinking into the reply itself, between <think> tags. Move it to
@@ -362,7 +385,7 @@ export async function runAgent(options: {
       // Told to go on, it said it was already done: its earlier reply was the answer after all.
       if (heldAnswer && /^\W*done\W*$/i.test(answer.trim())) {
         steps.splice(steps.findLastIndex((s) => s.tool === 'note'), 1);
-        return { reply: heldAnswer, steps };
+        return { reply: heldAnswer, steps, model };
       }
       let cutOff = reply.done_reason === 'length';
       // Ran out of room part-way: make room and ask the model to go on from where it stopped.
@@ -374,7 +397,7 @@ export async function runAgent(options: {
           { role: 'user' as const, content: answer.trim() ? CONTINUE_PROMPT : 'Answer now, briefly, without thinking it through again.' },
         ];
         fitToWindow(more, numCtx);
-        const next = await askModel(options.model, more, [], numCtx, options.priority ?? 'high', options.context.userId);
+        const next = await askModel(model, more, [], numCtx, options.priority ?? 'high', options.context.userId);
         const piece = splitThinking(next.message?.content ?? '').content;
         if (!piece.trim()) break;
         answer = answer.trim() ? joinPieces(answer, piece) : piece;
@@ -382,7 +405,7 @@ export async function runAgent(options: {
       }
       answer = answer.trim();
       if (cutOff && answer) answer += CUT_OFF_NOTE;
-      return { reply: answer || '…', steps };
+      return { reply: answer || '…', steps, model };
     }
 
     // The model wants to use tools. Keep its request in the conversation, then run each one.
@@ -450,7 +473,7 @@ export async function runAgent(options: {
       checkpoint(round);
     }
   }
-  return { reply: '…', steps }; // not reached: the last round always returns
+  return { reply: '…', steps, model }; // not reached: the last round always returns
 }
 
 /**

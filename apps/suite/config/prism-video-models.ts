@@ -5,6 +5,10 @@
 // out ("not downloaded yet") until some machine's ComfyUI has every file its recipe loads.
 //
 // The first entry is the default.
+//
+// The two "Cloud Movies" entries are different: they're made online by far bigger models
+// (lib/prism/cloud.ts), cost money for every second of video, and send your prompt and picture
+// out of the house. They're last in the list and only ever used when picked by hand.
 
 export interface PrismVideoModel {
   id: string;
@@ -21,6 +25,10 @@ export interface PrismVideoModel {
   vramGB: number;
   /** First guesses at how long each length takes to make, in seconds, until real ones replace them. */
   estimates: Record<VideoLengthId, number>;
+  /** Its own clip lengths, in seconds, when it can't make the usual ones (see lengthSeconds). */
+  seconds?: Record<VideoLengthId, number>;
+  /** True for a model that runs online, not on these machines (lib/prism/cloud.ts). */
+  cloud?: boolean;
 }
 
 /** The lengths you can pick. The number of frames depends on the model (see framesFor). */
@@ -57,10 +65,46 @@ export const PRISM_VIDEO_MODELS = [
     // Guesses: not measured yet.
     estimates: { short: 210, medium: 330, long: 600 },
   },
+  // Prices: Comfy credits per second at 1080p, at 211 credits to the dollar (November 2026).
+  {
+    id: 'cloud-kling',
+    name: 'Cloud Movies (Kling 3)',
+    // 23.63 credits a second, without sound.
+    note: 'Made online at 1080p, without sound. About 11¢ for each second of video (56¢ for 5 seconds). Your prompt and picture leave the house.',
+    fps: 24, // a guess: only used to count frames, and by Smooth
+    pixels: 1920 * 1080,
+    step: 8,
+    vramGB: 0,
+    seconds: { short: 3, medium: 5, long: 10 }, // Kling takes 3 to 15 seconds
+    estimates: { short: 120, medium: 150, long: 240 }, // guesses: not measured yet
+    cloud: true,
+  },
+  {
+    id: 'cloud-veo',
+    name: 'Cloud Movies Premium (Veo 3.1)',
+    // 84.4 credits a second, with sound.
+    note: 'Google’s best, made online at 1080p with sound. About 40¢ for each second of video ($1.60 for 4 seconds). Landscape or portrait only. Your prompt and picture leave the house.',
+    fps: 24, // a guess, as above
+    pixels: 1920 * 1080,
+    step: 8,
+    vramGB: 0,
+    seconds: { short: 4, medium: 6, long: 8 }, // Veo takes 4, 6 or 8 seconds
+    estimates: { short: 120, medium: 150, long: 180 }, // guesses: not measured yet
+    cloud: true,
+  },
 ] as const satisfies readonly PrismVideoModel[];
 
 export type VideoModelId = (typeof PRISM_VIDEO_MODELS)[number]['id'];
 export const DEFAULT_VIDEO_MODEL: VideoModelId = PRISM_VIDEO_MODELS[0].id;
+
+export type CloudVideoModelId = 'cloud-kling' | 'cloud-veo';
+/** The models that run on these machines: the ones with recipe files in lib/prism. */
+export type LocalVideoModelId = Exclude<VideoModelId, CloudVideoModelId>;
+export const isCloudVideo = (id: unknown): id is CloudVideoModelId => id === 'cloud-kling' || id === 'cloud-veo';
+
+/** How long a clip of this length is, in seconds, for this model. */
+export const lengthSeconds = (model: PrismVideoModel, length: VideoLengthId): number =>
+  model.seconds?.[length] ?? VIDEO_LENGTHS.find((l) => l.id === length)!.seconds;
 
 /** The model with this id. Anything unknown (or left out, as in videos made before there was a choice) gives the default. */
 export function findVideoModel(id: unknown): (typeof PRISM_VIDEO_MODELS)[number] {

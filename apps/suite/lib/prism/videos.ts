@@ -17,9 +17,10 @@ import { gpuQueue } from '@/lib/queue';
 import { checkWorkers } from '../gpu/health.ts';
 import { GPU_WORKERS } from '../../config/gpu-workers.ts';
 import {
-  PRISM_VIDEO_MODELS, VIDEO_LENGTHS, findVideoModel, framesFor,
+  PRISM_VIDEO_MODELS, VIDEO_LENGTHS, findVideoModel, framesFor, isCloudVideo, lengthSeconds,
   type VideoLengthId, type VideoModelId,
 } from '../../config/prism-video-models.ts';
+import { CLOUD_SETUP, cloudProblem, friendlyCloudError, generateCloudVideo } from './cloud.ts';
 import { generateVideo, videoFiles, videoNeeds, type VideoMode } from './video-workflow.ts';
 import { SMOOTH_FILE, smoothNeeds, smoothVideo } from './smooth.ts';
 import type { PreparedSource } from './source';
@@ -72,7 +73,9 @@ const withUrls = (row: Row): PrismVideo => {
     ...row,
     model,
     fps: findVideoModel(model).fps * (row.smoothOf ? 2 : 1),
-    clipSeconds: VIDEO_LENGTHS.find((l) => l.id === row.length)?.seconds ?? Math.round(row.frames / findVideoModel(model).fps),
+    clipSeconds: VIDEO_LENGTHS.some((l) => l.id === row.length)
+      ? lengthSeconds(findVideoModel(model), row.length)
+      : Math.round(row.frames / findVideoModel(model).fps),
     url: `/api/prism/videos/${row.id}`,
     poster: hasPoster ? `/api/prism/videos/${row.id}?poster=1` : null,
   };
@@ -98,7 +101,8 @@ export function startVideo(
 ): PrismVideo {
   const length = VIDEO_LENGTHS.find((l) => l.id === options.length)!;
   const model = findVideoModel(options.model);
-  const frames = framesFor(model, length.seconds);
+  const clipSeconds = lengthSeconds(model, length.id);
+  const frames = framesFor(model, clipSeconds);
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const { picture } = options;
@@ -114,17 +118,17 @@ export function startVideo(
 
   // Not awaited on purpose: this keeps going after the page gets its answer.
   // The GPU queue picks a machine that has the video model's files (see lib/gpu/router.ts).
-  const request = {
-    model: model.id,
-    prompt: options.prompt,
-    frames,
-    ...(picture ? { picture } : { size: { width: size.width, height: size.height } }),
-  };
-  void gpuQueue
-    .add((worker) => generateVideo(request, worker), 'high', 'comfy', {
-      userId,
-      needs: videoNeeds(model.id, mode),
-    })
+  const modelId = model.id;
+  const from = picture ? { picture } : { size: { width: size.width, height: size.height } };
+  // A Cloud Movies model is made online (lib/prism/cloud.ts): it needs no graphics card here, so
+  // it doesn't wait in the GPU queue.
+  const making = isCloudVideo(modelId)
+    ? generateCloudVideo({ model: modelId, prompt: options.prompt, seconds: clipSeconds, ...from })
+    : gpuQueue.add((worker) => generateVideo({ model: modelId, prompt: options.prompt, frames, ...from }, worker), 'high', 'comfy', {
+        userId,
+        needs: videoNeeds(modelId, mode),
+      });
+  void making
     .then((result) => {
       fs.writeFileSync(path.join(VIDEO_DIR, `${id}.mp4`), result.video);
       if (result.poster) fs.writeFileSync(path.join(VIDEO_DIR, `${id}.png`), result.poster);
@@ -134,7 +138,7 @@ export function startVideo(
       console.error('Prism video error:', err);
       const friendly = /fetch failed|ECONNREFUSED/i.test(err.message ?? '')
         ? 'ComfyUI isn’t running. Start it with run_nvidia_gpu.bat and try again.'
-        : err.message || 'Something went wrong.';
+        : (isCloudVideo(modelId) && friendlyCloudError(err)) || err.message || 'Something went wrong.';
       db.prepare(`UPDATE PrismVideo SET status = 'failed', error = ? WHERE id = ?`).run(friendly, id);
     });
 
@@ -245,7 +249,7 @@ export function lengthChoices(): Record<VideoModelId, LengthChoice[]> {
   for (const model of PRISM_VIDEO_MODELS) {
     choices[model.id] = VIDEO_LENGTHS.map((l) => {
       const made = rows.find((r) => r.model === model.id && r.length === l.id);
-      return { id: l.id, name: l.name, seconds: l.seconds, wait: made ? made.average : model.estimates[l.id], runs: made?.runs ?? 0 };
+      return { id: l.id, name: l.name, seconds: lengthSeconds(model, l.id), wait: made ? made.average : model.estimates[l.id], runs: made?.runs ?? 0 };
     });
   }
   return choices;
@@ -270,8 +274,14 @@ export async function videoModelStatus(): Promise<{ models: VideoModelStatus[]; 
   const smooth = online.some((s) => s.files.has(SMOOTH_FILE));
   const models = PRISM_VIDEO_MODELS.map((model) => {
     const status: VideoModelStatus = { id: model.id, ready: { image: false, text: false }, missing: { image: [], text: [] } };
+    const modelId = model.id;
+    // A Cloud Movies model has no files to look for: it's ready once the account key is set.
+    if (isCloudVideo(modelId)) {
+      const missing = cloudProblem() ? [CLOUD_SETUP] : [];
+      return { ...status, ready: { image: !missing.length, text: !missing.length }, missing: { image: missing, text: missing } };
+    }
     for (const mode of ['image', 'text'] as const) {
-      const files = videoFiles(model.id, mode);
+      const files = videoFiles(modelId, mode);
       const missingOn = online.map((s) => files.filter((f) => !s.files.has(f))).sort((a, b) => a.length - b.length);
       status.ready[mode] = missingOn[0].length === 0;
       status.missing[mode] = missingOn[0];

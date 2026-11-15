@@ -1,0 +1,127 @@
+/* Halo (app/(apps)/halo): the animation maker. Gold accent, from config/apps.ts. */
+
+/* #region halo */
+.halo {
+  --halo: #f2c14e;
+  display: grid;
+  grid-template-columns: minmax(16rem, 26rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  /* Bottom: clear the floating app picker, like Astra. */
+  padding: var(--header-h) 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
+  color: var(--text-color);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.halo::-webkit-scrollbar { display: none; }
+@media (max-width: 760px) {
+  .halo { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The preview stays in view while you scroll the controls. */
+.halo-stage { position: sticky; top: 0; display: grid; gap: 0.75rem; }
+.halo-preview {
+  aspect-ratio: 1;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  /* A soft checkerboard, so see-through parts read as see-through. */
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0 25%, transparent 0 50%) 0 0 / 2rem 2rem,
+    rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.halo-name {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+}
+.halo-name:hover { border-color: color-mix(in srgb, currentColor 30%, transparent); }
+.halo-name:focus-visible { outline: none; border-color: currentColor; }
+
+.halo-action {
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--halo);
+  border-radius: 0.5rem;
+  font: inherit;
+  color: var(--halo);
+  background: transparent;
+  cursor: pointer;
+}
+.halo-action:hover { background: rgba(242, 193, 78, 0.12); }
+.halo-action:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; }
+.halo-action.is-main { background: var(--halo); color: #1d1606; font-weight: 600; }
+.halo-action.is-main:hover { background: #f6cf72; }
+.halo-action span { font-weight: 400; opacity: 0.7; }
+
+.halo-controls { display: grid; gap: 1rem; min-width: 0; }
+.halo-panel {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+.halo-panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+.halo-help, .halo-note { margin: -0.4rem 0 0.75rem; font-size: 0.85rem; opacity: 0.75; }
+.halo-note { margin: 0.75rem 0 0; color: #e3b84f; opacity: 1; }
+.halo-error { margin: 0; color: #e0484f; }
+
+/* Shape buttons: a small picture with the name under it. */
+.halo-shapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr)); gap: 0.5rem; }
+.halo-shape {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.halo-shape svg { width: 2.5rem; height: 2.5rem; fill: currentColor; }
+.halo-shape:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.halo-shape.is-current { border-color: var(--halo); color: var(--halo); }
+.halo-shape:focus-visible { outline: 2px solid var(--halo); outline-offset: 2px; }
+.halo-shape.is-upload { border-style: dashed; opacity: 0.8; }
+.halo-shape.is-upload span { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; font-size: 1.6rem; }
+
+.halo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.75rem; font-size: 0.9rem; }
+.halo-row input[type="range"] { flex: 1; min-width: 8rem; accent-color: var(--halo); }
+.halo-row input[type="color"] { width: 3rem; height: 2rem; padding: 0; border: none; background: none; cursor: pointer; }
+.halo-row select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  font: inherit;
+  color: inherit;
+  background: var(--grad-color-2);
+}
+
+/* Each move: a tick box, a strength slider, and what it does. */
+.halo-moves { display: grid; gap: 0.6rem; }
+.halo-move {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.75rem;
+  opacity: 0.6;
+}
+.halo-move.is-on { opacity: 1; }
+.halo-move-name { display: flex; align-items: center; gap: 0.45rem; font-weight: 600; cursor: pointer; }
+.halo-move-name input { accent-color: var(--halo); }
+.halo-move input[type="range"] { width: 100%; accent-color: var(--halo); }
+.halo-move-about { grid-column: 2; font-size: 0.8rem; opacity: 0.7; }
+/* #endregion halo */

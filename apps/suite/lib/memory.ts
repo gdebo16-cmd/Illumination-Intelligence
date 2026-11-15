@@ -10,7 +10,7 @@
 // What a chat itself remembers (its running summary, and recall of past exchanges) is in
 // lib/chat-memory.ts, which uses the embedding helpers here.
 import 'server-only';
-import { thinkSetting } from '@/config/models';
+import { localOnly, thinkSetting } from '@/config/models';
 import { OLLAMA_KEEP_ALIVE } from '@/lib/queue';
 
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
@@ -18,7 +18,8 @@ const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 // used: that one is already on the graphics card, so nothing has to be unloaded and loaded again
 // around every message. Set MEMORY_EXTRACT_MODEL in .env to always use one particular model.
 const FIXED_EXTRACT_MODEL = process.env.MEMORY_EXTRACT_MODEL?.trim() || null;
-export const extractModelFor = (chatModel: string) => FIXED_EXTRACT_MODEL ?? chatModel;
+// (After a cloud reply it's a local model instead: this work never goes online.)
+export const extractModelFor = (chatModel: string) => FIXED_EXTRACT_MODEL ?? localOnly(chatModel);
 const EMBED_MODEL = process.env.MEMORY_EMBED_MODEL ?? 'nomic-embed-text';
 // The embedding model is tiny, so it runs on the processor and leaves the graphics card to the
 // chat model. Set MEMORY_EMBED_GPU=1 in .env to put it on the card instead.

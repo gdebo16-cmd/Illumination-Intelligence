@@ -430,13 +430,13 @@ function launch(run: {
       // In the background: save this exchange for recall, and fold old messages into the chat's
       // summary once it has grown (lib/chat-memory.ts).
       maintainChat(
-        umbraChat(userId, bot.id), run.model, numCtxFor(run.toolIds),
+        umbraChat(userId, bot.id), result.model, numCtxFor(run.toolIds),
         botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0, run.think),
       );
       // With Memory on, read what you said for things worth remembering, as Lumen does. Only for
       // your own chat: a job another Flicker handed over isn't you talking.
       if (run.source === 'chat') {
-        rememberFromChat(userId, bot, { cursorKey: chatKey.umbra(bot.id), table: 'UmbraMessage', column: 'bot_id', id: bot.id }, run.model, run.toolIds);
+        rememberFromChat(userId, bot, { cursorKey: chatKey.umbra(bot.id), table: 'UmbraMessage', column: 'bot_id', id: bot.id }, result.model, run.toolIds);
       }
       db.prepare(
         `UPDATE UmbraChatRun SET status = 'done', steps = ?, reply = ?, message_id = ?, finishedAt = ?, heartbeatAt = ? WHERE id = ?`,

@@ -16,7 +16,8 @@ import { connection, NextResponse } from 'next/server';
 import { getCurrentUserId, noProfile } from '@/lib/user';
 import { readImageFile } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
-import { findLength, findVideoModel, findVideoShape, videoSize } from '@/config/prism-video-models';
+import { findLength, findVideoModel, findVideoShape, isCloudVideo, videoSize } from '@/config/prism-video-models';
+import { cloudProblem } from '@/lib/prism/cloud';
 import { lengthChoices, listVideos, smoothWait, startVideo, videoModelStatus } from '@/lib/prism/videos';
 
 const MAX_PROMPT = 2000;
@@ -68,12 +69,16 @@ export async function POST(req: Request) {
 
   if (fields.model !== undefined && findVideoModel(fields.model).id !== fields.model) return bad('Pick a video model.');
   const model = findVideoModel(fields.model);
+  // Cloud Movies (lib/prism/cloud.ts) are only ever used when the request names one, as here.
+  const cloud = isCloudVideo(model.id);
+  if (cloud && cloudProblem()) return bad(cloudProblem()!);
   const imageId = typeof fields.imageId === 'string' && fields.imageId ? fields.imageId : null;
 
   // From words only: no picture, just a shape.
   if (!upload && !imageId) {
     const shape = findVideoShape(fields.shape);
     if (!shape) return bad('Pick a picture to bring to life, or a shape for a video from words.');
+    if (model.id === 'cloud-veo' && shape.id === 'square') return bad('Veo makes landscape or portrait videos only. Pick one of those, or Cloud Movies (Kling 3).');
     const video = startVideo(userId, { prompt, model: model.id, length: length.id, size: videoSize(model, shape.ratio), imageId: null });
     return NextResponse.json(video, { status: 202 });
   }

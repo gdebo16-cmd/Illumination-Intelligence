@@ -115,6 +115,11 @@ export const BOT_MODELS = [
   { id: 'gpt-oss:20b', name: 'Big City Fish: multi-task (Heavy)' },
   { id: 'devstral-small-2:24b', name: 'Harbor Fish: project code (Heavy)' },
   { id: 'qwen3-coder:30b', name: 'Deep Sea Fish: tough code (Heavy, Slow)' },
+  // Not a model: the app picks one of the fish above for each message (lib/auto-model.ts).
+  // Last in the list so new Flickers still start on the first model.
+  { id: 'auto', name: 'Auto: picks a fish for each message' },
+  // Runs on Ollama's servers, not here (lib/cloud-model.ts): the chat leaves the house and costs a little.
+  { id: 'cloud', name: 'Cloud Fish: huge models, online (costs a little)' },
 ] as const;
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);

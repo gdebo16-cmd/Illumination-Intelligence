@@ -1,7 +1,7 @@
 // Prism's shared types and small helpers: what the API sends back, and how the page formats it.
 
 import { PRISM_STYLES } from '@/config/prism-styles';
-import { PRISM_VIDEO_MODELS, VIDEO_LENGTHS, type VideoModelId } from '@/config/prism-video-models';
+import { PRISM_VIDEO_MODELS, VIDEO_LENGTHS, lengthSeconds, type VideoModelId } from '@/config/prism-video-models';
 
 // The shapes you can pick. Sizes are in steps of 16 pixels, as the model needs.
 export const SHAPES = [
@@ -59,6 +59,8 @@ export interface ModelChoice {
   note: string;
   expands: boolean;
   ready: boolean;
+  /** True for Cloud Painting: made online, so it's "set up" (an account key), not "downloaded". */
+  cloud?: boolean;
 }
 
 // ...and for each video.
@@ -100,7 +102,7 @@ export interface LengthChoice {
 
 // Until the server answers, show each video model's first guesses (config/prism-video-models.ts).
 export const FIRST_GUESS = Object.fromEntries(
-  PRISM_VIDEO_MODELS.map((m) => [m.id, VIDEO_LENGTHS.map((l) => ({ ...l, wait: m.estimates[l.id], runs: 0 }))]),
+  PRISM_VIDEO_MODELS.map((m) => [m.id, VIDEO_LENGTHS.map((l) => ({ ...l, seconds: lengthSeconds(m, l.id), wait: m.estimates[l.id], runs: 0 }))]),
 ) as Record<VideoModelId, LengthChoice[]>;
 
 // Whether a video model's files are in ComfyUI, for a video from a picture and from words.

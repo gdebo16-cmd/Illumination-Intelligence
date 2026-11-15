@@ -5,7 +5,7 @@ import { useChat, type Message } from './ChatContext';
 import QueueNotice from '@/components/QueueNotice';
 import AppLauncher from '@/components/AppLauncher';
 import { useBarHeight } from '@/hooks/use-bar-height';
-import { canSeeImages } from '@/config/models';
+import { canSeeImages, isCloudModel, shortModelName } from '@/config/models';
 import { MessagePhotos, PhotoButton, PhotoTray, releasePhotos, usePhotos } from '@/components/PhotoAttach';
 import { ReplyContent, DocumentPanel, documentVersions } from '@/components/documents';
 
@@ -148,7 +148,7 @@ const Chat = () => {
       const saved: string[] = Array.isArray(data.images) ? data.images : [];
       setMessages((prev) => [
         ...prev.map((m) => (m === mine && saved.length ? { ...m, images: saved } : m)),
-        { role: 'assistant' as const, content: data.reply },
+        { role: 'assistant' as const, content: data.reply, pickedModel: typeof data.pickedModel === 'string' ? data.pickedModel : undefined },
       ]);
       if (saved.length) releasePhotos(sending);
 
@@ -187,7 +187,16 @@ const Chat = () => {
             <div className={`message-content ${msg.role === 'user' ? 'user' : 'assistant'}`}>
               {/* A reply's documents show as cards that open in the side panel. */}
               {msg.role === 'assistant'
-                ? <ReplyContent content={msg.content} onOpen={setOpenDoc} versions={versions} open={openDoc} />
+                ? (
+                  <>
+                    <ReplyContent content={msg.content} onOpen={setOpenDoc} versions={versions} open={openDoc} />
+                    {msg.pickedModel && (
+                      <div className="message-model">
+                        {isCloudModel(msg.pickedModel) ? 'Answered online by' : 'Auto chose'} {shortModelName(msg.pickedModel)}
+                      </div>
+                    )}
+                  </>
+                )
                 : (
                   <>
                     <MessagePhotos images={msg.images} withText={Boolean(msg.content.trim())} />

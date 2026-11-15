@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { freeMemory, modelFiles, order, pickUp, upload, waitFor, type Workflow } from './comfy.ts';
 import { LOCAL_WORKER, type GpuWorker } from '../../config/gpu-workers.ts';
-import { findVideoModel, type VideoModelId } from '../../config/prism-video-models.ts';
+import { findVideoModel, type LocalVideoModelId } from '../../config/prism-video-models.ts';
 import type { GpuNeeds } from '../gpu/router.ts';
 
 /** A video made from a picture, or from words only. */
@@ -37,7 +37,8 @@ const BOX = {
   poster: '91', // SaveImage
 };
 
-const RECIPES: Record<VideoModelId, { file: string; seedSetting: string; textFiles: Record<string, string> }> = {
+// (The Cloud Movies models have no recipe file: lib/prism/cloud.ts writes theirs.)
+const RECIPES: Record<LocalVideoModelId, { file: string; seedSetting: string; textFiles: Record<string, string> }> = {
   'wan-5b': { file: 'wan-video-workflow.json', seedSetting: 'seed', textFiles: {} },
   'wan-14b': {
     file: 'wan14b-video-workflow.json',
@@ -52,14 +53,14 @@ const RECIPES: Record<VideoModelId, { file: string; seedSetting: string; textFil
   },
 };
 
-const readRecipe = (model: VideoModelId) =>
+const readRecipe = (model: LocalVideoModelId) =>
   JSON.parse(fs.readFileSync(path.join(process.cwd(), 'lib', 'prism', RECIPES[model].file), 'utf8')) as Workflow;
 
 // The setting that names the file, in each kind of Load box the recipes use.
 const FILE_SETTING: Record<string, string> = { UnetLoaderGGUF: 'unet_name', LoraLoaderModelOnly: 'lora_name' };
 
 /** The recipe for this model and mode, before the prompt, size and seed are filled in. */
-export function videoRecipe(model: VideoModelId, mode: VideoMode): Workflow {
+export function videoRecipe(model: LocalVideoModelId, mode: VideoMode): Workflow {
   const workflow = readRecipe(model);
   if (mode === 'text') {
     // No starting picture: drop its box and the wire from it.
@@ -76,20 +77,20 @@ export function videoRecipe(model: VideoModelId, mode: VideoMode): Workflow {
 }
 
 /** Every model file this model needs for this mode. */
-export const videoFiles = (model: VideoModelId, mode: VideoMode) => modelFiles(videoRecipe(model, mode));
+export const videoFiles = (model: LocalVideoModelId, mode: VideoMode) => modelFiles(videoRecipe(model, mode));
 
 /**
  * What a video job needs from a machine, for the GPU queue's router. Both models want about
  * 14 GB, so videos prefer the Raider's 16 GB card. They can only go to the Alienware once its
  * ComfyUI has the files too.
  */
-export function videoNeeds(model: VideoModelId, mode: VideoMode): GpuNeeds {
+export function videoNeeds(model: LocalVideoModelId, mode: VideoMode): GpuNeeds {
   const found = findVideoModel(model);
   return { label: `${found.name} video`, vramGB: found.vramGB, files: videoFiles(model, mode) };
 }
 
 export interface VideoRequest {
-  model: VideoModelId;
+  model: LocalVideoModelId;
   /** What should move, e.g. "the waves roll in and the beam sweeps across the sea". */
   prompt: string;
   /** The starting picture, already prepared at the model's video size. Left out for a video from words. */
