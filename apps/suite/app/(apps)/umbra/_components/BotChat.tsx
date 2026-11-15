@@ -284,8 +284,6 @@ export default function BotChat({ botId }: { botId: string }) {
     );
   }
 
-  const runningStep = liveSteps.find((s) => s.status === 'running');
-
   return (
     <main className="umbra umbra-chat" style={{ '--bot-color': flameColor(bot.flame) } as React.CSSProperties}>
       <QueueNotice active={thinking} />
@@ -332,11 +330,11 @@ export default function BotChat({ botId }: { botId: string }) {
         )}
         {messages.map((m) => (
           <div key={m.id} className={`umbra-message ${m.role}`}>
-            {m.role === 'assistant' && <Flame flame={bot.flame} size={32} still className="umbra-message-flame" />}
+            {m.role === 'assistant'}
             <div className="umbra-bubble">
               {m.role === 'assistant' ? (
                 <>
-                  {m.steps && <Steps steps={m.steps} />}
+                  {m.steps && <Steps steps={m.steps} flame={bot.flame} />}
                   <ReplyContent content={m.content} onOpen={setOpenDoc} />
                 </>
               ) : (
@@ -349,16 +347,9 @@ export default function BotChat({ botId }: { botId: string }) {
           </div>
         ))}
         {thinking && (
-          <div className="umbra-message assistant">
-            <Flame flame={bot.flame} size={32} mood="working" className="umbra-message-flame" />
+          <div className="umbra-message assistant">        
             <div className="umbra-bubble">
-              <Steps steps={liveSteps} />
-              {/* A "Thinking" step already says what's happening, with the thinking itself. */}
-              {runningStep?.tool !== 'thinking' && (
-                <span className="umbra-thinking">
-                  {runningStep ? `${runningStep.label}…` : `${bot.name} is thinking…`}
-                </span>
-              )}
+              <Steps steps={liveSteps} live flame={bot.flame} />
             </div>
           </div>
         )}

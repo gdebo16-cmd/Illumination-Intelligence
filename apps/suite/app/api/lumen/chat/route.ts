@@ -6,7 +6,9 @@ import { chatContext, fitHistory, historyBudget, lumenChat, maintainChat, recall
 import { getCurrentUserId, noProfile } from '@/lib/user';
 import { gpuQueue, OLLAMA_KEEP_ALIVE, OLLAMA_CHAT_NUM_CTX } from '@/lib/queue';
 import { BASE_SYSTEM_PROMPT, DOCUMENT_SYSTEM_PROMPT } from '@/lib/prompts';
-import { canSeeImages } from '@/config/models';
+import { AUTO_MODEL, CLOUD_MODEL, canSeeImages, isCloudModel, thinkSetting } from '@/config/models';
+import { chooseLocalModel } from '@/lib/auto-model';
+import { cloudChat, cloudProblem, pickCloudModel } from '@/lib/cloud-model';
 import { saveDocumentArtifacts } from '@/lib/artifacts';
 import { mayHoldDocument } from '@/lib/document-blocks';
 import {
@@ -38,7 +40,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    const chatModel: string = (typeof fields.model === 'string' && fields.model) || DEFAULT_MODEL;
+    // "Auto" isn't a model: the rules in lib/auto-model.ts choose a local one for this message.
+    const requestedModel: string = (typeof fields.model === 'string' && fields.model) || DEFAULT_MODEL;
+    const autoPicked = requestedModel === AUTO_MODEL;
+    // "Cloud Fish" isn't one either: lib/cloud-model.ts chooses between the cloud models.
+    const chatModel = autoPicked
+      ? await chooseLocalModel(prompt, uploads.length > 0)
+      : requestedModel === CLOUD_MODEL ? pickCloudModel({ prompt }) : requestedModel;
+    // Cloud models run on Ollama's servers: no graphics card here, so no waiting in the GPU queue.
+    const viaCloud = isCloudModel(chatModel);
+    // No key yet: say so now, before the message is saved to a chat that can't be answered.
+    if (viaCloud && cloudProblem()) return NextResponse.json({ error: cloudProblem() }, { status: 400 });
     const canSee = canSeeImages(chatModel);
     // The photo button is hidden for models that can't see, so this is only a safety net.
     if (uploads.length > 0 && !canSee) {
@@ -113,30 +125,29 @@ export async function POST(req: Request) {
 
     // 8. Send to Ollama through the queue (live chat has priority over background jobs)
     //    The queue unloads any other model first and retries once if Ollama crashes.
-    const ollamaData = await gpuQueue.add(
-      async () => {
-        const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: chatModel,
-            messages,
-            stream: false,
-            options: { num_ctx: OLLAMA_CHAT_NUM_CTX },
-            keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
-          }),
-        });
-        if (!res.ok) {
-          // Ollama puts the real reason in the body; keep it for the server log.
-          const detail = (await res.text().catch(() => '')).slice(0, 300);
-          throw new Error(`Ollama error: ${res.status} ${res.statusText}${detail ? ` - ${detail}` : ''}`);
-        }
-        return (await res.json()) as { message?: { content?: string } };
-      },
-      'high',
-      'ollama',
-      { userId, model: chatModel },
-    );
+    //    A cloud model is asked directly instead (lib/cloud-model.ts), without thinking: that's billed.
+    const ask = async () => {
+      const res = viaCloud
+        ? await cloudChat({ model: chatModel, messages, stream: false, ...thinkSetting(chatModel, false) })
+        : await fetch(`${OLLAMA_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: chatModel,
+              messages,
+              stream: false,
+              options: { num_ctx: OLLAMA_CHAT_NUM_CTX },
+              keep_alive: OLLAMA_KEEP_ALIVE, // stay loaded a while for the next message (lib/queue.ts)
+            }),
+          });
+      if (!res.ok) {
+        // Ollama puts the real reason in the body; keep it for the server log.
+        const detail = (await res.text().catch(() => '')).slice(0, 300);
+        throw new Error(`${viaCloud ? 'Cloud' : 'Ollama'} error: ${res.status} ${res.statusText}${detail ? ` - ${detail}` : ''}`);
+      }
+      return (await res.json()) as { message?: { content?: string } };
+    };
+    const ollamaData = viaCloud ? await ask() : await gpuQueue.add(ask, 'high', 'ollama', { userId, model: chatModel });
 
     const reply = ollamaData.message?.content || 'No response generated.';
 
@@ -156,7 +167,8 @@ export async function POST(req: Request) {
     }
 
     // 10. Extract new memories in the background: do not await, so the reply returns immediately.
-    //     It uses the model that just answered (already on the card), with the same context size.
+    //     It uses the model that just answered (already on the card), with the same context size;
+    //     after a cloud reply, a local model (extractModelFor), so this never goes online.
     const memoryModel = extractModelFor(chatModel);
     gpuQueue
       .add(() => extractMemories(
@@ -173,7 +185,11 @@ export async function POST(req: Request) {
     maintainChat(chat, chatModel, OLLAMA_CHAT_NUM_CTX, budget);
 
     // 11. Return the response to the frontend
-    return NextResponse.json({ conversationId: activeConversationId, reply, images, artifacts });
+    //     (When Auto or Cloud Fish chose the model, say which, so the page can show it under the reply.)
+    return NextResponse.json({
+      conversationId: activeConversationId, reply, images, artifacts,
+      ...(autoPicked || viaCloud ? { pickedModel: chatModel } : {}),
+    });
   } catch (err: unknown) {
     const error = err as Error;
     console.error('API Chat Error:', error);

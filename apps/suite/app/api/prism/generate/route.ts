@@ -24,7 +24,8 @@ import { startImageJob } from '@/lib/prism/imageJobs';
 import { readImageFile, saveImage } from '@/lib/prism/images';
 import { MAX_SOURCE_BYTES, prepareSource, type PreparedSource } from '@/lib/prism/source';
 import { PRISM_STYLES } from '@/config/prism-styles';
-import { findPrismModel } from '@/config/prism-models';
+import { findPrismModel, isCloudPainting } from '@/config/prism-models';
+import { cloudProblem, generateCloudImage } from '@/lib/prism/cloud';
 
 const MAX_PROMPT = 2000;
 
@@ -58,6 +59,9 @@ export async function POST(req: Request) {
 
   const style = PRISM_STYLES.some((s) => s.id === fields.style) ? (fields.style as string) : 'none';
   const model = findPrismModel(fields.model); // anything unknown → the default model
+  // Cloud Painting (lib/prism/cloud.ts) is only ever used when the request names it, as here.
+  const cloud = isCloudPainting(model.id);
+  if (cloud && cloudProblem()) return bad(cloudProblem()!);
   // On unless switched off. (A form sends everything as text, so "false" counts too.)
   const expand = fields.expand !== false && fields.expand !== 'false';
   const number = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
@@ -98,8 +102,10 @@ export async function POST(req: Request) {
     model: model.id,
     modelName: model.name,
     sourceId: upload ? null : sourceId,
-    needs: imageNeeds(request),
-    run: (worker) => generateImage(request, worker),
+    // Cloud Painting is painted online: no machine to pick, and no waiting in the GPU queue.
+    cloud,
+    needs: cloud ? { label: 'Cloud Painting', vramGB: 0, files: [] } : imageNeeds(request),
+    run: (worker) => (cloud ? generateCloudImage(request) : generateImage(request, worker)),
     // 5. Keep it (the page finds it by the job's imageId).
     save: (result) => saveImage(userId, prompt, style, result, source ? { sourceId: upload ? null : sourceId } : undefined).id,
     label: 'Prism generate error',

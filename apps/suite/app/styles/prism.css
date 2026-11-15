@@ -142,6 +142,9 @@
   border: 1px solid currentColor; 
   border-radius: 3px; 
 }
+.prism-shape-icon.is-landscape { aspect-ratio: 16 / 9; }
+.prism-shape-icon.is-portrait { aspect-ratio: 9 / 16; }
+.prism-shape-icon.is-square { aspect-ratio: 1 / 1; }
 .prism-shape[aria-checked="true"] { 
   color: var(--text-color); 
   border-color: 
@@ -448,8 +451,12 @@
 /* Your pictures, in the side panel: a grid of square thumbnails */
 .prism-gallery {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0, …): a big picture inside a tile can't stretch its column past the panel. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
+}
+.prism-gallery > * {
+  min-width: 0;
 }
 /* The side panel is outside the studio, so it needs the accent color too. Buttons in a
    side panel are styled as full-width text rows; these put Prism's own buttons back. */
@@ -472,7 +479,9 @@
   background: var(--primary-color);
 }
 .prism-sidebar .prism-thumb {
+  display: block;
   width: 100%;
+  min-width: 0;
   height: auto;
   aspect-ratio: 1;
   min-height: 0;
@@ -524,9 +533,11 @@
   border-radius: 10px;
   cursor: pointer;
 }
-.prism-thumb img {
-  width: 100%; 
-  height: 100%; 
+.prism-thumb img,
+.prism-thumb video {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
   object-fit: cover; 
   display: block; 
 }
@@ -602,6 +613,22 @@
   opacity: 0.45;
   filter: blur(2px);
 }
+/* A video from words has no starting picture: an empty frame of the video's shape instead. */
+.prism-video-blank {
+  display: block;
+  height: min(24rem, 40vh);
+  max-width: 100%;
+  border-radius: 12px;
+  background: #0c1220;
+}
+.prism-video-blank.is-landscape { aspect-ratio: 16 / 9; }
+.prism-video-blank.is-portrait {
+  aspect-ratio: 9 / 16;
+  height: auto;
+  width: min(16rem, 50vw);
+  max-height: min(24rem, 40vh);
+}
+.prism-video-blank.is-square { aspect-ratio: 1 / 1; }
 .prism-video-status {
   position: absolute;
   inset: auto 1rem 1rem;

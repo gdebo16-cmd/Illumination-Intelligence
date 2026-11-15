@@ -20,6 +20,8 @@ export interface Message {
   content: string;
   /** Photos sent with the message: saved photo ids (or, just after sending, local previews). */
   images?: string[];
+  /** On a reply sent with the picker on Auto: the model Auto chose (shown until the chat is reloaded). */
+  pickedModel?: string;
 }
 
 interface ConversationItem {

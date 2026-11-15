@@ -107,7 +107,7 @@ const fullName = (model: string) => (model.includes(':') ? model : `${model}:lat
 // Embedding models are tiny and used between jobs (memory search); leave them loaded.
 const isEmbedModel = (name: string) => /embed/i.test(name);
 
-async function loadedOllamaModels(): Promise<string[]> {
+export async function loadedOllamaModels(): Promise<string[]> {
   const res = await fetch(`${OLLAMA_URL}/api/ps`);
   const { models = [] } = (await res.json()) as { models?: { name: string }[] };
   return models.map((m) => m.name);

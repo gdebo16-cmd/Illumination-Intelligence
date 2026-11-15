@@ -55,6 +55,9 @@ function Save {
   Move-Item -LiteralPath $tmp -Destination $Result -Force
 }
 
+# Say straight away that the worker is alive, so "queued" on the card means it never started.
+Save
+
 function Scrub([string]$text) {
   if (-not $text) { return '' }
   $t = $text -replace '(gh[pousr]_|github_pat_)[A-Za-z0-9_]+', '***'

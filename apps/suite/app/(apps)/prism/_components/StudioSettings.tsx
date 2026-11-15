@@ -1,9 +1,14 @@
 import { PRISM_STYLES } from '@/config/prism-styles';
+import {
+  PRISM_VIDEO_MODELS, VIDEO_SHAPES, findVideoModel, isCloudVideo,
+  type VideoModelId, type VideoShapeId,
+} from '@/config/prism-video-models';
 import { SHAPES, type ModelChoice, type ShapeId } from './types';
 
 // The side panel's pickers: model (and its prompt expander), art style and shape.
 export default function StudioSettings({
   animating,
+  fromWords,
   editing,
   models,
   model,
@@ -14,8 +19,14 @@ export default function StudioSettings({
   setStyle,
   shape,
   setShape,
+  videoModel,
+  setVideoModel,
+  videoShape,
+  setVideoShape,
+  videoReady,
 }: {
   animating: boolean;
+  fromWords: boolean;
   editing: boolean;
   models: ModelChoice[];
   model: string;
@@ -26,20 +37,68 @@ export default function StudioSettings({
   setStyle: (id: string) => void;
   shape: ShapeId;
   setShape: (id: ShapeId) => void;
+  videoModel: VideoModelId;
+  setVideoModel: (id: VideoModelId) => void;
+  videoShape: VideoShapeId;
+  setVideoShape: (id: VideoShapeId) => void;
+  videoReady: (id: VideoModelId) => boolean;
 }) {
   const pickedModel = models.find((m) => m.id === model);
   const pickedStyle = PRISM_STYLES.find((s) => s.id === style);
   return (
     <>
       {animating ? (
-        <p className="prism-note">Videos use their own model, so there is nothing to pick here while you make one.</p>
+        <>
+          <label className="sidebar-separator" htmlFor="prism-video-model">Video model</label>
+          <select
+            id="prism-video-model"
+            className="prism-select"
+            value={videoModel}
+            onChange={(e) => setVideoModel(e.target.value as VideoModelId)}
+          >
+            {PRISM_VIDEO_MODELS.map((m) => (
+              <option key={m.id} value={m.id} disabled={!videoReady(m.id)}>
+                {videoReady(m.id) ? m.name : `${m.name} (${isCloudVideo(m.id) ? 'not set up yet' : 'not downloaded yet'})`}
+              </option>
+            ))}
+          </select>
+          <p className="prism-note">{findVideoModel(videoModel).note}</p>
+          {!videoReady(videoModel) && (
+            <p className="prism-note">
+              {isCloudVideo(videoModel)
+                ? 'Cloud Movies need a Comfy account key first. See lib/prism/cloud.ts.'
+                : `${fromWords ? 'Videos from words' : 'Videos from a picture'} need more files for this model. See docs/prism-video.md.`}
+            </p>
+          )}
+
+          <span className="sidebar-separator" id="prism-video-shape-label">Shape</span>
+          {fromWords ? (
+            <div className="prism-shapes" role="radiogroup" aria-labelledby="prism-video-shape-label">
+              {VIDEO_SHAPES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={videoShape === s.id}
+                  className="prism-shape"
+                  onClick={() => setVideoShape(s.id)}
+                >
+                  <span className={`prism-shape-icon is-${s.id}`} />
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="prism-note">The video keeps your picture?s shape.</p>
+          )}
+        </>
       ) : (
         <>
           <label className="sidebar-separator" htmlFor="prism-model">Model</label>
           <select id="prism-model" className="prism-select" value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => (
               <option key={m.id} value={m.id} disabled={!m.ready}>
-                {m.ready ? m.name : `${m.name} (not downloaded yet)`}
+                {m.ready ? m.name : `${m.name} (${m.cloud ? 'not set up yet' : 'not downloaded yet'})`}
               </option>
             ))}
           </select>

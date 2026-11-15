@@ -137,7 +137,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // withPhotos swaps photo ids for the pictures themselves, when this bot's model can see them.
   const repo = bot.tools.includes('refract') ? readSelectedRepo(body.repo) : null;
   const sheet = systemPrompt(bot, USERS[userId]) + workshopPrompt(repo ?? undefined);
+<<<<<<< HEAD
   const recent = fitHistory(
+=======
+
+  const budget = botHistoryBudget(bot.tools, sheet.length, bot.think);
+  const gauge = getGasGauge(history, budget);
+
+  if (gauge > 90) {
+    foldSummary(chat, history);
+    let { history: freshHistory } = chatContext(chat);
+    history = freshHistory;
+  }
+
+  const recent = fitHistory(history, Math.max(2000, budget - message.length));
+>>>>>>> origin/main
   const remembered = await recall(chat, {
     summary, recent, message,
     facts: bot.tools.includes('notes') ? { botId: bot.id, userName: USERS[userId] } : false,

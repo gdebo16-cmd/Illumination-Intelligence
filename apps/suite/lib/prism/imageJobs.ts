@@ -14,9 +14,10 @@ import 'server-only';
 import crypto from 'node:crypto';
 import db from '@/lib/db';
 import { gpuQueue } from '@/lib/queue';
-import type { GpuWorker } from '@/config/gpu-workers';
+import { LOCAL_WORKER, type GpuWorker } from '@/config/gpu-workers';
 import type { GpuNeeds } from '@/lib/gpu/router';
 import { ranOutOfMemory } from './comfy';
+import { friendlyCloudError } from './cloud';
 
 // One row per picture being made. Finished pictures still go in PrismImage, as always; this table
 // only remembers how each job went, and which picture it made.
@@ -121,6 +122,11 @@ export interface ImageJobOptions<T extends { machine: string }> {
   save: (result: T) => Promise<string> | string;
   /** For the server log, e.g. "Prism generate error". */
   label: string;
+  /**
+   * True for Cloud Painting (lib/prism/cloud.ts): it's painted online and needs no graphics card
+   * here, so it doesn't wait in the GPU queue. `run` then chooses its own machine.
+   */
+  cloud?: boolean;
 }
 
 /**
@@ -137,8 +143,8 @@ export function startImageJob<T extends { machine: string }>(userId: string, opt
   ).run(id, userId, options.mode, options.prompt, options.model, options.sourceId, createdAt);
 
   // Not awaited on purpose: this keeps going after the page gets its answer.
-  void gpuQueue
-    .add(options.run, 'high', 'comfy', { userId, needs: options.needs })
+  const making = options.cloud ? options.run(LOCAL_WORKER) : gpuQueue.add(options.run, 'high', 'comfy', { userId, needs: options.needs });
+  void making
     .then(async (result) => {
       const imageId = await options.save(result);
       db.prepare(`UPDATE PrismImageJob SET status = 'done', image_id = ? WHERE id = ?`).run(imageId, id);
@@ -147,7 +153,7 @@ export function startImageJob<T extends { machine: string }>(userId: string, opt
     .catch((err: unknown) => {
       console.error(`${options.label}:`, err);
       db.prepare(`UPDATE PrismImageJob SET status = 'failed', error = ? WHERE id = ?`).run(
-        friendlyImageError(err, options.modelName),
+        (options.cloud && friendlyCloudError(err)) || friendlyImageError(err, options.modelName),
         id,
       );
     });

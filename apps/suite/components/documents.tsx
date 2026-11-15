@@ -273,26 +273,80 @@ try {
 </script></body></html>`;
 }
 
+// "lucide-react" for components, built from lucide's plain browser build (window.lucide), where each
+// icon is a list of SVG shapes. Each icon becomes a React component taking lucide-react's props
+// (size, color, strokeWidth, absoluteStrokeWidth, className, …). An icon name lucide doesn't have
+// draws a plain circle instead of stopping the whole component.
+const LUCIDE_REACT = `function makeLucideReact(lucide) {
+  var h = React.createElement;
+  var toKebab = function (s) { return s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(); };
+  var make = function (name, node) {
+    var Icon = React.forwardRef(function (props, ref) {
+      var size = props.size == null ? 24 : props.size;
+      var stroke = props.strokeWidth == null ? 2 : props.strokeWidth;
+      if (props.absoluteStrokeWidth) stroke = (Number(stroke) * 24) / Number(size);
+      var rest = {};
+      Object.keys(props).forEach(function (k) {
+        if (['size', 'color', 'strokeWidth', 'absoluteStrokeWidth', 'className', 'children'].indexOf(k) < 0) rest[k] = props[k];
+      });
+      var attrs = Object.assign({
+        ref: ref, xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+        fill: 'none', stroke: props.color || 'currentColor', strokeWidth: stroke,
+        strokeLinecap: 'round', strokeLinejoin: 'round',
+        className: ['lucide', 'lucide-' + toKebab(name), props.className].filter(Boolean).join(' '),
+      }, rest);
+      return h.apply(null, ['svg', attrs].concat(node.map(function (part, i) {
+        return h(part[0], Object.assign({ key: i }, part[1]));
+      }), [props.children]));
+    });
+    Icon.displayName = name;
+    return Icon;
+  };
+  var made = {};
+  var get = function (name) {
+    if (!made[name]) {
+      var node = lucide[name] || lucide[name.replace(/Icon$/, '')] || lucide[name.replace(/^Lucide/, '')];
+      made[name] = make(name, Array.isArray(node) ? node : [['circle', { cx: 12, cy: 12, r: 9 }]]);
+    }
+    return made[name];
+  };
+  var extras = {
+    __esModule: true,
+    icons: lucide.icons,
+    createLucideIcon: function (name, node) { return make(name, node); },
+  };
+  return new Proxy(extras, {
+    get: function (target, name) {
+      if (typeof name !== 'string' || name in target) return target[name];
+      if (name === 'default' || name === 'then' || !/^[A-Z]/.test(name)) return undefined;
+      return get(name);
+    },
+  });
+}`;
+
 function reactPage(code: string): string {
+  // The icon file is about half a megabyte, so it is only loaded for components that use it.
+  const usesIcons = code.includes('lucide-react');
   return `${FRAME_HEAD}<style>html,body{margin:0}${FRAME_ERROR_STYLE}</style>
 <script src="${RUNTIME}/tailwind.js"></script>
 </head><body><div id="root"></div>
 <script src="${RUNTIME}/react.js"></script>
 <script src="${RUNTIME}/react-dom.js"></script>
-<script>window.react = React;</script>
-<script src="${RUNTIME}/lucide-react.js"></script>
 <script src="${RUNTIME}/babel.js"></script>
+${usesIcons ? `<script src="${RUNTIME}/lucide.js"></script>` : ''}
 <script>${FRAME_SHOW_ERROR}
+${usesIcons ? LUCIDE_REACT : ''}
 window.addEventListener('error', function (e) { showError('The component stopped with an error:', e.error || e.message); });
 try {
   var compiled = Babel.transform(${embed(code)}, {
     filename: 'artifact.tsx',
     presets: [['env', { modules: 'commonjs' }], 'react', ['typescript', { isTSX: true, allExtensions: true }]],
   }).code;
-  var libraries = { 'react': React, 'react-dom': ReactDOM, 'react-dom/client': ReactDOM, 'lucide-react': window.LucideReact };
+  var libraries = { 'react': React, 'react-dom': ReactDOM, 'react-dom/client': ReactDOM };
+  if (window.lucide) libraries['lucide-react'] = makeLucideReact(window.lucide);
   var require = function (name) {
     if (Object.prototype.hasOwnProperty.call(libraries, name)) return libraries[name];
-    throw new Error('"' + name + '" isn\\'t available here. Components can use React (with its hooks), lucide-react icons and Tailwind classes.');
+    throw new Error('"' + name + '" isn\\'t available here. Components can use React (with its hooks), Tailwind classes and icons from "lucide-react".');
   };
   var module = { exports: {} };
   new Function('require', 'module', 'exports', 'React', compiled)(require, module, module.exports, React);

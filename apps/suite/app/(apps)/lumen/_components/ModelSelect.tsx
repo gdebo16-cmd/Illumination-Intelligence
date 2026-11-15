@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
-import { PAGE_MODELS, type PageType } from '@/config/models';
+import { LUMEN_MODELS, PAGE_MODELS, type PageType } from '@/config/models';
 
 interface ModelOption {
   id: string;
@@ -16,7 +16,8 @@ interface ModelSelectProps {
 const ModelSelect = ({ pageType, onChange }: ModelSelectProps) => {
   const id = useId();
 
-  const models: readonly ModelOption[] = PAGE_MODELS[pageType] ?? [];
+  // Chat lists Auto first, so it's what a new visit starts on.
+  const models: readonly ModelOption[] = pageType === 'chat' ? LUMEN_MODELS : (PAGE_MODELS[pageType] ?? []);
   const defaultId = models[0]?.id ?? '';
 
   const [selectedModel, setSelectedModel] = useState<string>(defaultId);

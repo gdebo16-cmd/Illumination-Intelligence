@@ -347,7 +347,7 @@ export async function runTeam(options: {
   remembered?: string;
   priority?: 'high' | 'low';
   onStep: (step: AgentStep) => void;
-}): Promise<{ reply: string; steps: AgentStep[] }> {
+}): Promise<{ reply: string; steps: AgentStep[]; model: string }> {
   const { userId, userName, team } = options;
   const leader = team.leader;
   const priority = options.priority ?? 'high';

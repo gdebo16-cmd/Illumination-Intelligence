@@ -83,7 +83,7 @@ export default function Inbox() {
               </button>
               {open === run.id && (
                 <div className="umbra-report-body">
-                  {run.steps.length > 0 && <Steps steps={run.steps} />}
+                  {run.steps.length > 0 && <Steps steps={run.steps} flame={run.botFlame} />}
                   {run.status === 'running' ? (
                     <p className="umbra-thinking">{run.botName} is still working on this…</p>
                   ) : (

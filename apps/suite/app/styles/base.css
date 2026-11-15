@@ -302,6 +302,11 @@ header > .model-select-container {
   color: var(--chat-assistant); 
   border-bottom: 1px solid var(--border-color); 
   border-top: 1px solid var(--border-color); }
+/* Under a reply sent on Auto: which model answered. */
+.message-model {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  opacity: 0.6; }
 .loading-content {
   color: var(--load); 
   padding: 1rem; 
