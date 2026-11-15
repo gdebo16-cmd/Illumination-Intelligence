@@ -431,7 +431,7 @@ function launch(run: {
       // summary once it has grown (lib/chat-memory.ts).
       maintainChat(
         umbraChat(userId, bot.id), run.model, numCtxFor(run.toolIds),
-        botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0),
+        botHistoryBudget(run.toolIds, run.messages[0]?.role === 'system' ? run.messages[0].content.length : 0, run.think),
       );
       // With Memory on, read what you said for things worth remembering, as Lumen does. Only for
       // your own chat: a job another Flicker handed over isn't you talking.
@@ -850,7 +850,7 @@ function delegationTools(userId: string, bot: Bot, userName: string): ToolDef[] 
       const waitS = Math.max(0, Math.min(MAX_WAIT_S, Math.floor(Number(a.wait_seconds ?? 0)) || 0));
       const now = run.status === 'working' && waitS > 0 ? (await waitForRun(run.id, userId, waitS * 1000)) ?? run : run;
       if (now.status !== 'working') return jobResult(target, now);
-      const doing = now.steps.filter((s) => s.tool !== 'thinking').map((s) => `- ${s.label} (${s.status})`).join('\n');
+      const doing = now.steps.filter((s) => s.tool !== 'thinking' && s.tool !== 'note').map((s) => `- ${s.label} (${s.status})`).join('\n');
       return {
         output: `${target.name} is still working on the job (started ${now.startedAt}).${doing ? `\nSteps so far:\n${doing}` : ''}`,
         summary: `${target.name} is still working`,

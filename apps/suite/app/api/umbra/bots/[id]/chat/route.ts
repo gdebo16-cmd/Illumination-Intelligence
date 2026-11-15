@@ -121,7 +121,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // withPhotos swaps photo ids for the pictures themselves, when this bot's model can see them.
   const repo = bot.tools.includes('refract') ? readSelectedRepo(body.repo) : null;
   const sheet = systemPrompt(bot, USERS[userId]) + workshopPrompt(repo ?? undefined);
-  const recent = fitHistory(history, Math.max(2000, botHistoryBudget(bot.tools, sheet.length) - message.length));
+  const recent = fitHistory(history, Math.max(2000, botHistoryBudget(bot.tools, sheet.length, bot.think) - message.length));
   const remembered = await recall(chat, {
     summary, recent, message,
     facts: bot.tools.includes('notes') ? { botId: bot.id, userName: USERS[userId] } : false,

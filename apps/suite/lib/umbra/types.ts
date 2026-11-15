@@ -21,8 +21,13 @@ export interface AgentStep {
   children?: AgentStep[];
   /** …and the full answer it gave the leader. */
   detail?: string;
-  /** A "Thinking" step (tool: 'thinking'): what the bot reasoned before acting or answering. */
+  /**
+   * A "Thinking" step (tool: 'thinking'): what the bot reasoned before acting or answering.
+   * An "Update" step (tool: 'note'): what the bot said to you on the way, between its tools.
+   */
   thought?: string;
+  /** A finished "Thinking" step: how long it thought for. */
+  seconds?: number;
 }
 
 /** A suggested change, as the chat shows it. */
