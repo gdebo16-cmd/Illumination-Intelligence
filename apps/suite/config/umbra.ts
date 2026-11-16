@@ -47,7 +47,11 @@ const WHITE = '#e8e8f0';
 //   "#ff8800"      a flame in a color you picked
 //   "violet"       one of the eight original flames, drawn with its own full-color pictures
 //                  (Flickers made before the shape picker keep looking exactly as they did)
-function read(flame: unknown): { shape: (typeof SHAPES)[number]; original?: (typeof FLAMES)[number]; tint?: string } | null {
+//   "halo:<id>#ff8800"  an animation made in Halo ("Add to Umbra"), saved under that id
+//                  (lib/umbra/looks.ts); the color is its accent color, the animation has its own
+function read(flame: unknown): { shape: (typeof SHAPES)[number]; original?: (typeof FLAMES)[number]; tint?: string; halo?: string } | null {
+  const halo = typeof flame === 'string' ? /^halo:([0-9a-f]{32})(#[0-9a-f]{6})$/i.exec(flame) : null;
+  if (halo) return { shape: SHAPES[0], tint: halo[2].toLowerCase(), halo: halo[1].toLowerCase() };
   // Shape ids are lowercase words, joined by hyphens ("wispy-flame").
   const parts = typeof flame === 'string' ? /^([a-z]+(?:-[a-z]+)*)?(#[0-9a-f]{6})?$/i.exec(flame) : null;
   if (!parts || (!parts[1] && !parts[2])) return null;
@@ -63,8 +67,15 @@ function read(flame: unknown): { shape: (typeof SHAPES)[number]; original?: (typ
 export const isFlame = (flame: unknown): flame is string => read(flame) !== null;
 /** The shape's id, e.g. 'star' (the eight original flames are all 'flame'). */
 export const flameShape = (flame: string): string => (read(flame)?.shape ?? SHAPES[0]).id;
-/** The color you picked, when the white picture should be tinted; nothing for white or an original flame. */
-export const flameTint = (flame: string): string | undefined => read(flame)?.tint;
+/** The color you picked, when the white picture should be tinted; nothing for white, an original flame or a Halo look. */
+export const flameTint = (flame: string): string | undefined => {
+  const look = read(flame);
+  return look?.halo ? undefined : look?.tint;
+};
+/** The saved animation's id, for a look made in Halo; nothing for any other look. */
+export const haloLook = (flame: string): string | undefined => read(flame)?.halo;
+/** The look to save for an animation made in Halo. */
+export const makeHaloLook = (id: string, color: string) => `halo:${id}${color.toLowerCase()}`;
 /** The accent color that goes with a look (buttons, borders, glow). */
 export function flameColor(flame: string): string {
   const look = read(flame);
@@ -75,6 +86,7 @@ export const makeFlame = (shapeId: string, color: string) => `${shapeId}${color.
 /** What the Flicker is told it looks like, e.g. "violet flame spirit" or "water droplet spirit". */
 export function flameWords(flame: string): string {
   const look = read(flame);
+  if (look?.halo) return 'glowing spirit with tiny eyes';
   if (look?.original) return `${look.original.id} flame spirit`;
   return (look?.shape ?? SHAPES[0]).words;
 }
@@ -120,6 +132,8 @@ export const BOT_MODELS = [
   { id: 'auto', name: 'Auto: picks a fish for each message' },
   // Runs on Ollama's servers, not here (lib/cloud-model.ts): the chat leaves the house and costs a little.
   { id: 'cloud', name: 'Cloud Fish: huge models, online (costs a little)' },
+  // The biggest cloud model, only ever used by a Flicker set to it here (config/models.ts, KIMI_MODEL).
+  { id: 'kimi-k3.1-pro', name: 'Kimi Fish: the biggest brain, online (pricier, only when picked)' },
 ] as const;
 
 export const isBotModel = (id: unknown): boolean => BOT_MODELS.some((m) => m.id === id);

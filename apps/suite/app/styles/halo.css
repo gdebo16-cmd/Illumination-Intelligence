@@ -45,6 +45,9 @@
   .halo-stage .halo-preview { grid-row: 1 / span 2; }
   .halo-stage .halo-name { font-size: 1.1rem; align-self: end; }
   .halo-stage .halo-action.is-main { align-self: start; padding: 0.5rem 0.75rem; }
+  /* With the Flicker template's "Add to Umbra" button there's a third row beside the preview. */
+  .halo-stage:has(.halo-umbra) .halo-preview { grid-row: 1 / span 3; }
+  .halo-stage .halo-umbra { align-self: start; padding: 0.5rem 0.75rem; }
 }
 .halo-preview {
   aspect-ratio: 1;

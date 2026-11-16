@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_FLAME_COLOR, DEFAULT_TOOL_IDS, SHAPES, flameColor, flameShape, makeFlame } from '@/config/umbra';
+import { BOT_LIMITS, BOT_MODELS, BOT_TOOLS, DEFAULT_FLAME_COLOR, DEFAULT_TOOL_IDS, SHAPES, flameColor, flameShape, haloLook, isFlame, makeFlame } from '@/config/umbra';
 import { canThink } from '@/config/models';
 import Flame from './Flame';
 import type { Bot, BotNote } from './types';
@@ -33,6 +33,19 @@ export default function BotForm({ botId }: { botId?: string }) {
   const [loaded, setLoaded] = useState(!editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // A look made in Halo, kept so you can switch to a drawn shape and back without losing it.
+  const [fromHalo, setFromHalo] = useState('');
+  const isHalo = Boolean(haloLook(form.flame));
+
+  // "Add to Umbra" in Halo opens /umbra/new?look=halo:<id>#color: start with that look.
+  useEffect(() => {
+    if (botId) return;
+    const look = new URLSearchParams(window.location.search).get('look');
+    if (look && haloLook(look) && isFlame(look)) {
+      setFromHalo(look);
+      setForm((cur) => ({ ...cur, flame: look }));
+    }
+  }, [botId]);
 
   // When editing, fill the form with the bot's current settings, and load what it remembers.
   useEffect(() => {
@@ -45,6 +58,7 @@ export default function BotForm({ botId }: { botId?: string }) {
           name: bot.name, flame: bot.flame, personality: bot.personality, purpose: bot.purpose, model: bot.model, tools: bot.tools,
           codeFolder: bot.codeFolder ?? '', codeAutoWrite: Boolean(bot.codeAutoWrite), think: Boolean(bot.think),
         });
+        if (haloLook(bot.flame)) setFromHalo(bot.flame);
         setLoaded(true);
       })
       .catch((err: Error) => setError(err.message));
@@ -111,12 +125,25 @@ export default function BotForm({ botId }: { botId?: string }) {
               <legend className="umbra-label">Pick a shape</legend>
               {/* Art's six pearl shapes (a clean palette), each with its idle loop. Picking one keeps the color you chose below. */}
               <div className="umbra-flames" role="radiogroup">
+                {fromHalo && (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isHalo}
+                    aria-label="Made in Halo"
+                    title="Made in Halo"
+                    className="umbra-flame-option"
+                    onClick={() => setForm((cur) => ({ ...cur, flame: fromHalo }))}
+                  >
+                    <Flame flame={fromHalo} size={64} />
+                  </button>
+                )}
                 {SHAPES.map((s) => (
                   <button
                     key={s.id}
                     type="button"
                     role="radio"
-                    aria-checked={flameShape(form.flame) === s.id}
+                    aria-checked={!isHalo && flameShape(form.flame) === s.id}
                     aria-label={s.name}
                     title={s.name}
                     className="umbra-flame-option"
@@ -126,7 +153,16 @@ export default function BotForm({ botId }: { botId?: string }) {
                   </button>
                 ))}
               </div>
-              {/* Then any color at all: the white shape is tinted to match. */}
+              {/* Then any color at all: the white shape is tinted to match. A Halo look has its own colours. */}
+              {isHalo ? (
+                <div className="umbra-flame-custom">
+                  <Flame flame={form.flame} size={56} />
+                  <span>
+                    <span className="umbra-tool-name">Made in Halo</span>
+                    <span className="umbra-tool-description">This Flicker uses the animation you made in Halo. To change how it looks, make a new one in Halo and add it again.</span>
+                  </span>
+                </div>
+              ) : (
               <label className="umbra-flame-custom">
                 <Flame flame={form.flame} size={56} />
                 <span>
@@ -140,6 +176,7 @@ export default function BotForm({ botId }: { botId?: string }) {
                   onChange={(e) => setForm((cur) => ({ ...cur, flame: makeFlame(flameShape(cur.flame), e.target.value) }))}
                 />
               </label>
+              )}
             </fieldset>
 
             <label className="umbra-field">

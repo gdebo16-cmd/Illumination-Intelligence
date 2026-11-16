@@ -4,6 +4,7 @@
 // one loop lasts, and download the .json. The preview plays the real file as you change things.
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import LottiePreview from "./LottiePreview";
 import { readSvg } from "./svg-file";
@@ -180,6 +181,30 @@ export default function Halo() {
 
   const sizeKb = Math.max(1, Math.round(JSON.stringify(animation).length / 1024));
 
+  // "Add to Umbra" (Flicker template only): save this animation as a Flicker look, then open
+  // Umbra's "Create a Flicker" with it already picked.
+  const router = useRouter();
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState("");
+  const isFlicker = mode === "template" && template.id === "flicker";
+  const addToUmbra = async () => {
+    setAdding(true);
+    setAddError("");
+    try {
+      const res = await fetch("/api/umbra/looks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animation, color: String(currentValues.color ?? "#a77bff") }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not add it to Umbra.");
+      router.push(`/umbra/new?look=${encodeURIComponent(data.look)}`);
+    } catch (err) {
+      setAddError((err as Error).message);
+      setAdding(false);
+    }
+  };
+
   return (
     <AppShell appId="halo">
       <main className="halo">
@@ -195,6 +220,12 @@ export default function Halo() {
           <button type="button" className="halo-action is-main" onClick={download}>
             Download .json <span>({sizeKb} KB)</span>
           </button>
+          {isFlicker && (
+            <button type="button" className="halo-action halo-umbra" onClick={addToUmbra} disabled={adding}>
+              {adding ? "Adding…" : "Add to Umbra"}
+            </button>
+          )}
+          {addError && <p className="halo-note" role="alert">{addError}</p>}
         </section>
 
         <div className="halo-controls">

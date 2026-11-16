@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { flameAnimation, flameAspect, flameColor, flameStill, flameTint, hasAnimation, hasDanceClip } from '@/config/umbra';
+import { useEffect, useRef, useState } from 'react';
+import { flameAnimation, flameAspect, flameColor, flameStill, flameTint, haloLook, hasAnimation, hasDanceClip } from '@/config/umbra';
 
 // A Flicker's avatar. `size` is its height in pixels. `flame` is its saved look: a shape and a
 // color, such as "star#ff8800" (see config/umbra.ts).
@@ -21,6 +21,8 @@ export default function Flame({ flame, size = 80, still = false, mood = 'idle', 
   className?: string;
 }) {
   const [broken, setBroken] = useState(false);
+  const halo = haloLook(flame);
+  if (halo) return <HaloFlame id={halo} color={flameColor(flame)} size={size} still={still} working={mood === 'working'} className={className} />;
   const working = mood === 'working';
   const dancing = working && hasDanceClip(flame);
   // Every look has a resting animation now; hasAnimation guards against a look without one.
@@ -58,5 +60,57 @@ export default function Flame({ flame, size = 80, still = false, mood = 'idle', 
         </svg>
       )}
     </picture>
+  );
+}
+
+// Saved Halo animations, loaded once each and shared by every avatar that shows them.
+const haloFiles = new Map<string, Promise<object | null>>();
+function loadHalo(id: string) {
+  let file = haloFiles.get(id);
+  if (!file) {
+    file = fetch(`/api/umbra/looks/${id}`).then((res) => (res.ok ? res.json() : null)).catch(() => null);
+    haloFiles.set(id, file);
+  }
+  return file;
+}
+
+// A Flicker made in Halo: plays its Lottie animation with the same player Halo uses. Still avatars
+// (and people who ask for less motion) show its first frame. While its bot works it plays faster,
+// and the same glow and hop as the other avatars come from the "flame" classes.
+function HaloFlame({ id, color, size, still, working, className }: {
+  id: string; color: string; size: number; still: boolean; working: boolean; className: string;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let live = true;
+    let player: { destroy: () => void } | null = null;
+    const calm = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const moving = (working || !still) && !calm;
+    void Promise.all([loadHalo(id), import('lottie-web')]).then(([data, { default: lottie }]) => {
+      if (!live || !box.current || !data) return;
+      const anim = lottie.loadAnimation({
+        container: box.current,
+        renderer: 'svg',
+        loop: true,
+        autoplay: moving,
+        animationData: structuredClone(data), // the player writes into what it's given
+      });
+      if (!moving) anim.goToAndStop(0, true);
+      if (working) anim.setSpeed(1.6);
+      player = anim;
+    });
+    return () => {
+      live = false;
+      player?.destroy();
+    };
+  }, [id, still, working]);
+  const classes = ['flame', 'is-halo', working && 'is-working', working && 'is-standin', className].filter(Boolean).join(' ');
+  return (
+    <div
+      ref={box}
+      className={classes}
+      aria-hidden
+      style={{ height: size, width: size, '--flame-color': color, '--flame-size': `${size}px` } as React.CSSProperties}
+    />
   );
 }
