@@ -13,9 +13,9 @@
 // - "gr" + "tr": a group of parts, and the group's own position/size/turn/opacity (which can animate).
 // - markers: named bookmarks in the timeline ("turn on" = frames 0–15) that apps can play.
 
-import { FRAME_RATE, START_SHAPES } from '@/config/halo';
+import { FRAME_RATE, START_SHAPES, ovalPath } from '@/config/halo';
 import { hexToRgb, round } from './lottie';
-import { fitPaths, parsePath } from './path';
+import { fitPaths, parsePath, type Bezier, type Point } from './path';
 
 // ---------- Settings ----------
 
@@ -1807,21 +1807,28 @@ const FLICKER_SHAPES = [
   { value: 'mushroom', label: 'Mushroom' },
 ];
 
+/** A chubby five-point star: fat arms (inner points over half way out), like Umbra's. */
+function chubbyStar() {
+  return Array.from({ length: 10 }, (_, n) => {
+    const r = n % 2 ? 28 : 50, a = (Math.PI * n) / 5 - Math.PI / 2;
+    return `${n ? 'L' : 'M'}${round(50 + r * Math.cos(a))} ${round(50 + r * Math.sin(a))}`;
+  }).join(' ') + ' Z';
+}
 const shapePath = (id: string) => START_SHAPES.find((s) => s.id === id)?.d ?? '';
 /**
  * Each shape's outline (SVG path text in a 100 × 100 box), how much to round its sharp corners, and
  * where the eyes sit: how far below the shape's middle, as a share of its size (minus = above), and
  * how far right of it (`x`, minus = left; only the moon needs it, its thick part is off to one side).
- * The star and the blob are built from Lottie's own star and oval instead (see flickerBody).
+ * The heart's point and the star's tips have no curve handles, so they can be rounded off.
  */
 const FLICKER_BODIES: Record<string, { d: string; round?: number; eyes: number; x?: number }> = {
   flame: { d: shapePath('flame'), eyes: 0.17 },
   droplet: { d: shapePath('drop'), eyes: 0.16 },
   sprout: { d: 'M50 98 C22 85 8 55 20 25 C28 8 50 2 82 4 C92 30 88 70 50 98 Z', eyes: 0.04 },
-  star: { d: '', eyes: 0.06 },
+  star: { d: chubbyStar(), round: 16, eyes: 0.06 },
   gem: { d: 'M30 5 H70 L95 35 L50 98 L5 35 Z', round: 7, eyes: -0.1 },
-  heart: { d: shapePath('heart'), eyes: -0.06 },
-  blob: { d: '', eyes: 0.05 },
+  heart: { d: 'M50 90 C50 90 0 55 0 30 C0 12 14 0 28 0 C38 0 46 6 50 14 C54 6 62 0 72 0 C86 0 100 12 100 30 C100 55 50 90 50 90 Z', round: 10, eyes: -0.06 },
+  blob: { d: ovalPath(50, 50, 50, 46), eyes: 0.05 },
   ghost: { d: 'M10 50 C10 20 28 0 50 0 C72 0 90 20 90 50 L90 96 L76 86 L63 96 L50 86 L37 96 L24 86 L10 96 Z', round: 4, eyes: -0.06 },
   wisp: { d: 'M50 100 C26 100 12 84 14 64 C16 48 28 40 30 24 C38 32 40 40 42 46 C46 30 56 16 52 0 C70 14 86 36 86 62 C86 84 72 100 50 100 Z', eyes: 0.17 },
   cloud: { d: 'M25 85 C10 85 2 74 4 62 C6 50 16 44 26 46 C26 30 40 20 54 22 C66 24 74 32 76 42 C88 40 98 50 96 64 C94 76 86 85 74 85 Z', eyes: 0.1 },
@@ -1831,21 +1838,52 @@ const FLICKER_BODIES: Record<string, { d: string; round?: number; eyes: number; 
   mushroom: { d: 'M50 6 C78 6 98 26 98 48 C98 56 92 60 84 60 L66 60 C68 72 70 84 68 94 C66 98 34 98 32 94 C30 84 32 72 34 60 L16 60 C8 60 2 56 2 48 C2 26 22 6 50 6 Z', round: 3, eyes: 0.24 },
 };
 
-/** The body's outline as Lottie shapes (fresh each time), centred on 0,0, and how far down its base is. */
-function flickerBody(shape: string, size: number): { shapes: object[]; bottom: number } {
-  if (shape === 'blob') return { shapes: [ellipse(0, 0, size, round(size * 0.92))], bottom: size * 0.46 };
-  if (shape === 'star') {
-    // A chubby star: fat arms (inner points over half way out) with rounded tips, like Umbra's.
-    const R = size * 0.55;
-    return { shapes: [{ ...starShape(R), ir: fixed(round(R * 0.56)) }, rounded(round(R * 0.32))], bottom: R * 0.81 };
-  }
+/**
+ * Makes a shape wider towards its base, for a squat, blobby look. Each point moves sideways by an
+ * amount that grows from nothing at the top to the most at the bottom (`wide` 0–1: up to 60% wider).
+ * Curve handles are moved by working out where their tips land, so the curves stay smooth.
+ */
+function widenBase(paths: Bezier[], wide: number, top: number, bottom: number) {
+  const move = ([x, y]: Point): Point => {
+    const f = Math.max(0, Math.min(1, (y - top) / (bottom - top || 1)));
+    return [x * (1 + 0.6 * wide * f * f), y];
+  };
+  const handle = (at: Point, h: Point): Point => {
+    const [tx, ty] = move([at[0] + h[0], at[1] + h[1]]), [px, py] = move(at);
+    return [tx - px, ty - py];
+  };
+  return paths.map((p) => ({ closed: p.closed, v: p.v.map(move), i: p.v.map((pt, n) => handle(pt, p.i[n])), o: p.v.map((pt, n) => handle(pt, p.o[n])) }));
+}
+
+/**
+ * The body's outline as Lottie shapes (fresh each time), centred on 0,0; how far down its base is;
+ * and where the eyes go. `wide` (0–1) widens the base; the shape is then fitted back to `size`.
+ */
+function flickerBody(shape: string, size: number, wide: number): { shapes: object[]; bottom: number; eyes: Point } {
   const body = FLICKER_BODIES[shape] ?? FLICKER_BODIES.flame;
-  const fitted = fitPaths(parsePath(body.d).paths, size);
+  const first = fitPaths(parsePath(body.d).paths, size);
+  // The eyes' spot, in the same coordinates, so it moves with the shape when it's widened and refitted.
+  const eye: Point = [(body.x ?? 0) * size, body.eyes * size];
+  let ys = first.paths.flatMap((p) => p.v.map(([, y]) => y));
+  const widened = widenBase(first.paths, wide, Math.min(...ys), Math.max(...ys));
+  const fitted = fitPaths(widened, size);
+  // fitPaths recentres and rescales; do the same to the eyes' spot.
+  const [wEye] = widenBase([{ closed: false, v: [eye], i: [[0, 0]], o: [[0, 0]] }], wide, Math.min(...ys), Math.max(...ys)).map((p) => p.v[0]);
+  const xs = widened.flatMap((p) => p.v.map(([x]) => x));
+  ys = widened.flatMap((p) => p.v.map(([, y]) => y));
+  const k = size / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1e-6);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
   const shapes = fitted.paths.map((p) => ({
     ty: 'sh',
     ks: fixed({ c: p.closed, v: p.v.map((pt) => pt.map(round)), i: p.i.map((pt) => pt.map(round)), o: p.o.map((pt) => pt.map(round)) }),
   }));
-  return { shapes: body.round ? [...shapes, rounded(round((body.round * size) / 100))] : shapes, bottom: fitted.bottom };
+  // Corners get rounder as the base widens, so points (a heart's tip, a gem's) soften into a blob.
+  const corner = ((body.round ?? 0) + 14 * wide) * (size / 100);
+  return {
+    shapes: corner > 0 ? [...shapes, rounded(round(corner))] : shapes,
+    bottom: fitted.bottom,
+    eyes: [round((wEye[0] - cx) * k), round((wEye[1] - cy) * k)],
+  };
 }
 
 const BODY_MOVES = [
@@ -1973,6 +2011,7 @@ const flicker: Template = {
   howToUse: 'Loop it: a mascot, a loading buddy, or a friendly face on an empty screen.',
   settings: [
     { id: 'shape', label: 'Shape', kind: 'choice', options: FLICKER_SHAPES, default: 'flame' },
+    { id: 'wide', label: 'Wider base (more blobby)', kind: 'number', min: 0, max: 100, step: 5, default: 50, unit: '%' },
     { id: 'color', label: 'Colour', kind: 'color', default: '#a77bff' },
     {
       id: 'core',
@@ -2018,12 +2057,11 @@ const flicker: Template = {
     const look = str(v, 'eyes', 'look');
     const blink = bool(v, 'blink', true);
 
-    const body = flickerBody(shape, size);
+    const body = flickerBody(shape, size, num(v, 'wide', 50) / 100);
     const pose = (t: number) => bodyPose(move, t, k, size);
 
     // ---- The body, with a light in its middle (drawn over its fill) ----
-    const spot = FLICKER_BODIES[shape] ?? FLICKER_BODIES.flame;
-    const eyeY = round(spot.eyes * size), eyeX = round((spot.x ?? 0) * size);
+    const [eyeX, eyeY] = body.eyes;
     const light = towardsWhite(color, 0.88);
     const core = str(v, 'core', 'pulse');
     const coreColor = hexToRgb(str(v, 'coreColor', '#ffffff'));
