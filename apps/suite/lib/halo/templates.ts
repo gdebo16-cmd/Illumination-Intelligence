@@ -13,8 +13,9 @@
 // - "gr" + "tr": a group of parts, and the group's own position/size/turn/opacity (which can animate).
 // - markers: named bookmarks in the timeline ("turn on" = frames 0–15) that apps can play.
 
-import { FRAME_RATE } from '@/config/halo';
+import { FRAME_RATE, START_SHAPES } from '@/config/halo';
 import { hexToRgb, round } from './lottie';
+import { fitPaths, parsePath } from './path';
 
 // ---------- Settings ----------
 
@@ -217,7 +218,7 @@ function part(spec: PartSpec, layers: TemplateLayers) {
 }
 
 /** The whole file's movement: position, turn, and the point it turns round (anchor). */
-interface LayerMotion { p?: object; r?: object; a?: object }
+interface LayerMotion { p?: object; r?: object; a?: object; s?: object }
 function file(name: string, w: number, h: number, frames: number, groups: (object | null)[], motion: LayerMotion = {}, markers: object[] = [], fps = FRAME_RATE) {
   return {
     v: '5.7.4',
@@ -242,7 +243,7 @@ function file(name: string, w: number, h: number, frames: number, groups: (objec
           r: motion.r ?? fixed(0),
           p: motion.p ?? fixed([0, 0, 0]),
           a: motion.a ?? fixed([0, 0, 0]),
-          s: fixed([100, 100, 100]),
+          s: motion.s ?? fixed([100, 100, 100]),
         },
         ao: 0,
         shapes: groups.filter(Boolean),
@@ -1782,4 +1783,318 @@ const menu: Template = {
   },
 };
 
-export const TEMPLATES: readonly Template[] = [toggleSwitch, button, like, menu, progress, spinner, successCheck, background];
+// ---------- Flicker ----------
+//
+// A little glowing spirit like the ones in Umbra: a shape you pick, two tiny eyes just below its
+// middle, and a soft light in its centre. The body moves one way (floats, bounces, sways…) and the
+// eyes do their own thing on top (look around, blink), because the eyes are a separate part inside
+// the moving body.
+
+const FLICKER_SHAPES = [
+  { value: 'flame', label: 'Flame' },
+  { value: 'droplet', label: 'Droplet' },
+  { value: 'sprout', label: 'Sprout (a leaf)' },
+  { value: 'star', label: 'Star' },
+  { value: 'gem', label: 'Gem' },
+  { value: 'heart', label: 'Heart' },
+  { value: 'blob', label: 'Blob (round)' },
+  { value: 'ghost', label: 'Ghost' },
+];
+
+const shapePath = (id: string) => START_SHAPES.find((s) => s.id === id)?.d ?? '';
+/**
+ * Each shape's outline (SVG path text in a 100 × 100 box), how much to round its sharp corners, and
+ * where the eyes sit: how far below the shape's middle, as a share of its size (minus = above).
+ * The star and the blob are built from Lottie's own star and oval instead (see flickerBody).
+ */
+const FLICKER_BODIES: Record<string, { d: string; round?: number; eyes: number }> = {
+  flame: { d: shapePath('flame'), eyes: 0.17 },
+  droplet: { d: shapePath('drop'), eyes: 0.16 },
+  sprout: { d: 'M50 98 C22 85 8 55 20 25 C28 8 50 2 82 4 C92 30 88 70 50 98 Z', eyes: 0.04 },
+  star: { d: '', eyes: 0.06 },
+  gem: { d: 'M30 5 H70 L95 35 L50 98 L5 35 Z', round: 7, eyes: -0.1 },
+  heart: { d: shapePath('heart'), eyes: -0.06 },
+  blob: { d: '', eyes: 0.05 },
+  ghost: { d: 'M10 50 C10 20 28 0 50 0 C72 0 90 20 90 50 L90 96 L76 86 L63 96 L50 86 L37 96 L24 86 L10 96 Z', round: 4, eyes: -0.06 },
+};
+
+/** The body's outline as Lottie shapes (fresh each time), centred on 0,0, and how far down its base is. */
+function flickerBody(shape: string, size: number): { shapes: object[]; bottom: number } {
+  if (shape === 'blob') return { shapes: [ellipse(0, 0, size, round(size * 0.92))], bottom: size * 0.46 };
+  if (shape === 'star') {
+    // A chubby star: fat arms (inner points over half way out) with rounded tips, like Umbra's.
+    const R = size * 0.55;
+    return { shapes: [{ ...starShape(R), ir: fixed(round(R * 0.56)) }, rounded(round(R * 0.32))], bottom: R * 0.81 };
+  }
+  const body = FLICKER_BODIES[shape] ?? FLICKER_BODIES.flame;
+  const fitted = fitPaths(parsePath(body.d).paths, size);
+  const shapes = fitted.paths.map((p) => ({
+    ty: 'sh',
+    ks: fixed({ c: p.closed, v: p.v.map((pt) => pt.map(round)), i: p.i.map((pt) => pt.map(round)), o: p.o.map((pt) => pt.map(round)) }),
+  }));
+  return { shapes: body.round ? [...shapes, rounded(round((body.round * size) / 100))] : shapes, bottom: fitted.bottom };
+}
+
+const BODY_MOVES = [
+  { value: 'float', label: 'Floats up and down' },
+  { value: 'bounce', label: 'Bounces (squashes when it lands)' },
+  { value: 'sway', label: 'Sways side to side' },
+  { value: 'flicker', label: 'Flickers like firelight' },
+  { value: 'wobble', label: 'Wobbles like jelly' },
+  { value: 'wander', label: 'Wanders around' },
+  { value: 'spin', label: 'Hops and spins' },
+  { value: 'still', label: 'Stays still' },
+];
+/** Moves that turn and squash round the base (like a flame or a plant); the rest use the middle. */
+const FROM_THE_BASE = ['bounce', 'sway', 'flicker', 'wobble'];
+
+const EYE_STYLES = [
+  { value: 'dots', label: 'Little dots' },
+  { value: 'ovals', label: 'Tall ovals' },
+  { value: 'sparkly', label: 'Big and sparkly' },
+  { value: 'happy', label: 'Happy (^ ^)' },
+];
+
+const EYE_MOVES = [
+  { value: 'look', label: 'Look left and right' },
+  { value: 'around', label: 'Look all around' },
+  { value: 'follow', label: 'Look where it is going' },
+  { value: 'surprised', label: 'Go wide (surprised)' },
+  { value: 'still', label: 'Stay put' },
+];
+
+/** Where the body is at one moment: moved by x, y (pixels), turned by r (degrees), stretched by sx, sy. */
+interface Pose { x: number; y: number; r: number; sx: number; sy: number }
+
+/**
+ * The body's pose at time t (0 to 1 through the loop), for a move at strength k (0 to 1).
+ * Every wave fits a whole number of times into the loop, so the end matches the start.
+ */
+function bodyPose(move: string, t: number, k: number, size: number): Pose {
+  const w = (times: number, shift = 0) => Math.sin(TAU * (times * t + shift));
+  const pose: Pose = { x: 0, y: 0, r: 0, sx: 1, sy: 1 };
+  if (move === 'float') {
+    pose.y = -0.07 * size * k * w(1);
+    pose.r = 3 * k * w(1, 0.25);
+  } else if (move === 'bounce') {
+    const hop = Math.abs(Math.sin(TAU * t)); // two hops per loop; 0 = on the ground
+    const landing = Math.pow(1 - hop, 6); // near 1 only right as it lands
+    pose.y = -0.32 * size * k * hop;
+    pose.sy = 1 - 0.2 * k * landing + 0.06 * k * hop; // squashed on the ground, a little stretched in the air
+    pose.sx = 1 + 0.2 * k * landing - 0.03 * k * hop;
+  } else if (move === 'sway') {
+    pose.r = 12 * k * w(1);
+  } else if (move === 'flicker') {
+    // The same uneven firelight as the Flicker move in the shape maker (config/halo.ts).
+    const jitter = w(3) + 0.5 * w(7) + 0.25 * w(13);
+    pose.sy = 1 + 0.08 * k * jitter;
+    pose.sx = 1 - 0.04 * k * jitter;
+    pose.r = 3 * k * w(5);
+  } else if (move === 'wobble') {
+    pose.sx = 1 + 0.12 * k * w(2);
+    pose.sy = 1 - 0.12 * k * w(2);
+  } else if (move === 'wander') {
+    // A sideways figure of eight, leaning into the way it's going.
+    pose.x = 0.22 * size * k * w(1);
+    pose.y = -0.08 * size * k * w(2);
+    pose.r = 8 * k * w(1, 0.25);
+  } else if (move === 'spin') {
+    // Hop up and turn once in the air (first 60%), then rest. 360° looks the same as 0°, so the loop joins up.
+    const u = Math.min(1, t / 0.6);
+    pose.y = -0.35 * size * k * Math.sin(Math.PI * u);
+    pose.r = 360 * easeInOut(u);
+  }
+  return pose;
+}
+
+/**
+ * Eases from stop to stop: each stop is [time 0–1, values]. Between stops it moves slow-fast-slow;
+ * two stops in a row with the same values make it wait there.
+ */
+function throughStops(t: number, stops: [number, number[]][]) {
+  const n = stops.findIndex(([time]) => time >= t);
+  if (n <= 0) return stops[Math.max(0, n)][1];
+  const [t0, a] = stops[n - 1], [t1, b] = stops[n];
+  const x = easeInOut((t - t0) / (t1 - t0));
+  return a.map((v, i) => v + (b[i] - v) * x);
+}
+
+/** Where the eyes look at time t: x and y from -1 to 1 (how far they reach), and how wide they open (1 = normal). */
+function eyeLook(look: string, t: number, travelling: (t: number) => number[]): { x: number; y: number; wide: number } {
+  if (look === 'look') {
+    const [x] = throughStops(t, [[0, [0]], [0.1, [-1]], [0.35, [-1]], [0.45, [1]], [0.7, [1]], [0.8, [0]], [1, [0]]]);
+    return { x, y: 0, wide: 1 };
+  }
+  if (look === 'around') {
+    const [x, y] = throughStops(t, [
+      [0, [0, 0]], [0.08, [-1, 0.1]], [0.2, [-1, 0.1]], [0.28, [-0.6, -0.8]], [0.4, [-0.6, -0.8]],
+      [0.48, [0.6, -0.8]], [0.6, [0.6, -0.8]], [0.68, [1, 0.1]], [0.8, [1, 0.1]], [0.9, [0, 0]], [1, [0, 0]],
+    ]);
+    return { x, y, wide: 1 };
+  }
+  if (look === 'surprised') {
+    const [g] = throughStops(t, [[0, [0]], [0.4, [0]], [0.45, [1]], [0.7, [1]], [0.8, [0]], [1, [0]]]);
+    return { x: 0, y: 0, wide: 1 + 0.5 * g };
+  }
+  if (look === 'follow') {
+    const [x, y] = travelling(t);
+    return { x, y, wide: 1 };
+  }
+  return { x: 0, y: 0, wide: 1 };
+}
+
+/** How open the eyes are at time t: 1 = open, nearly 0 = shut. One blink, then a quick double blink. */
+function blinkAt(t: number, seconds: number) {
+  const half = Math.min(0.08, 0.07 / seconds); // a blink lasts about a seventh of a second
+  const shut = Math.min(...[0.3, 0.78, 0.86].map((b) => Math.min(1, Math.abs(t - b) / half)));
+  return 0.08 + 0.92 * shut;
+}
+
+/** A colour blended part of the way to white (share 0 = the colour, 1 = white). */
+const towardsWhite = (hex: string, share: number) => hexToRgb(hex).map((c) => round(c + (1 - c) * share));
+
+const flicker: Template = {
+  id: 'flicker',
+  name: 'Flicker',
+  description: 'A little glowing spirit with tiny eyes, like the ones in Umbra. Pick its shape, how it moves, and what its eyes do.',
+  howToUse: 'Loop it: a mascot, a loading buddy, or a friendly face on an empty screen.',
+  settings: [
+    { id: 'shape', label: 'Shape', kind: 'choice', options: FLICKER_SHAPES, default: 'flame' },
+    { id: 'color', label: 'Colour', kind: 'color', default: '#a77bff' },
+    { id: 'glow', label: 'Glowing middle', kind: 'toggle', default: true },
+    { id: 'move', label: 'How it moves', kind: 'choice', options: BODY_MOVES, default: 'float' },
+    { id: 'strength', label: 'How much it moves', kind: 'number', min: 10, max: 100, step: 5, default: 60, unit: '%', when: (v) => v.move !== 'still' },
+    { id: 'eyeStyle', label: 'Eyes', kind: 'choice', options: EYE_STYLES, default: 'dots' },
+    { id: 'eyeColor', label: 'Eye colour', kind: 'color', default: '#24123d' },
+    { id: 'eyeSize', label: 'Eye size', kind: 'number', min: 60, max: 180, step: 10, default: 100, unit: '%' },
+    { id: 'eyes', label: 'What the eyes do', kind: 'choice', options: EYE_MOVES, default: 'look' },
+    { id: 'blink', label: 'Blinks', kind: 'toggle', default: true },
+    { id: 'cheeks', label: 'Rosy cheeks', kind: 'toggle', default: false },
+    { id: 'cheekColor', label: 'Cheek colour', kind: 'color', default: '#ff8fb8', when: (v) => v.cheeks === true },
+    { id: 'sparks', label: 'Little sparks around it', kind: 'toggle', default: false },
+    { id: 'seconds', label: 'One loop takes', kind: 'number', min: 1.5, max: 6, step: 0.5, default: 3, unit: 's' },
+  ],
+  parts: (v) => [
+    ...(v.eyeStyle === 'sparkly' ? [solidPart('shine', 'Eye shine')] : []),
+    solidPart('eyes', 'Eyes'),
+    ...(v.cheeks ? [solidPart('cheeks', 'Cheeks')] : []),
+    solidPart('body', 'Body'),
+    ...(v.sparks ? [solidPart('sparks', 'Sparks')] : []),
+  ],
+  build(v, name, layers) {
+    const seconds = num(v, 'seconds', 3);
+    const frames = Math.max(30, Math.round(seconds * FRAME_RATE));
+    const S = 240, c = S / 2, size = 150;
+    const color = str(v, 'color', '#a77bff');
+    const shape = str(v, 'shape', 'flame');
+    const move = str(v, 'move', 'float');
+    const k = num(v, 'strength', 60) / 100;
+    const eyeStyle = str(v, 'eyeStyle', 'dots');
+    const look = str(v, 'eyes', 'look');
+    const blink = bool(v, 'blink', true);
+
+    const body = flickerBody(shape, size);
+    const pose = (t: number) => bodyPose(move, t, k, size);
+
+    // ---- The body, with a soft light in its middle (drawn over its fill) ----
+    const eyeY = round((FLICKER_BODIES[shape] ?? FLICKER_BODIES.flame).eyes * size);
+    const light = towardsWhite(color, 0.88);
+    const glow = bool(v, 'glow', true)
+      ? [{
+          ty: 'gf', t: 2, s: fixed([0, eyeY]), e: fixed([round(size * 0.55), eyeY]), h: fixed(0), a: fixed(0),
+          // Colour stops (light, light), then see-through stops: solid in the middle, clear at the edge.
+          g: { p: 2, k: fixed([0, ...light, 1, ...light, 0, 1, 0.4, 0.75, 1, 0]) }, o: fixed(100), r: 1,
+        }]
+      : [];
+    const bodyPart = part({ id: 'body', shapes: body.shapes, extra: glow, paint: { kind: 'fill', color }, shadeFrom: [0, -size / 2], shadeTo: [0, size / 2] }, layers);
+
+    // ---- The eyes ----
+    const scale = num(v, 'eyeSize', 100) / 100;
+    const dot = size * 0.06 * scale * (eyeStyle === 'sparkly' ? 1.7 : 1);
+    const gap = size * 0.085 * Math.max(1, scale * 0.8) * (eyeStyle === 'sparkly' ? 1.25 : 1);
+    const reach = size * 0.07;
+    // "Look where it is going": compare where the body is a moment before and after, and look that way.
+    const travelling = (t: number) => {
+      const a = pose((t + 0.99) % 1), b = pose((t + 0.01) % 1);
+      const sideways = (b.x - a.x) / (size * 0.02), upDown = (b.y - a.y) / (size * 0.04);
+      return [Math.max(-1, Math.min(1, sideways)), Math.max(-1, Math.min(1, upDown))];
+    };
+    const still = look === 'still' && !blink;
+    // Functions, so the eyes and their shine each get their own fresh copy (the player edits what it's given).
+    const eyeP = () => still ? fixed([0, eyeY]) : sampled(frames, 1, (t) => { const l = eyeLook(look, t, travelling); return [l.x * reach, eyeY + l.y * reach * 0.7]; });
+    const eyeS = () => still ? fixed([100, 100]) : sampled(frames, 1, (t) => {
+      const wide = eyeLook(look, t, travelling).wide;
+      return [100 * wide, 100 * wide * (blink ? blinkAt(t, seconds) : 1)];
+    });
+    const eyeColor = str(v, 'eyeColor', '#24123d');
+    const pair = (draw: (x: number) => object) => [draw(-gap), draw(gap)];
+    const eyes =
+      eyeStyle === 'happy'
+        ? part({
+            id: 'eyes',
+            // Two little upside-down curves: ^ ^
+            shapes: pair((x) => ({
+              ty: 'sh',
+              ks: fixed({ c: false, v: [[round(x - dot), round(dot * 0.4)], [round(x + dot), round(dot * 0.4)]], i: [[0, 0], [round(-dot * 0.5), round(-dot * 1.5)]], o: [[round(dot * 0.5), round(-dot * 1.5)], [0, 0]] }),
+            })),
+            paint: { kind: 'line', color: eyeColor, width: round(Math.max(2, dot * 0.55)) },
+            shadeFrom: [0, -dot], shadeTo: [0, dot], p: eyeP(), s: eyeS(),
+          }, layers)
+        : part({
+            id: 'eyes',
+            shapes: pair((x) => ellipse(round(x), 0, round(dot), round(eyeStyle === 'ovals' ? dot * 1.7 : dot))),
+            paint: { kind: 'fill', color: eyeColor },
+            shadeFrom: [0, -dot], shadeTo: [0, dot], p: eyeP(), s: eyeS(),
+          }, layers);
+    // A white glint in each big eye, moving with it (same position and blink).
+    const shine = eyeStyle === 'sparkly'
+      ? part({
+          id: 'shine',
+          shapes: pair((x) => ellipse(round(x - dot * 0.18), round(-dot * 0.2), round(dot * 0.38))),
+          paint: { kind: 'fill', color: '#ffffff' },
+          shadeFrom: [0, -dot], shadeTo: [0, dot], p: eyeP(), s: eyeS(),
+        }, layers)
+      : null;
+
+    const cheeks = bool(v, 'cheeks', false)
+      ? part({
+          id: 'cheeks',
+          shapes: pair((x) => ellipse(round(x * 2.1), round(eyeY + size * 0.07), round(size * 0.1), round(size * 0.055))),
+          paint: { kind: 'fill', color: str(v, 'cheekColor', '#ff8fb8') },
+          shadeFrom: [0, eyeY], shadeTo: [0, eyeY + size * 0.1],
+        }, layers)
+      : null;
+
+    // ---- Sparks: small dots that rise from round the body and fade, each at its own time ----
+    let sparks: object | null = null;
+    if (bool(v, 'sparks', false)) {
+      const rand = seeded(7);
+      const pieces: Piece[] = Array.from({ length: 6 }, (_, n) => {
+        const x = between(rand, -0.45, 0.45) * size, start = between(rand, 0.05, 0.35) * size, rise = between(rand, 0.35, 0.6) * size;
+        const phase = n / 6, sway = between(rand, 0.03, 0.06) * size, sz = round(between(rand, 0.025, 0.045) * size);
+        const u = (t: number) => (t + phase) % 1;
+        return {
+          shapes: [ellipse(0, 0, sz)],
+          paint: { kind: 'fill', color: `#${light.map((ch) => Math.round(ch * 255).toString(16).padStart(2, '0')).join('')}` },
+          size: sz,
+          p: sampled(frames, 1, (t) => [x + sway * Math.sin(TAU * 2 * u(t)), start - rise * u(t)]),
+          o: sampled(frames, 1, (t) => [100 * Math.sin(Math.PI * u(t))]),
+        };
+      });
+      sparks = colourGroup('sparks', pieces, layers);
+    }
+
+    // ---- The whole Flicker moves together ----
+    const anchorY = FROM_THE_BASE.includes(move) ? round(body.bottom) : 0;
+    const centreY = c + 8; // a little low, to leave room for hops
+    const moving = move !== 'still';
+    return file(name, S, S, frames, [shine, eyes, cheeks, bodyPart, sparks], {
+      a: fixed([0, anchorY, 0]),
+      p: moving ? sampled(frames, 1, (t) => { const q = pose(t); return [c + q.x, centreY + anchorY + q.y, 0]; }) : fixed([c, centreY + anchorY, 0]),
+      r: moving ? sampled(frames, 1, (t) => [pose(t).r]) : fixed(0),
+      s: moving ? sampled(frames, 1, (t) => { const q = pose(t); return [100 * q.sx, 100 * q.sy, 100]; }) : fixed([100, 100, 100]),
+    });
+  },
+};
+
+export const TEMPLATES: readonly Template[] = [toggleSwitch, button, like, menu, progress, spinner, successCheck, flicker, background];
